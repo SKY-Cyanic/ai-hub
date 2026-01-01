@@ -1,0 +1,157 @@
+
+import React, { useEffect, useState } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { api } from '../services/api';
+import { storage } from '../services/storage';
+import { Post, Comment, FactCheckReport } from '../types';
+import CommentSection from '../components/CommentSection';
+import { ThumbsUp, ThumbsDown, Share2, Eye, Clock, BarChart2, Ban, Trash2, Bookmark, Sparkles, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+
+const PostPage: React.FC = () => {
+  const { boardId, postId } = useParams<{ boardId: string; postId: string }>();
+  const navigate = useNavigate();
+  const [post, setPost] = useState<Post | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAuthorMenu, setShowAuthorMenu] = useState(false);
+  const { user, refreshUser } = useAuth();
+  const [isScrapped, setIsScrapped] = useState(false);
+  const [isReporting, setIsReporting] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (postId) {
+        const postData = await api.getPost(postId);
+        setPost(postData);
+        const unsubscribe = storage.subscribeComments(postId, (updatedComments) => {
+          setComments(updatedComments);
+        });
+        setLoading(false);
+        return () => unsubscribe();
+      }
+    };
+    fetchData();
+  }, [postId]);
+
+  useEffect(() => {
+    if (user && post && user.scrapped_posts?.includes(post.id)) setIsScrapped(true);
+    else setIsScrapped(false);
+  }, [user, post]);
+
+  const handleVote = async (type: 'up' | 'down') => {
+    if (!post || !user) return alert('로그인이 필요합니다.');
+    if (post.liked_users && post.liked_users.includes(user.id)) return alert('이미 평가한 게시물입니다.');
+    const success = await api.votePost(post.id, type, user.id);
+    if (success) {
+      setPost(prev => prev ? {
+        ...prev,
+        upvotes: type === 'up' ? prev.upvotes + 1 : prev.upvotes,
+        downvotes: type === 'down' ? prev.downvotes + 1 : prev.downvotes,
+        liked_users: [...(prev.liked_users || []), user.id]
+      } : null);
+    }
+  };
+
+  const handleReportAiError = async () => {
+    if (!user) return alert('로그인이 필요합니다.');
+    if (!post) return;
+    const reason = prompt('AI가 작성한 글에서 발견된 오류 내용을 적어주세요.\n사실 여부 확인 후 보상이 지급됩니다.');
+    if (reason && reason.trim()) {
+      setIsReporting(true);
+      const report: FactCheckReport = {
+        id: `rep-${Date.now()}`,
+        post_id: post.id,
+        reporter_id: user.id,
+        reason: reason,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+      const res = await storage.reportAiError(report);
+      if (res) alert('성공적으로 제보되었습니다. 시스템 검토를 기다려주세요.');
+      else alert('제보에 실패했습니다.');
+      setIsReporting(false);
+    }
+  };
+
+  const processContent = (html: string) => {
+    const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/g;
+    return html.replace(youtubeRegex, (match, videoId) => {
+      return `<div class="aspect-w-16 aspect-h-9 my-4"><iframe src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen class="w-full h-full rounded shadow-lg" style="min-height: 300px;"></iframe></div>`;
+    });
+  };
+
+  if (loading) return <div className="p-8 text-center dark:text-gray-300 animate-pulse font-ai text-gray-500 uppercase">Syncing node data...</div>;
+  if (!post) return <div className="p-8 text-center text-red-500">데이터가 손상되었거나 존재하지 않습니다.</div>;
+
+  const isLiked = user && post.liked_users && post.liked_users.includes(user.id);
+  const isDisliked = user && post.disliked_users && post.disliked_users.includes(user.id);
+
+  return (
+    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-sm shadow-sm p-4 md:p-6 transition-colors">
+      <div className="border-b border-gray-200 dark:border-gray-700 pb-4 mb-4">
+        {/* ... Header Content (unchanged) ... */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center space-x-2 text-sm text-indigo-600 dark:text-indigo-400 font-bold">
+            <Link to={`/board/${boardId}`} className="hover:underline">{boardId}</Link>
+            {post.category && <span className="text-gray-400">/ {post.category}</span>}
+          </div>
+          {post.ai_agent_type && (
+            <button
+              onClick={handleReportAiError}
+              disabled={isReporting}
+              className="flex items-center gap-1.5 px-3 py-1 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full text-[10px] font-black border border-red-100 dark:border-red-900/50 hover:bg-red-100 transition-all animate-pulse"
+            >
+              <ShieldCheck size={12} /> REPORT AI ERROR (BUG BOUNTY)
+            </button>
+          )}
+        </div>
+        <h1 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white mb-3">{post.title}</h1>
+        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+          <div className="flex items-center space-x-4 relative">
+            <span
+              className="font-bold cursor-pointer hover:underline"
+              onClick={() => setShowAuthorMenu(!showAuthorMenu)}
+              style={{ color: post.author.active_items?.name_color }}
+            >
+              {post.author.active_items?.badge} {post.author.username}
+            </span>
+            <span><Clock size={12} className="inline mr-1" />{new Date(post.created_at).toLocaleString()}</span>
+          </div>
+          <div className="flex items-center space-x-3">
+            <span><Eye size={12} className="inline mr-1" />{post.view_count}</span>
+            <span className="text-red-500 font-bold"><ThumbsUp size={12} className="inline mr-1" />{post.upvotes}</span>
+            <span className="text-blue-500 font-bold"><ThumbsDown size={12} className="inline mr-1" />{post.downvotes}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="py-6 min-h-[200px] leading-7">
+        <div dangerouslySetInnerHTML={{ __html: processContent(post.content) }} />
+      </div>
+
+      <div className="flex justify-center space-x-4 my-8">
+        <button
+          onClick={() => handleVote('up')}
+          disabled={!user}
+          className={`flex flex-col items-center justify-center w-20 h-20 rounded-full border-2 transition-all active:scale-95 ${isLiked ? 'bg-red-50 dark:bg-red-900/20 border-red-500 text-red-500' : 'border-gray-200 dark:border-gray-700 text-gray-400 hover:border-red-400 hover:text-red-400'}`}
+        >
+          <ThumbsUp size={24} className={isLiked ? 'fill-current' : ''} />
+          <span className="font-bold text-lg mt-1">{post.upvotes}</span>
+        </button>
+        <button
+          onClick={() => handleVote('down')}
+          disabled={!user}
+          className={`flex flex-col items-center justify-center w-20 h-20 rounded-full border-2 transition-all active:scale-95 ${isDisliked ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-500 text-blue-500' : 'border-gray-200 dark:border-gray-700 text-gray-400 hover:border-blue-400 hover:text-blue-400'}`}
+        >
+          <ThumbsDown size={24} className={isDisliked ? 'fill-current' : ''} />
+          <span className="font-bold text-lg mt-1">{post.downvotes}</span>
+        </button>
+      </div>
+
+      <CommentSection comments={comments} postId={post.id} postAuthorId={post.author_id} />
+    </div>
+  );
+};
+
+export default PostPage;

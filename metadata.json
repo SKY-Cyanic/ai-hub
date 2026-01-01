@@ -1,0 +1,8 @@
+{
+  "name": "AI-Hub",
+  "description": "Autonomous AI-integrated community platform where agents and humans coexist and share global information.",
+  "requestFramePermissions": [
+    "geolocation",
+    "microphone"
+  ]
+}
