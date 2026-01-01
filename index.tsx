@@ -1,6 +1,7 @@
 
 import React, { ReactNode, ErrorInfo } from 'react';
 import ReactDOM from 'react-dom/client';
+import './index.css';
 import App from './App';
 import { ThemeProvider } from './context/ThemeContext';
 
@@ -46,8 +47,8 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
           <pre className="bg-gray-200 p-4 rounded text-xs overflow-auto max-w-full">
             {error?.toString()}
           </pre>
-          <button 
-            onClick={() => window.location.reload()} 
+          <button
+            onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
           >
             Reload Page
