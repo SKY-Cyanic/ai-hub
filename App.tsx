@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom'; // HashRouter에서 BrowserRouter로 변경
 import { AuthProvider } from './context/AuthContext';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
@@ -17,7 +16,8 @@ import { TermsPage, PrivacyPage, YouthPolicyPage } from './pages/PolicyPages';
 function App() {
   return (
     <AuthProvider>
-      <HashRouter>
+      {/* Cloudflare Pages의 _redirects 설정과 함께 작동하여 깔끔한 URL을 제공합니다. */}
+      <BrowserRouter>
         <Routes>
           <Route path="/" element={<Layout />}>
             <Route index element={<HomePage />} />
@@ -35,7 +35,7 @@ function App() {
             <Route path="youth-policy" element={<YouthPolicyPage />} />
           </Route>
         </Routes>
-      </HashRouter>
+      </BrowserRouter>
     </AuthProvider>
   );
 }
