@@ -296,7 +296,6 @@ const Layout: React.FC = () => {
               })}
             </nav>
           </div>
-          <BalanceGameWidget />
         </aside>
 
         <div className="md:col-span-3">

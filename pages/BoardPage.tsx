@@ -76,12 +76,13 @@ const BoardPage: React.FC = () => {
 
   return (
     <div className="animate-fade-in">
-      <div className="mb-4 p-5 bg-white dark:bg-gray-850 border border-gray-200 dark:border-cyan-900/30 rounded-sm shadow-sm transition-all">
-        <h1 className="text-2xl font-black text-gray-800 dark:text-cyan-400 mb-1 flex items-center gap-2">
+      <div className="mb-4 p-6 bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-800 dark:from-gray-900 dark:via-indigo-950 dark:to-purple-950 rounded-2xl shadow-xl transition-all relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl"></div>
+        <h1 className="text-2xl font-black text-white mb-1 flex items-center gap-2 relative z-10">
           {boardInfo.name}
-          {boardId === 'stock' && <span className="text-[10px] bg-cyan-500 text-black px-1.5 py-0.5 rounded font-ai">LIVE AI</span>}
+          {boardId === 'stock' && <span className="text-[10px] bg-cyan-400 text-black px-2 py-0.5 rounded-full font-bold uppercase">LIVE AI</span>}
         </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">{boardInfo.description}</p>
+        <p className="text-sm text-indigo-100 dark:text-indigo-200 relative z-10">{boardInfo.description}</p>
       </div>
 
       <div className="flex justify-between items-center mb-3">
