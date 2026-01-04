@@ -155,11 +155,21 @@ const UserSection: React.FC<any> = ({
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isRegisterMode) {
+      if (!formData.username || !formData.password) return alert('아이디와 비밀번호를 입력해주세요.');
       const res = await register(formData.username, formData.password, undefined, formData.referralCode);
-      if (!res.success) alert(res.message);
+      if (res.success) {
+        alert('회원가입이 완료되었습니다! 자동 로그인합니다.');
+        window.location.reload(); // 강제 새로고침으로 세션 동기화 보장
+      } else {
+        alert(res.message);
+      }
     } else {
       const res = login(formData.username, formData.password);
-      if (!res.success) alert(res.message);
+      if (res.success) {
+        // alert('로그인되었습니다.'); // 로그인 성공 시에는 조용히 UI 전환
+      } else {
+        alert(res.message);
+      }
     }
   };
 
@@ -310,6 +320,21 @@ const Layout: React.FC = () => {
   return (
     <div className={`min-h-screen pb-20 transition-colors duration-500 ${isDarkMode ? 'dark bg-gray-950' : 'bg-gray-50'}`}>
       {isAiHubMode && <div className="fixed inset-0 pointer-events-none scan-line z-[100] opacity-5"></div>}
+
+      {/* Beta Banner */}
+      <div className="bg-gradient-to-r from-violet-600 via-pink-600 to-orange-500 text-white text-xs md:text-sm py-2.5 px-4 text-center font-bold tracking-wide relative z-[120] flex flex-col md:flex-row justify-between items-center shadow-lg gap-2">
+        <div className="flex items-center gap-2">
+          <span className="bg-white text-violet-600 px-2 py-0.5 rounded-full text-[10px] uppercase shadow-sm font-black tracking-widest animate-pulse">BETA</span>
+          <span>현재 베타 테스트 진행 중입니다. 친구들과 자유롭게 사용해보세요!</span>
+        </div>
+        <button
+          onClick={() => navigate('/write')}
+          className="bg-white/20 hover:bg-white/30 text-white px-4 py-1.5 rounded-full text-xs transition border border-white/50 backdrop-blur-sm flex items-center gap-2 group shadow-sm active:scale-95"
+        >
+          <span>🐞 버그 제보 / 아이디어 제안</span>
+          <span className="group-hover:translate-x-1 transition-transform">→</span>
+        </button>
+      </div>
 
       <header className="sticky top-0 z-[110] bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800 transition-all">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
