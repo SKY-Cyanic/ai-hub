@@ -53,10 +53,24 @@ const ShopPage: React.FC = () => {
 
     const handleCharge = async () => {
         if (!user) return;
+
+        // Check cooldown from transactions
+        const lastCharge = user.transactions?.filter(t => t.type === 'charge').sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+        if (lastCharge) {
+            const lastDate = new Date(lastCharge.created_at);
+            const now = new Date();
+            const diffHours = (now.getTime() - lastDate.getTime()) / (1000 * 60 * 60);
+            if (diffHours < 24) {
+                alert(`충전은 24시간마다 가능합니다.\n남은 시간: ${Math.ceil(24 - diffHours)}시간`);
+                setIsChargeModalOpen(false);
+                return;
+            }
+        }
+
         setIsChargeModalOpen(false);
         const success = await storage.chargePoints(user.id, chargeAmount);
         if (success) {
-            alert(`${chargeAmount.toLocaleString()} P 충전 완료!`);
+            alert(`${chargeAmount.toLocaleString()} P 충전 완료! (다음 충전: 24시간 후)`);
             refreshUser();
         }
     };
@@ -74,10 +88,8 @@ const ShopPage: React.FC = () => {
                 <div className="text-right">
                     <div className="text-[10px] text-indigo-200 uppercase font-black tracking-widest">Balance</div>
                     <div className="text-3xl font-black">{user.points.toLocaleString()} P</div>
-                    <div className="text-[10px] text-indigo-200 uppercase font-black tracking-widest">Balance</div>
-                    <div className="text-3xl font-black">{user.points.toLocaleString()} P</div>
                     <button onClick={() => setIsChargeModalOpen(true)} className="mt-2 text-xs bg-white/20 hover:bg-white/30 px-3 py-1 rounded-lg backdrop-blur-sm transition-all">
-                        + 충전하기
+                        + 무료 충전소
                     </button>
                 </div>
             </div>
@@ -86,9 +98,10 @@ const ShopPage: React.FC = () => {
             {isChargeModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setIsChargeModalOpen(false)}>
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-2xl w-full max-w-xs border border-indigo-500/20" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-lg font-black dark:text-white mb-4">크레딧 충전 (Simulation)</h3>
+                        <h3 className="text-lg font-black dark:text-white mb-4">일일 무료 충전소</h3>
+                        <p className="text-xs text-gray-400 mb-4">하루에 한 번, 연구 자금을 지원받을 수 있습니다.</p>
                         <div className="grid grid-cols-2 gap-2 mb-4">
-                            {[1000, 5000, 10000, 50000].map(amt => (
+                            {[1000, 2000, 3000, 5000].map(amt => (
                                 <button
                                     key={amt}
                                     onClick={() => setChargeAmount(amt)}
@@ -99,7 +112,7 @@ const ShopPage: React.FC = () => {
                             ))}
                         </div>
                         <button onClick={handleCharge} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all active:scale-95 shadow-lg">
-                            충전하기
+                            지원금 받기
                         </button>
                     </div>
                 </div>
