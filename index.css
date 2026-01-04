@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Tailwind v4 다크 모드 설정 - class 기반 */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* 프로젝트 전용 폰트 및 기본 스타일 */
 body {
   font-family: 'Noto Sans KR', sans-serif;
@@ -9,4 +12,14 @@ body {
 
 .font-ai {
   font-family: 'Orbitron', sans-serif;
+}
+
+/* 애니메이션 */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
 }

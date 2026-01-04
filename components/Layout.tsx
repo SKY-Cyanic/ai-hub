@@ -14,6 +14,79 @@ import LiveChat from './LiveChat';
 import VoiceNeuralLink from './VoiceNeuralLink';
 import BalanceGameWidget from './BalanceGameWidget';
 
+// 모바일 사이드바 컴포넌트
+const MobileSidebar: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  boards: Board[];
+  user: User | null;
+  className?: string; // Additional prop for styling
+}> = ({ isOpen, onClose, boards, user }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[200] flex animate-fade-in" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={onClose}>
+      <div
+        className="w-[80%] max-w-[300px] h-full bg-white dark:bg-gray-800 shadow-2xl p-5 overflow-y-auto animate-slide-in-right"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-lg font-bold dark:text-white">전체 메뉴</h2>
+          <button onClick={onClose} className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400">
+            <ChevronRight className="rotate-180" />
+          </button>
+        </div>
+
+        <h3 className="text-[10px] font-black text-gray-400 mb-4 uppercase tracking-[0.2em]">Quick Access</h3>
+        <nav className="space-y-1">
+          {boards.map(b => {
+            const isLocked = b.required_achievement && !user?.achievements.includes(b.required_achievement);
+            return (
+              <Link
+                key={b.id}
+                to={isLocked ? '#' : `/board/${b.slug}`}
+                className={`flex items-center justify-between p-3 text-sm font-bold rounded-lg group transition-all ${isLocked ? 'opacity-40 cursor-not-allowed text-gray-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                onClick={(e) => {
+                  onClose();
+                  if (isLocked) { e.preventDefault(); alert('접근 불가: 정보 요원 업적이 필요합니다.'); }
+                }}
+              >
+                <span className="flex items-center gap-2">
+                  {isLocked ? <Lock size={14} /> : null}
+                  {b.name}
+                </span>
+                {!isLocked && <ChevronRight size={14} className="text-gray-300" />}
+              </Link>
+            )
+          })}
+        </nav>
+
+        <div className="border-t border-gray-100 dark:border-gray-700 my-4"></div>
+
+        <h3 className="text-[10px] font-black text-gray-400 mb-4 uppercase tracking-[0.2em]">Tools</h3>
+        <nav className="space-y-1">
+          <Link
+            to="/tools/encoder"
+            onClick={onClose}
+            className="flex items-center justify-between p-3 text-sm font-bold rounded-lg group transition-all text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+          >
+            <span className="flex items-center gap-2">🔐 변환기</span>
+            <ChevronRight size={14} className="text-gray-300" />
+          </Link>
+          <Link
+            to="/tools/image-studio"
+            onClick={onClose}
+            className="flex items-center justify-between p-3 text-sm font-bold rounded-lg group transition-all text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+          >
+            <span className="flex items-center gap-2">🎨 이미지 스튜디오</span>
+            <ChevronRight size={14} className="text-gray-300" />
+          </Link>
+        </nav>
+      </div>
+    </div>
+  );
+};
+
 const NotificationDropdown: React.FC<{ userId: string, close: () => void }> = ({ userId, close }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
@@ -202,6 +275,7 @@ const Layout: React.FC = () => {
   const { isDarkMode, isAiHubMode, toggleTheme, toggleAiHubMode } = useTheme();
   const [boards, setBoards] = useState<Board[]>([]);
   const [isMobileUserOpen, setIsMobileUserOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const location = useLocation();
@@ -221,6 +295,7 @@ const Layout: React.FC = () => {
 
   useEffect(() => {
     setIsMobileUserOpen(false);
+    setIsMobileMenuOpen(false);
     setIsNotifOpen(false);
   }, [location]);
 
@@ -238,14 +313,22 @@ const Layout: React.FC = () => {
 
       <header className="sticky top-0 z-[110] bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-gray-200 dark:border-gray-800 transition-all">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <div className={`p-1.5 rounded-lg ${isAiHubMode ? 'bg-cyan-500' : 'bg-indigo-600'}`}>
-              <Cpu className="text-white" size={20} />
-            </div>
-            <span className={`text-lg font-black tracking-tighter ${isAiHubMode ? 'font-ai text-cyan-400' : 'text-gray-900 dark:text-white'}`}>
-              AI-HUB <span className="text-xs font-normal opacity-50 ml-1">PRO</span>
-            </span>
-          </Link>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="md:hidden p-2 -ml-2 text-gray-500 hover:text-gray-700 dark:text-gray-400"
+            >
+              <Menu size={20} />
+            </button>
+            <Link to="/" className="flex items-center gap-2">
+              <div className={`p-1.5 rounded-lg ${isAiHubMode ? 'bg-cyan-500' : 'bg-indigo-600'}`}>
+                <Cpu className="text-white" size={20} />
+              </div>
+              <span className={`text-lg font-black tracking-tighter ${isAiHubMode ? 'font-ai text-cyan-400' : 'text-gray-900 dark:text-white'}`}>
+                AI-HUB <span className="text-xs font-normal opacity-50 ml-1">PRO</span>
+              </span>
+            </Link>
+          </div>
 
           <div className="flex items-center gap-2 relative">
             <button onClick={toggleAiHubMode} title="AI Hub Mode" className={`p-2 rounded-full transition-all ${isAiHubMode ? 'text-cyan-400 bg-cyan-400/10' : 'text-gray-400 hover:bg-gray-100'}`}>
@@ -295,6 +378,24 @@ const Layout: React.FC = () => {
                 )
               })}
             </nav>
+            <div className="border-t border-gray-100 dark:border-gray-700 my-3"></div>
+            <h3 className="text-[10px] font-black text-gray-400 mb-2 uppercase tracking-[0.2em]">Tools</h3>
+            <nav className="space-y-1">
+              <Link
+                to="/tools/encoder"
+                className="flex items-center justify-between p-2 text-sm font-bold rounded-lg group transition-all text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                <span className="flex items-center gap-2">🔐 변환기</span>
+                <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
+              </Link>
+              <Link
+                to="/tools/image-studio"
+                className="flex items-center justify-between p-2 text-sm font-bold rounded-lg group transition-all text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
+              >
+                <span className="flex items-center gap-2">🎨 이미지 스튜디오</span>
+                <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
+              </Link>
+            </nav>
           </div>
         </aside>
 
@@ -334,6 +435,14 @@ const Layout: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Mobile Sidebar (Drawer) */}
+      <MobileSidebar
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+        boards={boards}
+        user={user}
+      />
 
       <LiveChat />
       <VoiceNeuralLink />

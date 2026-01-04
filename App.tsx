@@ -11,6 +11,8 @@ import ShopPage from './pages/ShopPage';
 import WikiPage from './pages/WikiPage';
 import AdminPage from './pages/AdminPage';
 import MessagesPage from './pages/MessagesPage';
+import EncoderPage from './pages/EncoderPage';
+import ImageStudioPage from './pages/ImageStudioPage';
 import { TermsPage, PrivacyPage, YouthPolicyPage } from './pages/PolicyPages';
 
 function App() {
@@ -29,6 +31,8 @@ function App() {
             <Route path="wiki" element={<WikiPage />} />
             <Route path="wiki/:slug" element={<WikiPage />} />
             <Route path="messages" element={<MessagesPage />} />
+            <Route path="tools/encoder" element={<EncoderPage />} />
+            <Route path="tools/image-studio" element={<ImageStudioPage />} />
             <Route path="admin" element={<AdminPage />} />
             <Route path="terms" element={<TermsPage />} />
             <Route path="privacy" element={<PrivacyPage />} />
