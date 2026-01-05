@@ -10,11 +10,23 @@ import { Post, Comment, Board, User, WikiPage, ChatMessage, AiLog, ShopItem, Not
 export const NODE_GAS_FEE = 10;
 
 export const SHOP_ITEMS: ShopItem[] = [
-  { id: 'item-1', name: 'Red Name', description: '아이디 색상을 빨간색으로 변경합니다.', price: 500, type: 'color', value: '#FF0000', icon: '🎨' },
-  { id: 'item-2', name: 'Bold Name', description: '아이디를 굵게 표시합니다.', price: 800, type: 'style', value: 'bold', icon: '✨' },
-  { id: 'item-3', name: 'King Badge', description: '아이디 옆에 왕관 배지를 달아줍니다.', price: 1000, type: 'badge', value: '👑', icon: '👑' },
-  { id: 'item-5', name: 'Cyberpunk Theme', description: 'UI를 사이버펑크 핑크 테마로 변경합니다.', price: 3000, type: 'theme', value: 'cyberpunk', icon: '🌌' },
-  { id: 'item-6', name: 'Retro Theme', description: 'UI를 고전 터미널 스타일로 변경합니다.', price: 2500, type: 'theme', value: 'retro', icon: '📠' },
+  // --- Visual Effects (Phase 7.1) ---
+  { id: 'effect-rainbow', name: '🌈 무지개 닉네임', description: '닉네임이 RGB 컬러로 부드럽게 변하는 효과 (30일)', price: 1000, type: 'style', category: 'name', value: 'rainbow', icon: '🌈' },
+  { id: 'effect-glitch', name: '⚡ 글리치 효과', description: '닉네임과 아바타에 해커 감성 지직거림 부여', price: 2000, type: 'style', category: 'name', value: 'glitch', icon: '⚡' },
+
+  // --- Avatar Frames (Seasonal) ---
+  { id: 'frame-shell', name: '[시즌] 뉴비의 알껍질', description: '뉴비들을 위한 귀여운 알껍질 테두리', price: 500, type: 'frame', category: 'avatar', value: 'border-yellow-200 border-2 rounded-full border-dashed', icon: '🥚' },
+  { id: 'frame-laurel', name: '[시즌] 황금 월계관', description: '승리자의 상징인 황금 월계관 테두리', price: 5000, type: 'frame', category: 'avatar', value: 'border-yellow-500 border-4 shadow-[0_0_10px_gold] rounded-lg', icon: '🌿' },
+  { id: 'frame-cyber', name: '[시즌] 사이버펑크 네온', description: '강렬한 핑크-시안 네온 테두리', price: 3000, type: 'frame', category: 'avatar', value: 'border-pink-500 border-2 shadow-[0_0_15px_#ff00ff,#00ffff_inset]', icon: '🏙️' },
+
+  // --- Utility Items ---
+  { id: 'item-megaphone', name: '📌 확성기', description: '채팅방 상단에 내 메시지를 1시간 동안 고정', price: 500, type: 'badge', category: 'system', value: 'megaphone', icon: '📢' },
+  { id: 'item-shield', name: '🛡️ 1일 방어권', description: '신고로부터 경고 카운트를 1회 방어합니다.', price: 300, type: 'badge', category: 'system', value: 'shield', icon: '🛡️' },
+  { id: 'item-title', name: '📝 내 맘대로 타이틀', description: '닉네임 옆에 원하는 칭호를 직접 설정', price: 5000, type: 'badge', category: 'system', value: 'custom_title', icon: '🏷️' },
+
+  // --- Mystery Box / Lottery (Phase 7.2) ---
+  { id: 'item-box', name: '📦 미스테리 박스', description: '랜덤한 보상이 들어있는 상자 (꽝도 있음!)', price: 100, type: 'badge', category: 'system', value: 'mystery_box', icon: '🎁' },
+  { id: 'item-lottery', name: '🎟️ 주간 복권', description: '매주 금요일 밤 10시 추첨! 팟 시스템 상금 독식', price: 50, type: 'badge', category: 'system', value: 'lottery_ticket', icon: '🎰' },
 ];
 
 export const ACHIEVEMENTS: Achievement[] = [
@@ -181,9 +193,14 @@ export const storage = {
   },
 
   subscribeComments: (postId: string, callback: (comments: Comment[]) => void) => {
-    const q = query(collection(db, "comments"), where("post_id", "==", postId), orderBy("created_at", "asc"));
+    // Index Error Fix: Removed orderBy from query to avoid manual index creation requirement.
+    // Sorting is now done client-side.
+    const q = query(collection(db, "comments"), where("post_id", "==", postId));
     return onSnapshot(q, (snapshot) => {
       const comments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Comment));
+      // Client-side sort
+      comments.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
       const allCached = storage.getComments().filter(c => c.post_id !== postId);
       localStorage.setItem(LOCAL_COMMENTS_KEY, JSON.stringify([...allCached, ...comments]));
       callback(comments);
@@ -193,6 +210,21 @@ export const storage = {
   saveComment: async (comment: Comment, postAuthorId: string) => {
     try {
       const docRef = await addDoc(collection(db, "comments"), sanitize(comment));
+
+      // Update post comment count
+      try {
+        const postRef = doc(db, "posts", comment.post_id);
+        const postSnap = await getDoc(postRef);
+        if (postSnap.exists()) {
+          const postData = postSnap.data();
+          await updateDoc(postRef, {
+            comment_count: (postData.comment_count || 0) + 1
+          });
+        }
+      } catch (e) {
+        console.error("FAILED TO UPDATE POST COMMENT COUNT:", e);
+      }
+
       const user = storage.getUserByRawId(comment.author_id);
       if (user) {
         user.quests.comment_count += 1;
@@ -206,7 +238,11 @@ export const storage = {
         });
       }
       return { id: docRef.id, ...comment };
-    } catch (e) { return comment; }
+    } catch (e) {
+      console.error("COMMENT SAVE ERROR:", e);
+      alert(`댓글 저장 중 오류가 발생했습니다: ${e}`);
+      return comment;
+    }
   },
 
   subscribeNotifications: (userId: string, callback: (notifs: Notification[]) => void) => {
@@ -237,20 +273,41 @@ export const storage = {
   processAttendance: async (userId: string) => {
     const user = storage.getUserByRawId(userId);
     if (!user) return;
-    const today = new Date().toISOString().split('T')[0];
+
+    // KST 기준 날짜 계산 (UTC+9)
+    const kstOffset = 9 * 60 * 60 * 1000;
+    const now = new Date(Date.now() + kstOffset);
+    const today = now.toISOString().split('T')[0];
+
     if (user.last_attendance_date === today) return;
 
-    const lastDate = new Date(user.last_attendance_date);
-    const diff = (new Date(today).getTime() - lastDate.getTime()) / (1000 * 3600 * 24);
+    let streak = 1;
+    if (user.last_attendance_date) {
+      const lastDate = new Date(user.last_attendance_date);
+      const diffTime = new Date(today).getTime() - lastDate.getTime();
+      const diffDays = diffTime / (1000 * 3600 * 24);
+      if (diffDays <= 2) streak = user.attendance_streak + 1; // 하루 정도는 여유를 줌 (혹은 == 1 만 허용)
+      else streak = 1;
+    }
 
-    if (diff === 1) user.attendance_streak += 1;
-    else user.attendance_streak = 1;
-
+    user.attendance_streak = streak;
     user.last_attendance_date = today;
-    user.points += 10;
+    user.points += 10 + (Math.min(streak, 10) * 5); // 연속 출석 보너스
     user.quests.daily_login = true;
+
+    // 알림 전송
+    await storage.sendNotification({
+      user_id: user.id, type: 'system', message: `일일 출석 완료! (연속 ${streak}일) +${10 + (Math.min(streak, 10) * 5)}P`,
+      link: '/mypage'
+    });
+
     await storage.saveUser(user);
     await storage.checkAchievements(userId);
+  },
+
+  calculateHotScore: (post: any) => {
+    const score = (post.view_count || 0) + ((post.upvotes || 0) * 2) + ((post.comment_count || 0) * 3);
+    return score;
   },
 
   getAuctionItems: (): AuctionItem[] => [{
@@ -326,31 +383,164 @@ export const storage = {
     return false;
   },
 
-  buyItem: async (userId: string, itemId: string): Promise<boolean> => {
+  // --- Megaphone & Lottery Systems ---
+  getMegaphoneMessage() {
+    return {
+      text: "현재 상점에서 🌈 무지개 닉네임을 1,000 CR에 판매 중입니다!",
+      author: "System"
+    };
+  },
+
+  async setMegaphoneMessage(userId: string, text: string): Promise<{ success: boolean, message: string }> {
+    const user = this.getUserByRawId(userId);
+    if (!user) return { success: false, message: 'User not found' };
+    if (user.points < 2000) return { success: false, message: 'CR이 부족합니다.' };
+
+    user.points -= 2000;
+    if (!user.transactions) user.transactions = [];
+    user.transactions.push({
+      id: `tx-${Date.now()}`,
+      type: 'spend', // Changed from 'spent' to 'spend' for consistency
+      amount: 2000,
+      description: '확성기 (전역 메시지) 구매',
+      created_at: new Date().toISOString()
+    });
+    await this.saveUser(user); // Save user after point deduction and transaction
+    // In a real app, this would update a global state or Firestore collection
+    console.log(`MEGAPHONE BY ${user.username}: ${text}`);
+    return { success: true, message: '확성기 메시지가 등록되었습니다!' };
+  },
+
+  getLotteryPot() {
+    return 125500; // Simulated pot
+  },
+
+  async buyLotteryTicket(userId: string): Promise<{ success: boolean, message: string }> {
+    const user = this.getUserByRawId(userId);
+    if (!user) return { success: false, message: 'User not found' };
+    if (user.points < 500) return { success: false, message: 'CR이 부족합니다.' };
+
+    user.points -= 500;
+    if (!user.inventory) user.inventory = []; // Initialize if not exists
+    user.inventory.push('item-lottery-ticket'); // New internal item ID
+    if (!user.transactions) user.transactions = [];
+    user.transactions.push({
+      id: `tx-${Date.now()}`,
+      type: 'spend', // Changed from 'spent' to 'spend' for consistency
+      amount: 500,
+      description: '주간 복권 티켓 구매',
+      created_at: new Date().toISOString()
+    });
+    await this.saveUser(user); // Save user after point deduction and transaction
+
+    return { success: true, message: '복권 티켓을 구매했습니다! 토요일 추첨을 기다려주세요.' };
+  },
+
+  buyItem: async (userId: string, itemId: string): Promise<{ success: boolean; message: string }> => {
     const user = storage.getUserByRawId(userId);
     const item = SHOP_ITEMS.find(i => i.id === itemId);
-    if (user && item && user.points >= item.price && !user.inventory.includes(itemId)) {
-      user.points -= item.price;
-      user.inventory.push(itemId);
-      if (item.type === 'color') user.active_items.name_color = item.value;
-      if (item.type === 'style') user.active_items.name_style = item.value as any;
-      if (item.type === 'badge') user.active_items.badge = item.value;
-      if (item.type === 'theme') user.active_items.theme = item.value;
 
-      // Record Transaction
-      if (!user.transactions) user.transactions = [];
-      user.transactions.push({
-        id: `tx-${Date.now()}`,
-        type: 'spend',
-        amount: item.price,
-        description: `상점 구매: ${item.name}`,
-        created_at: new Date().toISOString()
-      });
+    if (!user) return { success: false, message: '사용자를 찾을 수 없습니다.' };
+    if (!item) return { success: false, message: '아이템을 찾을 수 없습니다.' };
 
-      await storage.saveUser(user);
-      return true;
+    if (user.points < item.price) return { success: false, message: 'CR이 부족합니다.' };
+    if (user.inventory?.includes(itemId)) return { success: false, message: '이미 보유 중인 아이템입니다.' };
+
+    // Special logic for functional items
+    if (itemId === 'item-megaphone') {
+      const text = prompt('전 서버에 전달할 메시지를 입력하세요 (2,000 CR 차감):');
+      if (!text) return { success: false, message: '전송이 취소되었습니다.' };
+      return await storage.setMegaphoneMessage(userId, text);
     }
-    return false;
+
+    if (itemId === 'item-lottery') {
+      return await storage.buyLotteryTicket(userId);
+    }
+
+    if (itemId === 'item-title') {
+      const title = prompt('사용할 닉네임 칭호를 입력하세요:');
+      if (!title) return { success: false, message: '칭호를 입력해야 합니다.' };
+      user.active_items.custom_title = title;
+    }
+
+    // Deduct points and add to inventory
+    user.points -= item.price;
+    if (!user.inventory) user.inventory = [];
+    user.inventory.push(itemId);
+
+    // Apply immediate effects for visual items
+    if (item.type === 'color') user.active_items.name_color = item.value;
+    if (item.type === 'frame') user.active_items.frame = item.value;
+    if (item.type === 'badge') user.active_items.badge = item.value;
+    if (item.type === 'theme') user.active_items.theme = item.value;
+
+    if (item.category === 'name' && (item.id.includes('effect'))) {
+      if (!user.active_items.special_effects) user.active_items.special_effects = [];
+      if (!user.active_items.special_effects.includes(item.value!)) {
+        user.active_items.special_effects.push(item.value!);
+      }
+
+      // Handle Expiration
+      if (itemId === 'effect-rainbow') {
+        if (!user.expires_at) user.expires_at = {};
+        const expiry = new Date();
+        expiry.setDate(expiry.getDate() + 7); // 7 day trial
+        user.expires_at[itemId] = expiry.toISOString();
+      }
+    }
+
+    if (itemId === 'item-shield') {
+      user.shields = (user.shields || 0) + 1;
+    }
+
+    // Record Transaction
+    if (!user.transactions) user.transactions = [];
+    user.transactions.push({
+      id: `tx-${Date.now()}`,
+      type: 'spend',
+      amount: item.price,
+      description: `상점 구매: ${item.name}`,
+      created_at: new Date().toISOString()
+    });
+
+    await storage.saveUser(user);
+    return { success: true, message: '구매가 완료되었습니다.' };
+  },
+
+  openMysteryBox: async (userId: string): Promise<{ success: boolean; message: string; type?: string }> => {
+    const user = storage.getUserByRawId(userId);
+    if (!user || user.points < 100) return { success: false, message: 'CR이 부족합니다.' };
+
+    user.points -= 100;
+    if (!user.transactions) user.transactions = [];
+    user.transactions.push({
+      id: `tx-box-${Date.now()}`,
+      type: 'spend',
+      amount: 100,
+      description: '미스테리 박스 개봉',
+      created_at: new Date().toISOString()
+    });
+
+    const rand = Math.random() * 100;
+    let result = { success: true, message: '', type: 'fail' };
+
+    if (rand < 60) {
+      user.points += 10;
+      result = { success: true, message: '꽝! (10 CR 보전됨)', type: 'fail' };
+    } else if (rand < 90) {
+      user.points += 200;
+      result = { success: true, message: '대박! 200 CR 당첨!', type: 'jackpot' };
+    } else if (rand < 99) {
+      const rareBadge = '💎';
+      user.active_items.badge = rareBadge;
+      result = { success: true, message: '희귀 뱃지 획득! [💎]', type: 'rare' };
+    } else {
+      user.active_items.custom_title = '전설의 모험가';
+      result = { success: true, message: '[전설] 타이틀 획득!', type: 'legend' };
+    }
+
+    await storage.saveUser(user);
+    return result;
   },
 
   toggleScrap: async (userId: string, postId: string) => {

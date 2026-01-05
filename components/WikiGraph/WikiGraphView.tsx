@@ -9,9 +9,10 @@ import { SidebarData, TabType } from './types';
 interface WikiGraphProps {
     initialSlug?: string;
     onNodeSelect?: (slug: string) => void;
+    mini?: boolean;
 }
 
-const WikiGraphView: React.FC<WikiGraphProps> = ({ initialSlug, onNodeSelect }) => {
+const WikiGraphView: React.FC<WikiGraphProps> = ({ initialSlug, onNodeSelect, mini = false }) => {
     const navigate = useNavigate();
     const containerRef = useRef<HTMLDivElement>(null);
     const networkRef = useRef<any>(null); // vis.Network instance

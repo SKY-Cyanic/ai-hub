@@ -14,11 +14,14 @@ import MessagesPage from './pages/MessagesPage';
 import EncoderPage from './pages/EncoderPage';
 import ImageStudioPage from './pages/ImageStudioPage';
 import { TermsPage, PrivacyPage, YouthPolicyPage } from './pages/PolicyPages';
+import ActivityPage from './pages/ActivityPage';
+import SearchPage from './pages/SearchPage';
+import BookmarksPage from './pages/BookmarksPage';
+import ToolsPage from './pages/ToolsPage';
 
 function App() {
   return (
     <AuthProvider>
-      {/* Cloudflare Pages의 _redirects 설정과 함께 작동하여 깔끔한 URL을 제공합니다. */}
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Layout />}>
@@ -27,10 +30,14 @@ function App() {
             <Route path="board/:boardId/:postId" element={<PostPage />} />
             <Route path="write" element={<WritePage />} />
             <Route path="mypage" element={<MyPage />} />
+            <Route path="activity" element={<ActivityPage />} />
+            <Route path="search" element={<SearchPage />} />
+            <Route path="bookmarks" element={<BookmarksPage />} />
             <Route path="shop" element={<ShopPage />} />
             <Route path="wiki" element={<WikiPage />} />
             <Route path="wiki/:slug" element={<WikiPage />} />
             <Route path="messages" element={<MessagesPage />} />
+            <Route path="tools" element={<ToolsPage />} />
             <Route path="tools/encoder" element={<EncoderPage />} />
             <Route path="tools/image-studio" element={<ImageStudioPage />} />
             <Route path="admin" element={<AdminPage />} />

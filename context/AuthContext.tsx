@@ -8,6 +8,7 @@ interface AuthContextType {
   login: (username: string, password?: string) => { success: boolean, message: string, requires2FA?: boolean };
   verify2FA: (code: string) => boolean;
   register: (username: string, password: string, secondPassword?: string, referralCode?: string) => Promise<{ success: boolean, message: string }>;
+  loginAsGuest: () => void;
   logout: () => void;
   isLoading: boolean;
   refreshUser: () => void;
@@ -134,10 +135,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true, message: '환영합니다!' };
   };
 
+  const loginAsGuest = async () => {
+    const randomId = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const guestUser: User = {
+      id: `guest-${Date.now()}`,
+      username: `익명 요원 ${randomId}`,
+      is_guest: true,
+      level: 0,
+      exp: 0,
+      points: 0,
+      inventory: [],
+      active_items: {},
+      blocked_users: [], scrapped_posts: [], achievements: [], attendance_streak: 0,
+      last_attendance_date: '',
+      quests: { last_updated: '', daily_login: false, post_count: 0, comment_count: 0, balance_voted: false },
+      referral_code: '',
+      invite_count: 0,
+      transactions: []
+    };
+    await storage.saveUser(guestUser); // Save guest to DB to prevent logout and fix Chat 'Unknown' issue
+    setUser(guestUser);
+    // 게스트는 세션을 로컬 스토리지에 저장하지 않기로 결정 (브라우저 닫으면 로그아웃) 혹은
+    // 사용자 편의를 위해 임시 저장을 원하면 sessionStorage를 사용 가능.
+    // 여기서는 간단히 메모리에만 유지하거나, 다르게 처리.
+    // 하지만 refreshUser가 localStorage를 보므로, 일단 localStorage에 저장하되 구분하자.
+    storage.setSession(guestUser);
+  };
+
   const logout = () => { setUser(null); storage.setSession(null); setTempAdminUser(null); };
 
   return (
-    <AuthContext.Provider value={{ user, login, verify2FA, register, logout, isLoading, refreshUser }}>
+    <AuthContext.Provider value={{ user, login, verify2FA, register, loginAsGuest, logout, isLoading, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -8,6 +8,7 @@ import { Flame, ChevronRight, TrendingUp, Sparkles, Cpu, Vote, Zap } from 'lucid
 import { Link } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import TrendingWidget from '../components/TrendingWidget';
 
 const HomePage: React.FC = () => {
   const [hotPosts, setHotPosts] = useState<Post[]>([]);
@@ -80,6 +81,32 @@ const HomePage: React.FC = () => {
         </div>
 
         <aside className="space-y-6">
+          {/* System Status / Notice */}
+          <div className="bg-white dark:bg-gray-800 rounded-3xl p-5 shadow-xl border border-gray-100 dark:border-gray-700">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xs font-black text-indigo-600 dark:text-cyan-400 uppercase flex items-center gap-2">
+                <Sparkles size={14} /> System Status
+              </h3>
+              <span className="text-[9px] bg-indigo-500 text-white px-1.5 py-0.5 rounded-full animate-pulse">Running</span>
+            </div>
+            <div className="space-y-3">
+              <div className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+                <h4 className="font-bold text-xs dark:text-white mb-1">📢 v1.5 BETA 업데이트</h4>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">
+                  - 게스트 로그인 (보안 접속없이 댓글 가능)<br />
+                  - 메시지 UI 리뉴얼 완료<br />
+                  - 일일 출석 리셋 문제 해결
+                </p>
+              </div>
+              <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-100 dark:border-indigo-800">
+                <h4 className="font-bold text-xs text-indigo-700 dark:text-indigo-300 mb-1">🎁 일일 무료 지원금</h4>
+                <p className="text-[11px] text-indigo-600 dark:text-indigo-400 leading-relaxed">
+                  상점에서 매일 연구 자금을 지원받으세요!
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Balance Game Widget */}
           {balance && (
             <div className="bg-white dark:bg-gray-800 rounded-3xl p-5 shadow-xl border border-gray-100 dark:border-gray-700">
@@ -108,6 +135,9 @@ const HomePage: React.FC = () => {
               <p className="text-[9px] text-gray-400 text-center mt-3 uppercase tracking-tighter">참여 시 5P 지급 (1일 1회)</p>
             </div>
           )}
+
+          {/* Trending Widget */}
+          <TrendingWidget />
 
           {/* Attendance Tracking (Quick View) */}
           {user && (

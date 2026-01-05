@@ -22,11 +22,23 @@ const MessagesPage: React.FC = () => {
     const [searchParams] = useSearchParams();
     const targetUsername = searchParams.get('target');
 
-    // Load Users Map
+    // Load Users Map & Subscribe
     useEffect(() => {
-        const users = storage.getUsers();
-        const map = users.reduce((acc, u) => ({ ...acc, [u.id]: u }), {});
-        setUsersMap(map);
+        const loadUsers = () => {
+            const users = storage.getUsers();
+            const map = users.reduce((acc, u) => ({ ...acc, [u.id]: u }), {});
+            setUsersMap(map);
+        };
+        loadUsers();
+
+        storage.channel.onmessage = (event) => {
+            const data = event.data as any;
+            if (data && data.type === 'USER_UPDATE') {
+                loadUsers();
+            }
+        };
+
+        return () => { storage.channel.onmessage = null; };
     }, []);
 
     // Subscribe Conversations
@@ -183,8 +195,8 @@ const MessagesPage: React.FC = () => {
                                                 <span className="ml-1 mb-1 text-[11px] text-gray-500 dark:text-gray-400 font-bold">{sender?.username || 'Unknown'}</span>
                                             )}
                                             <div className={`px-5 py-3 rounded-[20px] text-[15px] leading-relaxed shadow-sm break-words relative transition-all hover:shadow-md ${isMe
-                                                    ? (isAiHubMode ? 'bg-cyan-600 text-white rounded-tr-sm' : 'bg-gradient-to-br from-indigo-500 to-indigo-600 text-white rounded-tr-sm')
-                                                    : 'bg-white dark:bg-gray-800 dark:text-gray-100 rounded-tl-sm border border-gray-100 dark:border-gray-700'
+                                                ? (isAiHubMode ? 'bg-cyan-600 text-white rounded-tr-sm' : 'bg-gradient-to-br from-indigo-500 to-indigo-600 text-white rounded-tr-sm')
+                                                : 'bg-white dark:bg-gray-800 dark:text-gray-100 rounded-tl-sm border border-gray-100 dark:border-gray-700'
                                                 }`}>
                                                 {msg.content}
                                             </div>
@@ -230,7 +242,7 @@ const MessagesPage: React.FC = () => {
             {/* New Chat Modal */}
             {showNewChatModal && (
                 <NewChatModal
-                    users={Object.values(usersMap).filter(u => u.id !== user.id)}
+                    users={(Object.values(usersMap) as User[]).filter(u => u.id !== user.id)}
                     onClose={() => setShowNewChatModal(false)}
                     onStartChat={handleCreateChat}
                     onStartGroup={handleCreateGroup}

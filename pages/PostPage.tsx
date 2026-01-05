@@ -1,12 +1,13 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { storage } from '../services/storage';
 import { Post, Comment, FactCheckReport } from '../types';
 import CommentSection from '../components/CommentSection';
-import { ThumbsUp, ThumbsDown, Share2, Eye, Clock, BarChart2, Ban, Trash2, Bookmark, Sparkles, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Share2, Eye, Clock, BarChart2, Ban, Trash2, Bookmark, Sparkles, AlertTriangle, ShieldCheck, ZoomIn } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import ImageLightbox from '../components/ImageLightbox';
+import { UserNickname } from '../components/UserEffect';
 
 const PostPage: React.FC = () => {
   const { boardId, postId } = useParams<{ boardId: string; postId: string }>();
@@ -18,6 +19,7 @@ const PostPage: React.FC = () => {
   const { user, refreshUser } = useAuth();
   const [isScrapped, setIsScrapped] = useState(false);
   const [isReporting, setIsReporting] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -75,10 +77,21 @@ const PostPage: React.FC = () => {
   };
 
   const processContent = (html: string) => {
+    // YouTube embed
     const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/g;
-    return html.replace(youtubeRegex, (match, videoId) => {
+    let processed = html.replace(youtubeRegex, (match, videoId) => {
       return `<div class="aspect-w-16 aspect-h-9 my-4"><iframe src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen class="w-full h-full rounded shadow-lg" style="min-height: 300px;"></iframe></div>`;
     });
+
+    // Convert URLs to clickable links (not already in href or src)
+    const urlRegex = /(?<!["'=])(https?:\/\/[^\s<>"']+)/g;
+    processed = processed.replace(urlRegex, (url) => {
+      // Skip if it's a YouTube URL (already processed)
+      if (url.includes('youtube.com') || url.includes('youtu.be')) return url;
+      return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 dark:text-indigo-400 hover:underline break-all">${url}</a>`;
+    });
+
+    return processed;
   };
 
   if (loading) return <div className="p-8 text-center dark:text-gray-300 animate-pulse font-ai text-gray-500 uppercase">Syncing node data...</div>;
@@ -96,26 +109,43 @@ const PostPage: React.FC = () => {
             <Link to={`/board/${boardId}`} className="hover:underline">{boardId}</Link>
             {post.category && <span className="text-gray-400">/ {post.category}</span>}
           </div>
-          {post.ai_agent_type && (
-            <button
-              onClick={handleReportAiError}
-              disabled={isReporting}
-              className="flex items-center gap-1.5 px-3 py-1 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full text-[10px] font-black border border-red-100 dark:border-red-900/50 hover:bg-red-100 transition-all animate-pulse"
-            >
-              <ShieldCheck size={12} /> REPORT AI ERROR (BUG BOUNTY)
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {user && user.id === post.author_id && (
+              <>
+                <button
+                  onClick={() => navigate('/write', { state: { editPost: post } })}
+                  className="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 text-xs font-bold underline decoration-dotted"
+                >
+                  수정
+                </button>
+                <button
+                  onClick={async () => {
+                    if (window.confirm('정말로 이 글을 삭제하시겠습니까?')) {
+                      await storage.deletePost(post.id);
+                      navigate(`/board/${boardId}`);
+                    }
+                  }}
+                  className="text-gray-400 hover:text-red-500 text-xs font-bold underline decoration-dotted"
+                >
+                  삭제
+                </button>
+              </>
+            )}
+            {post.ai_agent_type && (
+              <button
+                onClick={handleReportAiError}
+                disabled={isReporting}
+                className="flex items-center gap-1.5 px-3 py-1 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full text-[10px] font-black border border-red-100 dark:border-red-900/50 hover:bg-red-100 transition-all animate-pulse"
+              >
+                <ShieldCheck size={12} /> REPORT AI ERROR (BUG BOUNTY)
+              </button>
+            )}
+          </div>
         </div>
         <h1 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white mb-3">{post.title}</h1>
         <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
           <div className="flex items-center space-x-4 relative">
-            <span
-              className="font-bold cursor-pointer hover:underline"
-              onClick={() => setShowAuthorMenu(!showAuthorMenu)}
-              style={{ color: post.author.active_items?.name_color }}
-            >
-              {post.author.active_items?.badge} {post.author.username}
-            </span>
+            <UserNickname profile={post.author} />
             <span><Clock size={12} className="inline mr-1" />{new Date(post.created_at).toLocaleString()}</span>
           </div>
           <div className="flex items-center space-x-3">
@@ -127,8 +157,56 @@ const PostPage: React.FC = () => {
       </div>
 
       <div className="py-6 min-h-[200px] leading-7">
-        <div dangerouslySetInnerHTML={{ __html: processContent(post.content) }} />
+        {post.is_spoiler && (
+          <div className="bg-gray-100 dark:bg-gray-700/50 p-6 rounded-xl text-center mb-6">
+            <AlertTriangle className="mx-auto text-red-500 mb-2" size={32} />
+            <h3 className="font-bold text-lg mb-1 dark:text-white">스포일러 경고</h3>
+            <p className="text-gray-500 text-sm mb-4">작성자가 스포일러 방지를 설정했습니다.</p>
+            <details className="cursor-pointer">
+              <summary className="inline-block px-4 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm font-bold shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors dark:text-gray-200">
+                내용 보기 (클릭)
+              </summary>
+              <div className="mt-6 text-left animate-fade-in">
+                <div dangerouslySetInnerHTML={{ __html: processContent(post.content) }} />
+                {/* Images inside spoiler */}
+                {post.images && post.images.length > 0 && (
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
+                    {post.images.map((img, idx) => (
+                      <button key={idx} onClick={() => setLightboxSrc(img)} className="block overflow-hidden rounded-xl border border-gray-100 dark:border-gray-700 hover:shadow-lg transition-shadow group relative">
+                        <img src={img} alt={`이미지 ${idx + 1}`} className="w-full h-48 object-cover group-hover:scale-105 transition-transform" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors">
+                          <ZoomIn className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={24} />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </details>
+          </div>
+        )}
+        {!post.is_spoiler && (
+          <>
+            <div dangerouslySetInnerHTML={{ __html: processContent(post.content) }} />
+            {/* Images for non-spoiler posts */}
+            {post.images && post.images.length > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
+                {post.images.map((img, idx) => (
+                  <button key={idx} onClick={() => setLightboxSrc(img)} className="block overflow-hidden rounded-xl border border-gray-100 dark:border-gray-700 hover:shadow-lg transition-shadow group relative">
+                    <img src={img} alt={`이미지 ${idx + 1}`} className="w-full h-48 object-cover group-hover:scale-105 transition-transform" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-colors">
+                      <ZoomIn className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={24} />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
       </div>
+
+      {/* Image Lightbox */}
+      {lightboxSrc && <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
 
       <div className="flex justify-center space-x-4 my-8">
         <button

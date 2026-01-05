@@ -16,10 +16,26 @@ export const aiService = {
   },
 
   factCheck: async (content: string) => {
-    return {
-      text: "Fact checking is currently disabled.",
-      sources: []
-    };
+    // Simple keyword matching against known wiki topics
+    // In a real app, this would use vector search or LLM
+    const wikiPages = storage.getWikiPages();
+    const references: string[] = [];
+
+    wikiPages.forEach(page => {
+      if (content.includes(page.title) || content.includes(page.slug)) {
+        references.push(page.slug);
+      }
+    });
+
+    if (references.length > 0) {
+      const links = references.map(slug => `[[${slug}]]`).join(' ');
+      return {
+        hasFact: true,
+        message: `🤖 **AI Fact Checker**\n\n이 글과 관련된 위키 문서를 발견했습니다:\n${links}\n\n더 자세한 내용은 위키를 참조하세요.`
+      };
+    }
+
+    return { hasFact: false, message: '' };
   },
 
   generateComment: async (postContent: string) => {

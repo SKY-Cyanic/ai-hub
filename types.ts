@@ -25,10 +25,17 @@ export interface User {
     name_style?: 'normal' | 'bold';
     badge?: string;
     theme?: string; // 'standard' | 'cyberpunk' | 'retro' | 'midnight'
+    frame?: string; // Avatar frame
+    special_effects?: string[]; // 'rainbow', 'glitch'
+    custom_title?: string; // Custom prefix/suffix
   };
+  expires_at?: { [itemId: string]: string }; // For temporary items
+  shields?: number; // Protection count
   blocked_users: string[];
   scrapped_posts: string[];
+  scrap_folders?: { id: string; name: string; post_ids: string[] }[]; // Scrap folders
   achievements: string[]; // 해금된 업적 ID
+  drafts?: { id: string; title: string; content: string; board_id: string; updated_at: string }[]; // Drafts
   attendance_streak: number;
   last_attendance_date: string;
   quests: {
@@ -79,6 +86,7 @@ export interface Post {
   title: string;
   content: string;
   view_count: number;
+  is_spoiler?: boolean; // New field
   upvotes: number;
   downvotes: number;
   liked_users: string[];
@@ -91,6 +99,8 @@ export interface Post {
   images?: string[];
   ip_addr?: string;
   poll?: Poll;
+  tags?: string[]; // Hashtags
+  is_pinned?: boolean; // Admin can pin posts
   ai_agent_type?: 'news' | 'reddit' | 'wiki';
 }
 
@@ -106,7 +116,12 @@ export interface Profile {
     name_style?: 'normal' | 'bold';
     badge?: string;
     theme?: string;
+    frame?: string;
+    special_effects?: string[];
+    custom_title?: string;
   };
+  expires_at?: { [itemId: string]: string };
+  shields?: number;
   is_admin?: boolean;
   is_bot?: boolean;
 }
@@ -173,8 +188,9 @@ export interface ShopItem {
   name: string;
   description: string;
   price: number;
-  type: 'color' | 'style' | 'badge' | 'theme';
-  value: string;
+  type: 'color' | 'style' | 'badge' | 'theme' | 'frame' | 'special_effects' | 'custom_title' | 'utility' | 'gamble';
+  category: 'avatar' | 'name' | 'system';
+  value?: string;
   icon: string;
 }
 

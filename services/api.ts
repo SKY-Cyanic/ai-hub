@@ -11,6 +11,14 @@ export const api = {
 
   getPosts: async (boardSlug?: string, page: number = 1): Promise<Post[]> => {
     let posts = storage.getPosts();
+
+    // Calculate Hot Status (Real-time)
+    posts = posts.map(p => {
+      const score = (p.view_count || 0) + ((p.upvotes || 0) * 2) + ((p.comment_count || 0) * 3);
+      // score > 20 is HOT
+      return { ...p, is_hot: score >= 20 };
+    });
+
     if (boardSlug && boardSlug !== 'all' && boardSlug !== 'best') {
       posts = posts.filter(p => p.board_id === boardSlug);
     }
@@ -58,6 +66,33 @@ export const api = {
       poll: postData.poll
     };
     storage.savePost(newPost);
+
+    // AI Agent Activity (Fact Check)
+    setTimeout(async () => {
+      try {
+        // Lazy load aiService to avoid circular dependency if any (though ai.ts imports storage, api imports ai... might be circular)
+        // Ideally refactor, but for now simple call if not circular loop issue.
+        // Actually api.ts doesn't import aiService yet.
+        const { aiService } = await import('./ai');
+        const check = await aiService.factCheck(newPost.content + " " + newPost.title);
+        if (check.hasFact) {
+          const botUser: User = {
+            id: 'ai-agent-nexus',
+            username: 'Nexus Bot',
+            is_admin: true,
+            level: 99,
+            exp: 0, points: 0, inventory: [], active_items: { badge: '🤖' },
+            blocked_users: [], scrapped_posts: [], achievements: [], attendance_streak: 0,
+            last_attendance_date: '', quests: { last_updated: '', daily_login: false, post_count: 0, comment_count: 0, balance_voted: false },
+            referral_code: '', invite_count: 0, transactions: []
+          };
+          await api.createComment(newPost.id, check.message, botUser, null, newPost.author_id);
+        }
+      } catch (e) {
+        console.error("AI Agent Error:", e);
+      }
+    }, 1000);
+
     return newPost;
   },
 
@@ -89,7 +124,7 @@ export const api = {
       },
       depth: 0
     };
-    storage.saveComment(newComment, postAuthorId);
+    await storage.saveComment(newComment, postAuthorId);
     return newComment;
   },
 

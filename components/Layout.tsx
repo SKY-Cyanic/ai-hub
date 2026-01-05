@@ -7,12 +7,13 @@ import { useTheme } from '../context/ThemeContext';
 import {
   Menu, User as UserIcon, LogOut, PenTool, Moon, Sun,
   BookOpen, Cpu, Sparkles, Home, ShoppingBag,
-  ChevronRight, Bell, Zap, Lock
+  ChevronRight, Bell, Zap, Lock, Search
 } from 'lucide-react';
 import { storage } from '../services/storage';
 import LiveChat from './LiveChat';
 import VoiceNeuralLink from './VoiceNeuralLink';
 import BalanceGameWidget from './BalanceGameWidget';
+import { UserNickname, UserAvatar } from './UserEffect';
 
 // 모바일 사이드바 컴포넌트
 const MobileSidebar: React.FC<{
@@ -65,20 +66,20 @@ const MobileSidebar: React.FC<{
 
         <h3 className="text-[10px] font-black text-gray-400 mb-4 uppercase tracking-[0.2em]">Tools</h3>
         <nav className="space-y-1">
-          <Link
-            to="/tools/encoder"
-            onClick={onClose}
-            className="flex items-center justify-between p-3 text-sm font-bold rounded-lg group transition-all text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
-          >
-            <span className="flex items-center gap-2">🔐 변환기</span>
+          <Link to="/tools?cat=anonymous" onClick={onClose} className="flex items-center justify-between p-3 text-sm font-bold rounded-lg group transition-all text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">
+            <span className="flex items-center gap-2">👤 익명 도구</span>
             <ChevronRight size={14} className="text-gray-300" />
           </Link>
-          <Link
-            to="/tools/image-studio"
-            onClick={onClose}
-            className="flex items-center justify-between p-3 text-sm font-bold rounded-lg group transition-all text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700"
-          >
-            <span className="flex items-center gap-2">🎨 이미지 스튜디오</span>
+          <Link to="/tools?cat=crypto" onClick={onClose} className="flex items-center justify-between p-3 text-sm font-bold rounded-lg group transition-all text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">
+            <span className="flex items-center gap-2">🔐 암호화 도구</span>
+            <ChevronRight size={14} className="text-gray-300" />
+          </Link>
+          <Link to="/tools?cat=image" onClick={onClose} className="flex items-center justify-between p-3 text-sm font-bold rounded-lg group transition-all text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">
+            <span className="flex items-center gap-2">🖼️ 이미지 도구</span>
+            <ChevronRight size={14} className="text-gray-300" />
+          </Link>
+          <Link to="/tools?cat=dev" onClick={onClose} className="flex items-center justify-between p-3 text-sm font-bold rounded-lg group transition-all text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700">
+            <span className="flex items-center gap-2">💻 개발 도구</span>
             <ChevronRight size={14} className="text-gray-300" />
           </Link>
         </nav>
@@ -142,7 +143,7 @@ const NotificationDropdown: React.FC<{ userId: string, close: () => void }> = ({
 };
 
 const UserSection: React.FC<any> = ({
-  user, isLoading, logout, login, register,
+  user, isLoading, logout, login, register, loginAsGuest,
   isAiHubMode
 }) => {
   const [isRegisterMode, setIsRegisterMode] = useState(false);
@@ -180,16 +181,12 @@ const UserSection: React.FC<any> = ({
       {user ? (
         <div className="space-y-4">
           <div className="flex items-center gap-4">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl font-bold shadow-inner ${isAiHubMode ? 'bg-cyan-500 text-black' : 'bg-indigo-600 text-white'}`}>
-              {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full rounded-2xl object-cover" /> : user.username[0].toUpperCase()}
-            </div>
+            <UserAvatar profile={user as any} size="lg" />
             <div className="flex-1 overflow-hidden">
-              <div className="font-black text-lg truncate dark:text-white flex items-center gap-1" style={{ color: user.active_items?.name_color }}>
-                {user.active_items?.badge} {user.username}
-              </div>
+              <UserNickname profile={user as any} className="text-lg" />
               <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500 uppercase tracking-tighter">
                 <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">LV. {user.level}</span>
-                <span className={`${isAiHubMode ? 'text-cyan-400' : 'text-indigo-500'}`}>{user.points.toLocaleString()} P</span>
+                <span className={`${isAiHubMode ? 'text-cyan-400' : 'text-indigo-500'}`}>{user.points.toLocaleString()} CR</span>
               </div>
               <div className="text-[10px] text-gray-400 mt-1">
                 코드: <span className="font-mono select-all bg-gray-100 dark:bg-gray-900 px-1 rounded">{user.referral_code}</span>
@@ -223,9 +220,14 @@ const UserSection: React.FC<any> = ({
               <LogOut size={14} /> 로그아웃
             </button>
           </div>
-          <Link to="/messages" className="block text-center text-xs py-2 bg-gray-50 dark:bg-gray-900 rounded-lg text-gray-500 hover:bg-gray-100">
-            1:1 메시지함
-          </Link>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <Link to="/activity" className="block text-center py-2 bg-gray-50 dark:bg-gray-900 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 font-bold">
+              📊 내 활동
+            </Link>
+            <Link to="/messages" className="block text-center py-2 bg-gray-50 dark:bg-gray-900 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 font-bold">
+              ✉️ 메시지
+            </Link>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
@@ -274,6 +276,17 @@ const UserSection: React.FC<any> = ({
               {isRegisterMode ? '가입 시작하기' : '보안 접속'}
             </button>
           </form>
+          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 text-center">
+            <button
+              onClick={() => {
+                loginAsGuest();
+                window.location.reload(); // Refresh to sync guest session
+              }}
+              className="text-xs text-gray-400 hover:text-indigo-500 underline"
+            >
+              로그인 없이 익명 요원으로 접속 (Guest)
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -281,7 +294,7 @@ const UserSection: React.FC<any> = ({
 };
 
 const Layout: React.FC = () => {
-  const { user, login, register, logout, isLoading } = useAuth();
+  const { user, login, register, loginAsGuest, logout, isLoading } = useAuth();
   const { isDarkMode, isAiHubMode, toggleTheme, toggleAiHubMode } = useTheme();
   const [boards, setBoards] = useState<Board[]>([]);
   const [isMobileUserOpen, setIsMobileUserOpen] = useState(false);
@@ -356,6 +369,9 @@ const Layout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 relative">
+            <Link to="/search" title="검색" className="p-2 rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-indigo-600">
+              <Search size={18} />
+            </Link>
             <button onClick={toggleAiHubMode} title="AI Hub Mode" className={`p-2 rounded-full transition-all ${isAiHubMode ? 'text-cyan-400 bg-cyan-400/10' : 'text-gray-400 hover:bg-gray-100'}`}>
               <Sparkles size={18} />
             </button>
@@ -379,12 +395,20 @@ const Layout: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 py-4 grid grid-cols-1 md:grid-cols-4 gap-6">
         <aside className="hidden md:block space-y-4">
           <UserSection
-            user={user} isLoading={isLoading} logout={logout} login={login} register={register}
+            user={user} isLoading={isLoading} logout={logout} login={login} register={register} loginAsGuest={loginAsGuest}
             isAiHubMode={isAiHubMode}
           />
           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
             <h3 className="text-[10px] font-black text-gray-400 mb-4 uppercase tracking-[0.2em]">Quick Access</h3>
             <nav className="space-y-1">
+              {/* Wiki - Pinned at top */}
+              <Link
+                to="/wiki"
+                className={`flex items-center justify-between p-2 text-sm font-bold rounded-lg group transition-all mb-1 ${isAiHubMode ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20' : 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40'}`}
+              >
+                <span className="flex items-center gap-2"><BookOpen size={14} /> 📚 NEXUS WIKI</span>
+                <ChevronRight size={14} className="opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
+              </Link>
               {boards.map(b => {
                 const isLocked = b.required_achievement && !user?.achievements.includes(b.required_achievement);
                 return (
@@ -424,7 +448,19 @@ const Layout: React.FC = () => {
           </div>
         </aside>
 
-        <div className="md:col-span-3">
+        <div className="md:col-span-3 space-y-4">
+          {/* Megaphone (Phase 7.3 Placeholder) */}
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 rounded-xl flex items-center gap-3 animate-fade-in shadow-sm">
+            <div className="bg-amber-500 text-white p-2 rounded-lg"><Zap size={16} /></div>
+            <div className="flex-1">
+              <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest block">Global Announcement</span>
+              <p className="text-xs font-bold text-gray-800 dark:text-gray-200">현재 상점에서 🌈 무지개 닉네임을 1,000 CR에 판매 중입니다!</p>
+            </div>
+            <button className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+              <ChevronRight size={16} />
+            </button>
+          </div>
+
           <Outlet />
         </div>
       </main>
@@ -454,7 +490,7 @@ const Layout: React.FC = () => {
               </button>
             </div>
             <UserSection
-              user={user} isLoading={isLoading} logout={logout} login={login} register={register}
+              user={user} isLoading={isLoading} logout={logout} login={login} register={register} loginAsGuest={loginAsGuest}
               isAiHubMode={isAiHubMode}
             />
           </div>

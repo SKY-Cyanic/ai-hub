@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
@@ -7,6 +6,7 @@ import PostList from '../components/PostList';
 import { PenTool, Search, Cpu } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { storage } from '../services/storage';
+import SystemStatus from '../components/SystemStatus';
 
 const BoardPage: React.FC = () => {
   const { boardId } = useParams<{ boardId: string }>();
@@ -85,33 +85,42 @@ const BoardPage: React.FC = () => {
         <p className="text-sm text-indigo-100 dark:text-indigo-200 relative z-10">{boardInfo.description}</p>
       </div>
 
-      <div className="flex justify-between items-center mb-3">
-        <div className="text-xs font-mono text-gray-500 uppercase tracking-tighter">
-          INDEXED: <span className="text-indigo-600 dark:text-cyan-400 font-bold">{posts.length}</span> NODES
-        </div>
-        <button
-          onClick={handleWriteClick}
-          className="flex items-center gap-2 bg-indigo-600 dark:bg-cyan-600 text-white dark:text-black text-sm font-bold px-4 py-2 rounded-sm hover:opacity-80 transition-all shadow-lg"
-        >
-          <PenTool size={16} /> 신규 글 작성
-        </button>
-      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-3 space-y-4">
+          <div className="flex justify-between items-center mb-3">
+            <div className="text-xs font-mono text-gray-500 uppercase tracking-tighter">
+              INDEXED: <span className="text-indigo-600 dark:text-cyan-400 font-bold">{posts.length}</span> NODES
+            </div>
+            <button
+              onClick={handleWriteClick}
+              className="flex items-center gap-2 bg-indigo-600 dark:bg-cyan-600 text-white dark:text-black text-sm font-bold px-4 py-2 rounded-sm hover:opacity-80 transition-all shadow-lg"
+            >
+              <PenTool size={16} /> 신규 글 작성
+            </button>
+          </div>
 
-      <div className="shadow-sm border border-gray-100 dark:border-cyan-900/20 rounded-sm overflow-hidden">
-        <PostList posts={posts} boardSlug={boardId!} isAnonymous={boardId === 'deepweb'} />
-      </div>
+          <div className="shadow-sm border border-gray-100 dark:border-cyan-900/20 rounded-sm overflow-hidden">
+            <PostList posts={posts} boardSlug={boardId!} isAnonymous={boardId === 'deepweb'} />
+          </div>
 
-      <div className="mt-8 bg-gray-100 dark:bg-gray-800/50 p-4 rounded-sm flex justify-center border border-dashed border-gray-300 dark:border-gray-700">
-        <div className="flex space-x-2 w-full max-w-md">
-          <input
-            type="text"
-            placeholder="제목, 내용, 글쓴이 검색..."
-            className="flex-grow border border-gray-300 dark:border-gray-600 p-2 text-sm rounded-sm focus:outline-none focus:border-cyan-500 dark:bg-gray-950 dark:text-cyan-400"
-          />
-          <button className="bg-gray-700 dark:bg-cyan-900 text-white dark:text-cyan-400 px-5 rounded-sm text-sm font-bold hover:bg-gray-600">
-            SEARCH
-          </button>
+          <div className="mt-8 bg-gray-100 dark:bg-gray-800/50 p-4 rounded-sm flex justify-center border border-dashed border-gray-300 dark:border-gray-700">
+            <div className="flex space-x-2 w-full max-w-md">
+              <input
+                type="text"
+                placeholder="제목, 내용, 글쓴이 검색..."
+                className="flex-grow border border-gray-300 dark:border-gray-600 p-2 text-sm rounded-sm focus:outline-none focus:border-cyan-500 dark:bg-gray-950 dark:text-cyan-400"
+              />
+              <button className="bg-gray-700 dark:bg-cyan-900 text-white dark:text-cyan-400 px-5 rounded-sm text-sm font-bold hover:bg-gray-600">
+                SEARCH
+              </button>
+            </div>
+          </div>
         </div>
+
+        <aside className="space-y-6">
+          <SystemStatus />
+          {/* Future widgets can go here */}
+        </aside>
       </div>
     </div>
   );

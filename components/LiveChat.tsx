@@ -4,8 +4,11 @@ import { ChatMessage, Conversation } from '../types';
 import { storage } from '../services/storage';
 import { MessageSquare, Send, X, Hash, ChevronLeft } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import { UserNickname, UserAvatar } from './UserEffect';
 
 const LiveChat: React.FC = () => {
+    // ... existing component code ...
+    // (I will rewrite the whole top section up to the component start to be safe)
     const { user } = useAuth();
     const { isAiHubMode } = useTheme();
     const [isOpen, setIsOpen] = useState(false);
@@ -126,16 +129,15 @@ const LiveChat: React.FC = () => {
                             return (
                                 <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                                     {showHeader && (
-                                        <div className="flex items-baseline gap-2 mb-1 mt-1">
-                                            <span className={`text-xs font-bold ${isMe ? (isAiHubMode ? 'text-cyan-400' : 'text-indigo-600') : 'text-gray-600 dark:text-gray-400'}`}>
-                                                {msg.username}
-                                            </span>
+                                        <div className="flex items-center gap-2 mb-1 mt-1">
+                                            <UserAvatar profile={storage.getUserByRawId(msg.user_id) as any} size="sm" />
+                                            <UserNickname profile={storage.getUserByRawId(msg.user_id) as any} className="text-[11px]" />
                                             <span className="text-[10px] text-gray-400">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                         </div>
                                     )}
                                     <div className={`px-4 py-2 rounded-2xl text-sm max-w-[85%] break-words shadow-sm ${isMe
-                                            ? (isAiHubMode ? 'bg-cyan-900/50 text-cyan-50 border border-cyan-800' : 'bg-indigo-600 text-white rounded-tr-none')
-                                            : 'bg-white dark:bg-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-700 rounded-tl-none'
+                                        ? (isAiHubMode ? 'bg-cyan-900/50 text-cyan-50 border border-cyan-800' : 'bg-indigo-600 text-white rounded-tr-none')
+                                        : 'bg-white dark:bg-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-700 rounded-tl-none'
                                         }`}>
                                         {msg.text}
                                     </div>
@@ -163,8 +165,8 @@ const LiveChat: React.FC = () => {
                             type="submit"
                             disabled={!inputText.trim() || !user}
                             className={`p-2.5 rounded-full transition-all ${inputText.trim()
-                                    ? (isAiHubMode ? 'bg-cyan-500 text-black hover:bg-cyan-400' : 'bg-indigo-600 text-white hover:bg-indigo-700')
-                                    : 'bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
+                                ? (isAiHubMode ? 'bg-cyan-500 text-black hover:bg-cyan-400' : 'bg-indigo-600 text-white hover:bg-indigo-700')
+                                : 'bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
                                 }`}
                         >
                             <Send size={18} />
