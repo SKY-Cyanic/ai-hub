@@ -1,6 +1,6 @@
-
 import React from 'react';
 import { Profile } from '../types';
+import { BadgeCheck, Shield } from 'lucide-react';
 
 interface UserNicknameProps {
     profile: Profile;
@@ -51,14 +51,36 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({ profile, size = 'md', cl
 
     return (
         <div className={`relative inline-block ${className}`}>
-            <div className={`rounded-full overflow-hidden ${sizeMap[size]} ${frameClass}`}>
-                <img
-                    src={profile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.username}`}
-                    alt={profile.username}
-                    className={`w-full h-full object-cover ${isGlitch ? 'effect-glitch opacity-80' : ''}`}
-                    data-text={profile.username} // Glitch effect needs this for pseudo-elements if applied to container
-                />
+            <div className={`
+                ${sizeMap[size]} 
+                relative overflow-hidden
+                ${frameClass}
+                flex items-center justify-center
+                group
+            `}>
+                {profile.avatar_url ? (
+                    <img
+                        src={profile.avatar_url}
+                        alt={profile.username}
+                        className={`w-full h-full object-cover transition-transform group-hover:scale-110 ${isGlitch ? 'animate-glitch' : ''}`}
+                        data-text={profile.username}
+                    />
+                ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center text-white font-bold">
+                        {profile.username[0].toUpperCase()}
+                    </div>
+                )}
             </div>
+
+            {/* Online Status or Shield */}
+            {profile.shields && profile.shields > 0 && (
+                <div className="absolute -top-1 -right-1 bg-blue-500 text-white p-1 rounded-full border-2 border-white dark:border-gray-900 shadow-lg animate-bounce-subtle">
+                    <Shield size={size === 'sm' ? 8 : 12} fill="currentColor" />
+                    {profile.shields > 1 && (
+                        <span className="absolute -bottom-1 -right-1 bg-red-500 text-[8px] font-black px-1 rounded-full">{profile.shields}</span>
+                    )}
+                </div>
+            )}
             {isGlitch && (
                 <div className="absolute inset-0 bg-cyan-500/10 pointer-events-none mix-blend-screen animate-pulse rounded-full" />
             )}

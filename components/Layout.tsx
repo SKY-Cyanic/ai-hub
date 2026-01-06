@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Board, User, Notification } from '../types';
@@ -12,7 +11,6 @@ import {
 import { storage } from '../services/storage';
 import LiveChat from './LiveChat';
 import VoiceNeuralLink from './VoiceNeuralLink';
-import BalanceGameWidget from './BalanceGameWidget';
 import { UserNickname, UserAvatar } from './UserEffect';
 
 // 모바일 사이드바 컴포넌트
@@ -21,7 +19,6 @@ const MobileSidebar: React.FC<{
   onClose: () => void;
   boards: Board[];
   user: User | null;
-  className?: string; // Additional prop for styling
 }> = ({ isOpen, onClose, boards, user }) => {
   if (!isOpen) return null;
 
@@ -34,7 +31,7 @@ const MobileSidebar: React.FC<{
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-lg font-bold dark:text-white">전체 메뉴</h2>
           <button onClick={onClose} className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400">
-            <ChevronRight className="rotate-180" />
+            <ChevronRight size={24} className="rotate-180" />
           </button>
         </div>
 
@@ -96,7 +93,7 @@ const NotificationDropdown: React.FC<{ userId: string, close: () => void }> = ({
     return () => unsub();
   }, [userId]);
 
-  const handleRead = async (id: string, link: string) => {
+  const handleRead = async (id: string) => {
     await storage.markNotificationAsRead(id);
     close();
   };
@@ -119,7 +116,7 @@ const NotificationDropdown: React.FC<{ userId: string, close: () => void }> = ({
             <Link
               to={notif.link}
               key={notif.id}
-              onClick={() => handleRead(notif.id, notif.link)}
+              onClick={() => handleRead(notif.id)}
               className={`block p-3 border-b border-gray-50 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${notif.is_read ? 'opacity-60' : 'bg-indigo-50/30 dark:bg-indigo-900/10'}`}
             >
               <div className="flex gap-3">
@@ -160,15 +157,13 @@ const UserSection: React.FC<any> = ({
       const res = await register(formData.username, formData.password, undefined, formData.referralCode);
       if (res.success) {
         alert('회원가입이 완료되었습니다! 자동 로그인합니다.');
-        window.location.reload(); // 강제 새로고침으로 세션 동기화 보장
+        window.location.reload();
       } else {
         alert(res.message);
       }
     } else {
       const res = login(formData.username, formData.password);
-      if (res.success) {
-        // alert('로그인되었습니다.'); // 로그인 성공 시에는 조용히 UI 전환
-      } else {
+      if (!res.success) {
         alert(res.message);
       }
     }
@@ -280,7 +275,7 @@ const UserSection: React.FC<any> = ({
             <button
               onClick={() => {
                 loginAsGuest();
-                window.location.reload(); // Refresh to sync guest session
+                window.location.reload();
               }}
               className="text-xs text-gray-400 hover:text-indigo-500 underline"
             >
@@ -301,11 +296,17 @@ const Layout: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [megaphone, setMegaphone] = useState<{ text: string; author: string } | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
     setBoards(storage.getBoards());
+  }, []);
+
+  useEffect(() => {
+    const unsub = storage.subscribeMegaphone(setMegaphone);
+    return () => unsub();
   }, []);
 
   useEffect(() => {
@@ -334,7 +335,6 @@ const Layout: React.FC = () => {
     <div className={`min-h-screen pb-20 transition-colors duration-500 ${isDarkMode ? 'dark bg-gray-950' : 'bg-gray-50'}`}>
       {isAiHubMode && <div className="fixed inset-0 pointer-events-none scan-line z-[100] opacity-5"></div>}
 
-      {/* Beta Banner */}
       <div className="bg-gradient-to-r from-violet-600 via-pink-600 to-orange-500 text-white text-xs md:text-sm py-2.5 px-4 text-center font-bold tracking-wide relative z-[120] flex flex-col md:flex-row justify-between items-center shadow-lg gap-2">
         <div className="flex items-center gap-2">
           <span className="bg-white text-violet-600 px-2 py-0.5 rounded-full text-[10px] uppercase shadow-sm font-black tracking-widest animate-pulse">BETA</span>
@@ -401,7 +401,6 @@ const Layout: React.FC = () => {
           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-5 shadow-sm">
             <h3 className="text-[10px] font-black text-gray-400 mb-4 uppercase tracking-[0.2em]">Quick Access</h3>
             <nav className="space-y-1">
-              {/* Wiki - Pinned at top */}
               <Link
                 to="/wiki"
                 className={`flex items-center justify-between p-2 text-sm font-bold rounded-lg group transition-all mb-1 ${isAiHubMode ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20' : 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/40'}`}
@@ -449,37 +448,46 @@ const Layout: React.FC = () => {
         </aside>
 
         <div className="md:col-span-3 space-y-4">
-          {/* Megaphone (Phase 7.3 Placeholder) */}
-          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3 rounded-xl flex items-center gap-3 animate-fade-in shadow-sm">
-            <div className="bg-amber-500 text-white p-2 rounded-lg"><Zap size={16} /></div>
-            <div className="flex-1">
-              <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest block">Global Announcement</span>
-              <p className="text-xs font-bold text-gray-800 dark:text-gray-200">현재 상점에서 🌈 무지개 닉네임을 1,000 CR에 판매 중입니다!</p>
+          {megaphone && (
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border border-amber-200 dark:border-amber-800 p-3 rounded-xl flex items-center gap-3 animate-fade-in shadow-sm relative overflow-hidden group">
+              <div className="absolute inset-0 bg-amber-400/10 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
+              <div className="bg-amber-500 text-white p-2 rounded-lg relative z-10"><Zap size={16} className="animate-pulse" /></div>
+              <div className="flex-1 relative z-10">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest block">Global Announcement</span>
+                  <span className="text-[9px] bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-200 px-1 rounded font-bold">BY {megaphone.author}</span>
+                </div>
+                <p className="text-xs font-bold text-gray-800 dark:text-gray-200">{megaphone.text}</p>
+              </div>
+              <button
+                onClick={() => navigate('/shop')}
+                className="text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 relative z-10 transition-transform hover:scale-110"
+              >
+                <ChevronRight size={16} />
+              </button>
             </div>
-            <button className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-              <ChevronRight size={16} />
-            </button>
-          </div>
+          )}
 
           <Outlet />
         </div>
       </main>
 
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-t border-gray-200 dark:border-gray-800 h-16 flex items-center justify-around z-[140] px-2 pb-safe">
-        {navItems.map((item, idx) => (
-          <button
-            key={idx}
-            onClick={() => item.onClick ? item.onClick() : navigate(item.path!)}
-            className={`flex flex-col items-center justify-center w-14 transition-all active:scale-90 ${location.pathname === item.path ? (isAiHubMode ? 'text-cyan-400' : 'text-indigo-600') : 'text-gray-400'
-              }`}
-          >
-            {item.icon}
-            <span className="text-[9px] font-bold mt-1 uppercase tracking-tighter">{item.label}</span>
-          </button>
-        ))}
+        {navItems.map((item, idx) => {
+          const isActive = location.pathname === item.path || (item.path && location.pathname.startsWith(item.path) && item.path !== '/');
+          return (
+            <button
+              key={idx}
+              onClick={() => item.onClick ? item.onClick() : navigate(item.path!)}
+              className={`flex flex-col items-center justify-center w-14 transition-all active:scale-90 ${isActive ? (isAiHubMode ? 'text-cyan-400' : 'text-indigo-600') : 'text-gray-400'}`}
+            >
+              {item.icon}
+              <span className="text-[9px] font-bold mt-1 uppercase tracking-tighter">{item.label}</span>
+            </button>
+          )
+        })}
       </nav>
 
-      {/* Mobile User Modal Fix */}
       {isMobileUserOpen && (
         <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setIsMobileUserOpen(false)}>
           <div className="w-full max-w-sm bg-white dark:bg-gray-800 rounded-t-2xl sm:rounded-2xl p-4 shadow-2xl transform transition-transform duration-300" onClick={e => e.stopPropagation()}>
@@ -497,7 +505,6 @@ const Layout: React.FC = () => {
         </div>
       )}
 
-      {/* Mobile Sidebar (Drawer) */}
       <MobileSidebar
         isOpen={isMobileMenuOpen}
         onClose={() => setIsMobileMenuOpen(false)}

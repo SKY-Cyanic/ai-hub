@@ -20,7 +20,7 @@ export const SHOP_ITEMS: ShopItem[] = [
   { id: 'frame-cyber', name: '[시즌] 사이버펑크 네온', description: '강렬한 핑크-시안 네온 테두리', price: 3000, type: 'frame', category: 'avatar', value: 'border-pink-500 border-2 shadow-[0_0_15px_#ff00ff,#00ffff_inset]', icon: '🏙️' },
 
   // --- Utility Items ---
-  { id: 'item-megaphone', name: '📌 확성기', description: '채팅방 상단에 내 메시지를 1시간 동안 고정', price: 500, type: 'badge', category: 'system', value: 'megaphone', icon: '📢' },
+  { id: 'item-megaphone', name: '📌 확성기', description: '전 서버 상단에 내 메시지를 공지 (2,000 CR)', price: 2000, type: 'badge', category: 'system', value: 'megaphone', icon: '📢' },
   { id: 'item-shield', name: '🛡️ 1일 방어권', description: '신고로부터 경고 카운트를 1회 방어합니다.', price: 300, type: 'badge', category: 'system', value: 'shield', icon: '🛡️' },
   { id: 'item-title', name: '📝 내 맘대로 타이틀', description: '닉네임 옆에 원하는 칭호를 직접 설정', price: 5000, type: 'badge', category: 'system', value: 'custom_title', icon: '🏷️' },
 
@@ -384,31 +384,53 @@ export const storage = {
   },
 
   // --- Megaphone & Lottery Systems ---
+  subscribeMegaphone(callback: (msg: { text: string; author: string } | null) => void) {
+    return onSnapshot(doc(db, "global_state", "megaphone"), (snapshot) => {
+      if (snapshot.exists()) {
+        callback(snapshot.data() as any);
+      } else {
+        callback(null);
+      }
+    });
+  },
+
   getMegaphoneMessage() {
-    return {
-      text: "현재 상점에서 🌈 무지개 닉네임을 1,000 CR에 판매 중입니다!",
-      author: "System"
-    };
+    // Legacy fallback for sync calls if any
+    return null;
   },
 
   async setMegaphoneMessage(userId: string, text: string): Promise<{ success: boolean, message: string }> {
     const user = this.getUserByRawId(userId);
-    if (!user) return { success: false, message: 'User not found' };
-    if (user.points < 2000) return { success: false, message: 'CR이 부족합니다.' };
+    if (!user) return { success: false, message: '사용자를 찾을 수 없습니다.' };
 
-    user.points -= 2000;
-    if (!user.transactions) user.transactions = [];
-    user.transactions.push({
-      id: `tx-${Date.now()}`,
-      type: 'spend', // Changed from 'spent' to 'spend' for consistency
-      amount: 2000,
-      description: '확성기 (전역 메시지) 구매',
-      created_at: new Date().toISOString()
-    });
-    await this.saveUser(user); // Save user after point deduction and transaction
-    // In a real app, this would update a global state or Firestore collection
-    console.log(`MEGAPHONE BY ${user.username}: ${text}`);
-    return { success: true, message: '확성기 메시지가 등록되었습니다!' };
+    const price = 2000;
+    if (user.points < price) return { success: false, message: 'CR이 부족합니다.' };
+
+    try {
+      user.points -= price;
+      if (!user.transactions) user.transactions = [];
+      user.transactions.push({
+        id: `tx-mega-${Date.now()}`,
+        type: 'spend',
+        amount: price,
+        description: '확성기 (전역 메시지) 구매',
+        created_at: new Date().toISOString()
+      });
+
+      await setDoc(doc(db, "global_state", "megaphone"), {
+        text,
+        author: user.username,
+        author_id: user.id,
+        created_at: new Date().toISOString()
+      });
+
+      await this.saveUser(user);
+      if (storage.getSession()?.id === user.id) storage.setSession(user);
+
+      return { success: true, message: '확성기 메시지가 전 서버에 울려퍼집니다!' };
+    } catch (e) {
+      return { success: false, message: `등록 실패: ${e}` };
+    }
   },
 
   getLotteryPot() {
