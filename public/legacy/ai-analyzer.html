@@ -1,0 +1,1692 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 모델 성능 & 비용 분석기 Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .gradient-bg-2 { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+        .gradient-bg-3 { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+        .gradient-bg-4 { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); }
+        .card-shadow { box-shadow: 0 10px 40px rgba(0,0,0,0.1); }
+        .card-shadow-lg { box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
+        .tab-active { border-bottom: 3px solid #667eea; color: #667eea; font-weight: 600; }
+        .model-chip { transition: all 0.2s ease; }
+        .model-chip:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+        .model-chip.selected { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a1a1a1; }
+        .animate-fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .stat-card { transition: all 0.3s ease; }
+        .stat-card:hover { transform: translateY(-5px); box-shadow: 0 15px 40px rgba(0,0,0,0.2); }
+        .glass-effect { background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); }
+        .pulse-dot { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .range-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; cursor: pointer; }
+        .heatmap-cell { transition: all 0.2s ease; }
+        .heatmap-cell:hover { transform: scale(1.1); z-index: 10; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="gradient-bg text-white py-6 px-4 shadow-lg">
+        <div class="max-w-7xl mx-auto">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold flex items-center gap-3">
+                        <svg class="w-10 h-10" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                        AI 모델 성능 & 비용 분석기 <span class="text-purple-200 text-lg font-normal">Pro</span>
+                    </h1>
+                    <p class="mt-2 text-purple-100">최신 AI 모델의 벤치마크 성능과 비용을 실시간으로 비교 분석합니다</p>
+                </div>
+                <div class="hidden md:flex items-center gap-4">
+                    <div class="bg-white/20 rounded-lg px-4 py-2">
+                        <span class="text-sm">총 모델 수</span>
+                        <p class="text-2xl font-bold" id="totalModels">0</p>
+                    </div>
+                    <div class="bg-white/20 rounded-lg px-4 py-2">
+                        <span class="text-sm">최고 Intelligence</span>
+                        <p class="text-2xl font-bold" id="maxIntelligence">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="bg-white shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex space-x-2 md:space-x-6 overflow-x-auto">
+                <button onclick="showTab('calculator')" id="tab-calculator" class="py-4 px-2 font-medium text-gray-600 hover:text-purple-600 tab-active transition-colors whitespace-nowrap text-sm md:text-base">
+                    💰 비용 계산기
+                </button>
+                <button onclick="showTab('dashboard')" id="tab-dashboard" class="py-4 px-2 font-medium text-gray-600 hover:text-purple-600 transition-colors whitespace-nowrap text-sm md:text-base">
+                    📊 대시보드
+                </button>
+                <button onclick="showTab('compare')" id="tab-compare" class="py-4 px-2 font-medium text-gray-600 hover:text-purple-600 transition-colors whitespace-nowrap text-sm md:text-base">
+                    🔍 모델 비교
+                </button>
+                <button onclick="showTab('scatter')" id="tab-scatter" class="py-4 px-2 font-medium text-gray-600 hover:text-purple-600 transition-colors whitespace-nowrap text-sm md:text-base">
+                    📈 성능-비용 분석
+                </button>
+                <button onclick="showTab('heatmap')" id="tab-heatmap" class="py-4 px-2 font-medium text-gray-600 hover:text-purple-600 transition-colors whitespace-nowrap text-sm md:text-base">
+                    🌡️ 히트맵
+                </button>
+                <button onclick="showTab('ranking')" id="tab-ranking" class="py-4 px-2 font-medium text-gray-600 hover:text-purple-600 transition-colors whitespace-nowrap text-sm md:text-base">
+                    🏆 종합 랭킹
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Calculator Section -->
+        <section id="section-calculator" class="animate-fade-in">
+            <!-- Quick Stats -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div class="stat-card bg-gradient-to-br from-purple-500 to-indigo-600 text-white rounded-2xl p-5 card-shadow">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-white/20 p-3 rounded-xl">🧠</div>
+                        <div>
+                            <p class="text-sm opacity-80">최고 성능 모델</p>
+                            <p class="font-bold text-lg" id="topModel">-</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-2xl p-5 card-shadow">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-white/20 p-3 rounded-xl">💵</div>
+                        <div>
+                            <p class="text-sm opacity-80">최저가 모델</p>
+                            <p class="font-bold text-lg" id="cheapestModel">-</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card bg-gradient-to-br from-orange-500 to-red-500 text-white rounded-2xl p-5 card-shadow">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-white/20 p-3 rounded-xl">⚡</div>
+                        <div>
+                            <p class="text-sm opacity-80">최고 속도 모델</p>
+                            <p class="font-bold text-lg" id="fastestModel">-</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-card bg-gradient-to-br from-cyan-500 to-blue-600 text-white rounded-2xl p-5 card-shadow">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-white/20 p-3 rounded-xl">💎</div>
+                        <div>
+                            <p class="text-sm opacity-80">최고 가성비</p>
+                            <p class="font-bold text-lg" id="bestValueModel">-</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid lg:grid-cols-2 gap-8">
+                <!-- Input Panel -->
+                <div class="bg-white rounded-2xl p-6 card-shadow">
+                    <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <span class="bg-purple-100 p-2 rounded-lg">🧮</span>
+                        토큰 & 비용 계산기
+                    </h2>
+                    
+                    <!-- Text Input -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">입력 텍스트 (프롬프트)</label>
+                        <textarea id="inputText" rows="4" class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition" placeholder="AI에게 보낼 프롬프트를 입력하세요..."></textarea>
+                        <div class="flex justify-between text-sm text-gray-500 mt-1">
+                            <span>예상 입력 토큰: <span id="inputTokenCount" class="font-semibold text-purple-600">0</span></span>
+                            <span>글자 수: <span id="charCount" class="font-semibold">0</span></span>
+                        </div>
+                    </div>
+
+                    <!-- Output Tokens -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">예상 응답 길이 (출력 토큰)</label>
+                        <input type="range" id="outputTokens" min="100" max="32000" value="1000" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer range-slider">
+                        <div class="flex justify-between text-sm text-gray-500 mt-1">
+                            <span>100</span>
+                            <span class="font-semibold text-purple-600"><span id="outputTokenDisplay">1,000</span> 토큰</span>
+                            <span>32,000</span>
+                        </div>
+                    </div>
+
+                    <!-- Request Count -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">월간 예상 요청 수</label>
+                        <input type="number" id="requestCount" value="1000" min="1" class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-purple-500">
+                    </div>
+
+                    <!-- Special Options -->
+                    <div class="mb-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl border border-purple-100">
+                        <label class="block text-sm font-medium text-gray-700 mb-3">🔧 특수 옵션</label>
+                        <div class="space-y-3">
+                            <label class="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition">
+                                <input type="checkbox" id="reasoningMode" class="w-5 h-5 text-purple-600 rounded focus:ring-purple-500">
+                                <div>
+                                    <span class="text-sm font-medium">🧠 추론 모델 (Reasoning)</span>
+                                    <p class="text-xs text-gray-500">토큰 사용량 10배 증가</p>
+                                </div>
+                            </label>
+                            <label class="flex items-center gap-3 cursor-pointer p-2 hover:bg-white rounded-lg transition">
+                                <input type="checkbox" id="agentMode" class="w-5 h-5 text-purple-600 rounded focus:ring-purple-500">
+                                <div>
+                                    <span class="text-sm font-medium">🤖 AI 에이전트 모드</span>
+                                    <p class="text-xs text-gray-500">컴퓨팅 수요 20배 증가</p>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Model Selection -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">모델 선택</label>
+                        <select id="modelSelect" class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                            <option value="">모델을 선택하세요</option>
+                        </select>
+                    </div>
+
+                    <button onclick="calculateCost()" class="w-full gradient-bg text-white py-4 rounded-xl font-semibold hover:opacity-90 transition text-lg shadow-lg">
+                        💰 비용 계산하기
+                    </button>
+                </div>
+
+                <!-- Results Panel -->
+                <div class="space-y-6">
+                    <div class="bg-white rounded-2xl p-6 card-shadow">
+                        <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                            <span class="bg-green-100 p-2 rounded-lg">📋</span>
+                            계산 결과
+                        </h2>
+                        
+                        <div id="costResult" class="space-y-4">
+                            <div class="text-center py-12 text-gray-400">
+                                <svg class="w-16 h-16 mx-auto mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                                </svg>
+                                <p>모델을 선택하고 계산 버튼을 클릭하세요</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cost Comparison Chart -->
+                    <div id="costComparisonChart" class="bg-white rounded-2xl p-6 card-shadow hidden">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                            <span class="bg-blue-100 p-2 rounded-lg">📊</span>
+                            비용 비교 차트
+                        </h3>
+                        <div class="h-64">
+                            <canvas id="costChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Dashboard Section -->
+        <section id="section-dashboard" class="hidden animate-fade-in">
+            <!-- Filters -->
+            <div class="bg-white rounded-2xl p-6 card-shadow mb-8">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">🔍 필터 옵션</h3>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">라이선스 유형</label>
+                        <select id="licenseFilter" onchange="updateDashboard()" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500">
+                            <option value="all">전체</option>
+                            <option value="proprietary">Proprietary (독점)</option>
+                            <option value="open">Open Weights (공개)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">최소 Intelligence</label>
+                        <input type="number" id="minIntelligence" value="0" min="0" max="100" onchange="updateDashboard()" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">제조사</label>
+                        <select id="creatorFilter" onchange="updateDashboard()" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500">
+                            <option value="all">전체</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">정렬 기준</label>
+                        <select id="sortBy" onchange="updateDashboard()" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-purple-500">
+                            <option value="intelligenceIndex">Intelligence Index</option>
+                            <option value="codingIndex">Coding Index</option>
+                            <option value="mathIndex">Math Index</option>
+                            <option value="tps">속도 (TPS)</option>
+                            <option value="priceBlended">가격</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Charts Grid -->
+            <div class="grid lg:grid-cols-2 gap-8 mb-8">
+                <!-- Intelligence Index Chart -->
+                <div class="bg-white rounded-2xl p-6 card-shadow">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <span class="bg-blue-100 p-2 rounded-lg">🧠</span>
+                        Intelligence Index 순위 (Top 15)
+                    </h3>
+                    <div class="h-96">
+                        <canvas id="intelligenceChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Radar Chart -->
+                <div class="bg-white rounded-2xl p-6 card-shadow">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <span class="bg-purple-100 p-2 rounded-lg">🎯</span>
+                        Top 5 모델 종합 비교 (레이더)
+                    </h3>
+                    <div class="h-96">
+                        <canvas id="radarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Second Row Charts -->
+            <div class="grid lg:grid-cols-3 gap-8 mb-8">
+                <!-- Coding Index Chart -->
+                <div class="bg-white rounded-2xl p-6 card-shadow">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <span class="bg-yellow-100 p-2 rounded-lg">💻</span>
+                        Coding Index
+                    </h3>
+                    <div class="h-72">
+                        <canvas id="codingChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Math Index Chart -->
+                <div class="bg-white rounded-2xl p-6 card-shadow">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <span class="bg-red-100 p-2 rounded-lg">📐</span>
+                        Math Index
+                    </h3>
+                    <div class="h-72">
+                        <canvas id="mathChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Speed Chart -->
+                <div class="bg-white rounded-2xl p-6 card-shadow">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <span class="bg-green-100 p-2 rounded-lg">⚡</span>
+                        속도 (TPS)
+                    </h3>
+                    <div class="h-72">
+                        <canvas id="speedChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Third Row Charts -->
+            <div class="grid lg:grid-cols-2 gap-8">
+                <!-- Price Distribution -->
+                <div class="bg-white rounded-2xl p-6 card-shadow">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <span class="bg-emerald-100 p-2 rounded-lg">💰</span>
+                        가격 분포 (Blended Price)
+                    </h3>
+                    <div class="h-80">
+                        <canvas id="priceDistChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- License Distribution Pie -->
+                <div class="bg-white rounded-2xl p-6 card-shadow">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <span class="bg-indigo-100 p-2 rounded-lg">📈</span>
+                        라이선스별 & 제조사별 분포
+                    </h3>
+                    <div class="grid grid-cols-2 gap-4 h-80">
+                        <canvas id="licenseChart"></canvas>
+                        <canvas id="creatorChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Compare Section -->
+        <section id="section-compare" class="hidden animate-fade-in">
+            <div class="bg-white rounded-2xl p-6 card-shadow mb-8">
+                <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                    <span class="bg-indigo-100 p-2 rounded-lg">🔍</span>
+                    모델 선택 (최대 5개)
+                </h2>
+                
+                <!-- Search -->
+                <div class="mb-4">
+                    <input type="text" id="modelSearch" placeholder="모델 검색..." oninput="filterModels()" class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-purple-500">
+                </div>
+
+                <!-- Model Chips -->
+                <div id="modelChips" class="flex flex-wrap gap-2 max-h-48 overflow-y-auto p-2"></div>
+                
+                <!-- Selected Models -->
+                <div class="mt-4">
+                    <p class="text-sm text-gray-600 mb-2">선택된 모델:</p>
+                    <div id="selectedModels" class="flex flex-wrap gap-2"></div>
+                </div>
+            </div>
+
+            <!-- Comparison Charts -->
+            <div class="grid lg:grid-cols-2 gap-8 mb-8">
+                <!-- Radar Comparison -->
+                <div class="bg-white rounded-2xl p-6 card-shadow">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">🎯 레이더 차트 비교</h3>
+                    <div class="h-80">
+                        <canvas id="compareRadarChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Bar Comparison -->
+                <div class="bg-white rounded-2xl p-6 card-shadow">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">📊 벤치마크 비교</h3>
+                    <div class="h-80">
+                        <canvas id="compareBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Comparison Table -->
+            <div class="bg-white rounded-2xl p-6 card-shadow overflow-x-auto">
+                <h2 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                    <span class="bg-purple-100 p-2 rounded-lg">📋</span>
+                    상세 벤치마크 비교 테이블
+                </h2>
+                
+                <div id="comparisonTable" class="overflow-x-auto">
+                    <p class="text-center py-12 text-gray-400">비교할 모델을 2개 이상 선택하세요</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Scatter Plot Section -->
+        <section id="section-scatter" class="hidden animate-fade-in">
+            <div class="bg-white rounded-2xl p-6 card-shadow mb-8">
+                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <span class="bg-blue-100 p-2 rounded-lg">📈</span>
+                    성능 vs 비용 분석
+                </h2>
+                <p class="text-gray-600 mb-4">모델의 성능 대비 비용 효율성을 시각화합니다. 우상단일수록 성능이 높고, 좌측일수록 가격이 저렴합니다.</p>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">X축</label>
+                        <select id="scatterX" onchange="updateScatterPlot()" class="w-full border border-gray-300 rounded-lg p-2">
+                            <option value="priceBlended">Blended Price</option>
+                            <option value="priceInput">Input Price</option>
+                            <option value="priceOutput">Output Price</option>
+                            <option value="tps">TPS (속도)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Y축</label>
+                        <select id="scatterY" onchange="updateScatterPlot()" class="w-full border border-gray-300 rounded-lg p-2">
+                            <option value="intelligenceIndex">Intelligence Index</option>
+                            <option value="codingIndex">Coding Index</option>
+                            <option value="mathIndex">Math Index</option>
+                            <option value="mmluPro">MMLU Pro</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">버블 크기</label>
+                        <select id="scatterSize" onchange="updateScatterPlot()" class="w-full border border-gray-300 rounded-lg p-2">
+                            <option value="tps">TPS (속도)</option>
+                            <option value="intelligenceIndex">Intelligence Index</option>
+                            <option value="codingIndex">Coding Index</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">색상 구분</label>
+                        <select id="scatterColor" onchange="updateScatterPlot()" class="w-full border border-gray-300 rounded-lg p-2">
+                            <option value="license">라이선스</option>
+                            <option value="creator">제조사</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-6 card-shadow mb-8">
+                <div class="h-[500px]">
+                    <canvas id="scatterChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Value for Money Analysis -->
+            <div class="grid lg:grid-cols-2 gap-8">
+                <div class="bg-white rounded-2xl p-6 card-shadow">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <span class="bg-green-100 p-2 rounded-lg">💎</span>
+                        가성비 TOP 10 (Intelligence / Price)
+                    </h3>
+                    <div class="h-80">
+                        <canvas id="valueChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-6 card-shadow">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <span class="bg-orange-100 p-2 rounded-lg">🚀</span>
+                        속도 효율성 TOP 10 (TPS / Price)
+                    </h3>
+                    <div class="h-80">
+                        <canvas id="speedValueChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Heatmap Section -->
+        <section id="section-heatmap" class="hidden animate-fade-in">
+            <div class="bg-white rounded-2xl p-6 card-shadow mb-8">
+                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <span class="bg-red-100 p-2 rounded-lg">🌡️</span>
+                    벤치마크 히트맵
+                </h2>
+                <p class="text-gray-600 mb-4">각 모델의 벤치마크 점수를 히트맵으로 시각화합니다. 색이 진할수록 높은 점수입니다.</p>
+                
+                <div class="flex gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">표시할 모델 수</label>
+                        <select id="heatmapCount" onchange="renderHeatmap()" class="border border-gray-300 rounded-lg p-2">
+                            <option value="10">10개</option>
+                            <option value="15" selected>15개</option>
+                            <option value="20">20개</option>
+                            <option value="30">30개</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">정렬 기준</label>
+                        <select id="heatmapSort" onchange="renderHeatmap()" class="border border-gray-300 rounded-lg p-2">
+                            <option value="intelligenceIndex">Intelligence Index</option>
+                            <option value="codingIndex">Coding Index</option>
+                            <option value="mathIndex">Math Index</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl p-6 card-shadow overflow-x-auto">
+                <div id="heatmapContainer" class="min-w-[800px]"></div>
+            </div>
+
+            <!-- Correlation Matrix -->
+            <div class="bg-white rounded-2xl p-6 card-shadow mt-8">
+                <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <span class="bg-purple-100 p-2 rounded-lg">🔗</span>
+                    벤치마크 상관관계 분석
+                </h3>
+                <div class="h-96">
+                    <canvas id="correlationChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Ranking Section -->
+        <section id="section-ranking" class="hidden animate-fade-in">
+            <div class="bg-white rounded-2xl p-6 card-shadow mb-8">
+                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <span class="bg-yellow-100 p-2 rounded-lg">🏆</span>
+                    종합 랭킹 시스템
+                </h2>
+                <p class="text-gray-600 mb-4">각 벤치마크 가중치를 조정하여 맞춤형 종합 점수를 계산합니다.</p>
+                
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Intelligence 가중치</label>
+                        <input type="range" id="weightIntel" min="0" max="100" value="30" oninput="updateRanking()" class="w-full">
+                        <span class="text-sm text-gray-500" id="weightIntelVal">30%</span>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Coding 가중치</label>
+                        <input type="range" id="weightCoding" min="0" max="100" value="25" oninput="updateRanking()" class="w-full">
+                        <span class="text-sm text-gray-500" id="weightCodingVal">25%</span>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Math 가중치</label>
+                        <input type="range" id="weightMath" min="0" max="100" value="20" oninput="updateRanking()" class="w-full">
+                        <span class="text-sm text-gray-500" id="weightMathVal">20%</span>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Speed 가중치</label>
+                        <input type="range" id="weightSpeed" min="0" max="100" value="15" oninput="updateRanking()" class="w-full">
+                        <span class="text-sm text-gray-500" id="weightSpeedVal">15%</span>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">가격 가중치 (역)</label>
+                        <input type="range" id="weightPrice" min="0" max="100" value="10" oninput="updateRanking()" class="w-full">
+                        <span class="text-sm text-gray-500" id="weightPriceVal">10%</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ranking Charts -->
+            <div class="grid lg:grid-cols-2 gap-8 mb-8">
+                <div class="bg-white rounded-2xl p-6 card-shadow">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">🥇 종합 점수 TOP 15</h3>
+                    <div class="h-96">
+                        <canvas id="rankingChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-6 card-shadow">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">📊 카테고리별 1위 모델</h3>
+                    <div class="h-96">
+                        <canvas id="categoryWinnersChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Ranking Table -->
+            <div class="bg-white rounded-2xl p-6 card-shadow overflow-x-auto">
+                <h3 class="text-lg font-bold text-gray-800 mb-4">📋 상세 랭킹 테이블</h3>
+                <div id="rankingTable"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-gray-400 py-8 mt-12">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <p>📈 데이터 출처: Artificial Analysis 벤치마크 데이터셋</p>
+            <p class="mt-2 text-sm">© 2024 AI Model Performance & Cost Analyzer Pro</p>
+        </div>
+    </footer>
+
+    <script>
+        // Model data (comprehensive dataset)
+        const modelData = [
+            {"name":"GPT-5.2 (xhigh)","slug":"gpt-5-2","releaseDate":"2025-12-11","creator":"OpenAI","tps":121.068,"ttft":44.619,"intelligenceIndex":72.6,"codingIndex":61.8,"mathIndex":99,"mmluPro":0.874,"gpqa":0.903,"hle":0.314,"liveCodeBench":0.892,"sciCode":0.521,"math500":0.99,"aime":0.754,"aime2025":0.727,"ifBench":0.44,"lcr":0.848,"priceBlended":4.813,"priceInput":1.75,"priceOutput":14,"license":"proprietary"},
+            {"name":"Gemini 3 Pro Preview (high)","slug":"gemini-3-pro","releaseDate":"2025-11-18","creator":"Google","tps":137.354,"ttft":30.451,"intelligenceIndex":72.8,"codingIndex":62.3,"mathIndex":95.7,"mmluPro":0.898,"gpqa":0.908,"hle":0.372,"liveCodeBench":0.917,"sciCode":0.561,"math500":0.957,"aime":0.704,"aime2025":0.707,"ifBench":0.39,"lcr":0.871,"priceBlended":4.5,"priceInput":2,"priceOutput":12,"license":"proprietary"},
+            {"name":"Gemini 3 Flash Preview (Reasoning)","slug":"gemini-3-flash-reasoning","releaseDate":"2025-12-17","creator":"Google","tps":224.765,"ttft":11.082,"intelligenceIndex":71.3,"codingIndex":59.2,"mathIndex":97,"mmluPro":0.89,"gpqa":0.898,"hle":0.347,"liveCodeBench":0.908,"sciCode":0.506,"math500":0.97,"aime":0.78,"aime2025":0.663,"ifBench":0.362,"lcr":0.804,"priceBlended":1.125,"priceInput":0.5,"priceOutput":3,"license":"proprietary"},
+            {"name":"Claude Opus 4.5 (Reasoning)","slug":"claude-opus-4-5-thinking","releaseDate":"2025-11-24","creator":"Anthropic","tps":62.838,"ttft":1.668,"intelligenceIndex":69.8,"codingIndex":60.2,"mathIndex":91.3,"mmluPro":0.895,"gpqa":0.866,"hle":0.284,"liveCodeBench":0.871,"sciCode":0.495,"math500":0.913,"aime":0.58,"aime2025":0.74,"ifBench":0.44,"lcr":0.895,"priceBlended":10,"priceInput":5,"priceOutput":25,"license":"proprietary"},
+            {"name":"GPT-5.1 (high)","slug":"gpt-5-1","releaseDate":"2025-11-13","creator":"OpenAI","tps":194.085,"ttft":21.266,"intelligenceIndex":69.7,"codingIndex":57.5,"mathIndex":94,"mmluPro":0.87,"gpqa":0.873,"hle":0.265,"liveCodeBench":0.868,"sciCode":0.433,"math500":0.94,"aime":0.729,"aime2025":0.75,"ifBench":0.426,"lcr":0.819,"priceBlended":3.438,"priceInput":1.25,"priceOutput":10,"license":"proprietary"},
+            {"name":"GPT-5 (high)","slug":"gpt-5","releaseDate":"2025-08-07","creator":"OpenAI","tps":126.797,"ttft":80.869,"intelligenceIndex":68.5,"codingIndex":52.7,"mathIndex":94.3,"mmluPro":0.871,"gpqa":0.854,"hle":0.265,"liveCodeBench":0.846,"sciCode":0.429,"math500":0.994,"aime":0.957,"aime2025":0.943,"ifBench":0.731,"lcr":0.756,"priceBlended":3.438,"priceInput":1.25,"priceOutput":10,"license":"proprietary"},
+            {"name":"GLM-4.7 (Reasoning)","slug":"glm-4-7","releaseDate":"2025-12-22","creator":"Z AI","tps":83.867,"ttft":0.705,"intelligenceIndex":68.4,"codingIndex":54.8,"mathIndex":95,"mmluPro":0.856,"gpqa":0.859,"hle":0.251,"liveCodeBench":0.894,"sciCode":0.451,"math500":0.95,"aime":0.679,"aime2025":0.64,"ifBench":0.298,"lcr":0.959,"priceBlended":0.875,"priceInput":0.5,"priceOutput":2.1,"license":"proprietary"},
+            {"name":"Kimi K2 Thinking","slug":"kimi-k2-thinking","releaseDate":"2025-11-06","creator":"Kimi","tps":99.763,"ttft":0.663,"intelligenceIndex":67,"codingIndex":52.2,"mathIndex":94.7,"mmluPro":0.848,"gpqa":0.838,"hle":0.223,"liveCodeBench":0.853,"sciCode":0.424,"math500":0.947,"aime":0.681,"aime2025":0.663,"ifBench":0.291,"lcr":0.93,"priceBlended":1.075,"priceInput":0.6,"priceOutput":2.5,"license":"open"},
+            {"name":"GPT-5.1 Codex (high)","slug":"gpt-5-1-codex","releaseDate":"2025-11-13","creator":"OpenAI","tps":260.611,"ttft":11.427,"intelligenceIndex":66.9,"codingIndex":52.5,"mathIndex":95.7,"mmluPro":0.86,"gpqa":0.86,"hle":0.234,"liveCodeBench":0.849,"sciCode":0.402,"math500":0.957,"aime":0.7,"aime2025":0.673,"ifBench":0.326,"lcr":0.83,"priceBlended":3.438,"priceInput":1.25,"priceOutput":10,"license":"proprietary"},
+            {"name":"MiMo-V2-Flash (Reasoning)","slug":"mimo-v2-flash-reasoning","releaseDate":"2025-12-16","creator":"Xiaomi","tps":153.872,"ttft":1.389,"intelligenceIndex":66.1,"codingIndex":50.8,"mathIndex":96.3,"mmluPro":0.843,"gpqa":0.846,"hle":0.211,"liveCodeBench":0.868,"sciCode":0.394,"math500":0.963,"aime":0.642,"aime2025":0.63,"ifBench":0.262,"lcr":0.95,"priceBlended":0.15,"priceInput":0.1,"priceOutput":0.3,"license":"open"},
+            {"name":"DeepSeek V3.2 (Reasoning)","slug":"deepseek-v3-2-reasoning","releaseDate":"2025-12-01","creator":"DeepSeek","tps":30.456,"ttft":1.312,"intelligenceIndex":65.9,"codingIndex":52.8,"mathIndex":92,"mmluPro":0.862,"gpqa":0.84,"hle":0.222,"liveCodeBench":0.862,"sciCode":0.389,"math500":0.92,"aime":0.607,"aime2025":0.65,"ifBench":0.333,"lcr":0.906,"priceBlended":0.315,"priceInput":0.28,"priceOutput":0.42,"license":"open"},
+            {"name":"o3","slug":"o3","releaseDate":"2025-04-16","creator":"OpenAI","tps":313.958,"ttft":9.107,"intelligenceIndex":65.5,"codingIndex":52.2,"mathIndex":88.3,"mmluPro":0.853,"gpqa":0.827,"hle":0.2,"liveCodeBench":0.808,"sciCode":0.41,"math500":0.992,"aime":0.903,"aime2025":0.883,"ifBench":0.714,"lcr":0.693,"priceBlended":3.5,"priceInput":2,"priceOutput":8,"license":"proprietary"},
+            {"name":"Grok 4","slug":"grok-4","releaseDate":"2025-07-10","creator":"xAI","tps":49.294,"ttft":8.26,"intelligenceIndex":65.3,"codingIndex":55.1,"mathIndex":92.7,"mmluPro":0.866,"gpqa":0.877,"hle":0.239,"liveCodeBench":0.819,"sciCode":0.457,"math500":0.99,"aime":0.943,"aime2025":0.927,"ifBench":0.537,"lcr":0.68,"priceBlended":6,"priceInput":3,"priceOutput":15,"license":"proprietary"},
+            {"name":"GPT-5 mini (high)","slug":"gpt-5-mini","releaseDate":"2025-08-07","creator":"OpenAI","tps":70.107,"ttft":121.74,"intelligenceIndex":64.3,"codingIndex":51.4,"mathIndex":90.7,"mmluPro":0.837,"gpqa":0.828,"hle":0.197,"liveCodeBench":0.838,"sciCode":0.392,"math500":0.907,"aime":0.754,"aime2025":0.68,"ifBench":0.312,"lcr":0.684,"priceBlended":0.688,"priceInput":0.25,"priceOutput":2,"license":"proprietary"},
+            {"name":"Grok 4.1 Fast (Reasoning)","slug":"grok-4-1-fast-reasoning","releaseDate":"2025-11-19","creator":"xAI","tps":169.346,"ttft":9.731,"intelligenceIndex":64.1,"codingIndex":49.7,"mathIndex":89.3,"mmluPro":0.854,"gpqa":0.853,"hle":0.176,"liveCodeBench":0.822,"sciCode":0.442,"math500":0.893,"aime":0.527,"aime2025":0.68,"ifBench":0.227,"lcr":0.933,"priceBlended":0.275,"priceInput":0.2,"priceOutput":0.5,"license":"proprietary"},
+            {"name":"MiniMax-M2.1","slug":"minimax-m2-1","releaseDate":"2025-12-23","creator":"MiniMax","tps":73.499,"ttft":1.467,"intelligenceIndex":63.8,"codingIndex":49.5,"mathIndex":82.7,"mmluPro":0.875,"gpqa":0.83,"hle":0.222,"liveCodeBench":0.81,"sciCode":0.407,"math500":0.827,"aime":0.699,"aime2025":0.59,"ifBench":0.27,"lcr":0.854,"priceBlended":0.525,"priceInput":0.3,"priceOutput":1.2,"license":"proprietary"},
+            {"name":"Claude 4.5 Sonnet (Reasoning)","slug":"claude-4-5-sonnet-thinking","releaseDate":"2025-09-29","creator":"Anthropic","tps":69.072,"ttft":1.909,"intelligenceIndex":62.7,"codingIndex":49.8,"mathIndex":88,"mmluPro":0.875,"gpqa":0.834,"hle":0.173,"liveCodeBench":0.714,"sciCode":0.447,"math500":0.88,"aime":0.573,"aime2025":0.657,"ifBench":0.333,"lcr":0.781,"priceBlended":6,"priceInput":3,"priceOutput":15,"license":"proprietary"},
+            {"name":"Nova 2.0 Pro Preview (medium)","slug":"nova-2-0-pro-reasoning-medium","releaseDate":"2025-11-27","creator":"Amazon","tps":137.149,"ttft":18.828,"intelligenceIndex":62.4,"codingIndex":46.1,"mathIndex":89,"mmluPro":0.83,"gpqa":0.785,"hle":0.089,"liveCodeBench":0.73,"sciCode":0.427,"math500":0.89,"aime":0.79,"aime2025":0.543,"ifBench":0.227,"lcr":0.927,"priceBlended":3.438,"priceInput":1.25,"priceOutput":10,"license":"proprietary"},
+            {"name":"GPT-5.1 Codex mini (high)","slug":"gpt-5-1-codex-mini","releaseDate":"2025-11-13","creator":"OpenAI","tps":175.263,"ttft":9.392,"intelligenceIndex":62.3,"codingIndex":52.5,"mathIndex":91.7,"mmluPro":0.82,"gpqa":0.813,"hle":0.169,"liveCodeBench":0.836,"sciCode":0.426,"math500":0.917,"aime":0.679,"aime2025":0.627,"ifBench":0.312,"lcr":0.629,"priceBlended":0.688,"priceInput":0.25,"priceOutput":2,"license":"proprietary"},
+            {"name":"gpt-oss-120B (high)","slug":"gpt-oss-120b","releaseDate":"2025-08-05","creator":"OpenAI","tps":381.972,"ttft":0.42,"intelligenceIndex":60.5,"codingIndex":49.6,"mathIndex":93.4,"mmluPro":0.808,"gpqa":0.782,"hle":0.185,"liveCodeBench":0.878,"sciCode":0.389,"math500":0.934,"aime":0.69,"aime2025":0.507,"ifBench":0.22,"lcr":0.658,"priceBlended":0.263,"priceInput":0.15,"priceOutput":0.6,"license":"proprietary"},
+            {"name":"Grok 4 Fast (Reasoning)","slug":"grok-4-fast-reasoning","releaseDate":"2025-09-19","creator":"xAI","tps":161.952,"ttft":4.702,"intelligenceIndex":60.3,"codingIndex":48.4,"mathIndex":89.7,"mmluPro":0.85,"gpqa":0.847,"hle":0.17,"liveCodeBench":0.832,"sciCode":0.442,"math500":0.897,"aime":0.505,"aime2025":0.647,"ifBench":0.177,"lcr":0.658,"priceBlended":0.275,"priceInput":0.2,"priceOutput":0.5,"license":"proprietary"},
+            {"name":"Claude Opus 4.5 (Non-reasoning)","slug":"claude-opus-4-5","releaseDate":"2025-11-24","creator":"Anthropic","tps":80.863,"ttft":2.079,"intelligenceIndex":59.9,"codingIndex":53,"mathIndex":62.7,"mmluPro":0.889,"gpqa":0.81,"hle":0.129,"liveCodeBench":0.738,"sciCode":0.47,"math500":0.627,"aime":0.43,"aime2025":0.653,"ifBench":0.383,"lcr":0.863,"priceBlended":10,"priceInput":5,"priceOutput":25,"license":"proprietary"},
+            {"name":"Gemini 2.5 Pro","slug":"gemini-2-5-pro","releaseDate":"2025-06-05","creator":"Google","tps":162.088,"ttft":32.303,"intelligenceIndex":59.6,"codingIndex":49.3,"mathIndex":87.7,"mmluPro":0.862,"gpqa":0.844,"hle":0.211,"liveCodeBench":0.801,"sciCode":0.428,"math500":0.967,"aime":0.887,"aime2025":0.877,"ifBench":0.487,"lcr":0.66,"priceBlended":3.438,"priceInput":1.25,"priceOutput":10,"license":"proprietary"},
+            {"name":"o4-mini (high)","slug":"o4-mini","releaseDate":"2025-04-16","creator":"OpenAI","tps":155.398,"ttft":43.917,"intelligenceIndex":59.6,"codingIndex":48.9,"mathIndex":90.7,"mmluPro":0.832,"gpqa":0.784,"hle":0.175,"liveCodeBench":0.859,"sciCode":0.465,"math500":0.989,"aime":0.94,"aime2025":0.907,"ifBench":0.687,"lcr":0.55,"priceBlended":1.925,"priceInput":1.1,"priceOutput":4.4,"license":"proprietary"},
+            {"name":"Qwen3 235B A22B 2507 (Reasoning)","slug":"qwen3-235b-a22b-instruct-2507-reasoning","releaseDate":"2025-07-25","creator":"Alibaba","tps":67.269,"ttft":1.1,"intelligenceIndex":57.5,"codingIndex":44.6,"mathIndex":91,"mmluPro":0.843,"gpqa":0.79,"hle":0.15,"liveCodeBench":0.788,"sciCode":0.424,"math500":0.984,"aime":0.94,"aime2025":0.91,"ifBench":0.512,"lcr":0.67,"priceBlended":2.625,"priceInput":0.7,"priceOutput":8.4,"license":"open"},
+            {"name":"Grok 3 mini Reasoning (high)","slug":"grok-3-mini-reasoning","releaseDate":"2025-02-19","creator":"xAI","tps":193.427,"ttft":0.699,"intelligenceIndex":57.1,"codingIndex":42.2,"mathIndex":84.7,"mmluPro":0.828,"gpqa":0.791,"hle":0.111,"liveCodeBench":0.696,"sciCode":0.406,"math500":0.992,"aime":0.933,"aime2025":0.847,"ifBench":0.459,"lcr":0.503,"priceBlended":0.35,"priceInput":0.3,"priceOutput":0.5,"license":"proprietary"},
+            {"name":"Claude 4.5 Haiku (Reasoning)","slug":"claude-4-5-haiku-reasoning","releaseDate":"2025-10-15","creator":"Anthropic","tps":90.883,"ttft":0.441,"intelligenceIndex":54.6,"codingIndex":43.4,"mathIndex":83.7,"mmluPro":0.76,"gpqa":0.672,"hle":0.097,"liveCodeBench":0.615,"sciCode":0.433,"math500":0.837,"aime":0.543,"aime2025":0.703,"ifBench":0.255,"lcr":0.547,"priceBlended":2,"priceInput":1,"priceOutput":5,"license":"proprietary"},
+            {"name":"Gemini 3 Flash Preview (Non-reasoning)","slug":"gemini-3-flash","releaseDate":"2025-12-17","creator":"Google","tps":202.376,"ttft":0.697,"intelligenceIndex":54.5,"codingIndex":53.1,"mathIndex":55.7,"mmluPro":0.882,"gpqa":0.812,"hle":0.141,"liveCodeBench":0.797,"sciCode":0.499,"math500":0.557,"aime":0.551,"aime2025":0.48,"ifBench":0.298,"lcr":0.433,"priceBlended":1.125,"priceInput":0.5,"priceOutput":3,"license":"proprietary"},
+            {"name":"DeepSeek V3.2 (Non-reasoning)","slug":"deepseek-v3-2","releaseDate":"2025-12-01","creator":"DeepSeek","tps":29.142,"ttft":1.311,"intelligenceIndex":52.4,"codingIndex":42.8,"mathIndex":59,"mmluPro":0.837,"gpqa":0.751,"hle":0.105,"liveCodeBench":0.593,"sciCode":0.387,"math500":0.59,"aime":0.49,"aime2025":0.39,"ifBench":0.305,"lcr":0.789,"priceBlended":0.315,"priceInput":0.28,"priceOutput":0.42,"license":"open"},
+            {"name":"gpt-oss-20B (high)","slug":"gpt-oss-20b","releaseDate":"2025-08-05","creator":"OpenAI","tps":308.92,"ttft":0.503,"intelligenceIndex":52.1,"codingIndex":40.7,"mathIndex":89.3,"mmluPro":0.748,"gpqa":0.688,"hle":0.098,"liveCodeBench":0.777,"sciCode":0.344,"math500":0.893,"aime":0.651,"aime2025":0.307,"ifBench":0.099,"lcr":0.602,"priceBlended":0.1,"priceInput":0.07,"priceOutput":0.2,"license":"proprietary"},
+            {"name":"DeepSeek R1 0528 (May '25)","slug":"deepseek-r1","releaseDate":"2025-05-28","creator":"DeepSeek","tps":0,"ttft":0,"intelligenceIndex":52,"codingIndex":44.1,"mathIndex":76,"mmluPro":0.849,"gpqa":0.813,"hle":0.149,"liveCodeBench":0.77,"sciCode":0.403,"math500":0.983,"aime":0.893,"aime2025":0.76,"ifBench":0.396,"lcr":0.547,"priceBlended":2.362,"priceInput":1.35,"priceOutput":3,"license":"open"},
+            {"name":"Gemini 2.5 Flash (Reasoning)","slug":"gemini-2-5-flash-reasoning","releaseDate":"2025-05-20","creator":"Google","tps":276.55,"ttft":15.879,"intelligenceIndex":51.2,"codingIndex":40.5,"mathIndex":73.3,"mmluPro":0.832,"gpqa":0.79,"hle":0.111,"liveCodeBench":0.695,"sciCode":0.394,"math500":0.981,"aime":0.823,"aime2025":0.733,"ifBench":0.503,"lcr":0.617,"priceBlended":0.85,"priceInput":0.3,"priceOutput":2.5,"license":"proprietary"},
+            {"name":"GPT-5 nano (high)","slug":"gpt-5-nano","releaseDate":"2025-08-07","creator":"OpenAI","tps":134.71,"ttft":96.203,"intelligenceIndex":51,"codingIndex":42.3,"mathIndex":83.7,"mmluPro":0.78,"gpqa":0.676,"hle":0.082,"liveCodeBench":0.789,"sciCode":0.366,"math500":0.837,"aime":0.676,"aime2025":0.417,"ifBench":0.113,"lcr":0.365,"priceBlended":0.138,"priceInput":0.05,"priceOutput":0.4,"license":"proprietary"},
+            {"name":"Claude 4.5 Sonnet (Non-reasoning)","slug":"claude-4-5-sonnet","releaseDate":"2025-09-29","creator":"Anthropic","tps":71.469,"ttft":1.976,"intelligenceIndex":49.6,"codingIndex":42.9,"mathIndex":37,"mmluPro":0.86,"gpqa":0.727,"hle":0.071,"liveCodeBench":0.59,"sciCode":0.428,"math500":0.37,"aime":0.427,"aime2025":0.513,"ifBench":0.27,"lcr":0.705,"priceBlended":6,"priceInput":3,"priceOutput":15,"license":"proprietary"},
+            {"name":"GPT-5.2 (Non-reasoning)","slug":"gpt-5-2-non-reasoning","releaseDate":"2025-12-11","creator":"OpenAI","tps":78.337,"ttft":0.666,"intelligenceIndex":48,"codingIndex":45.7,"mathIndex":51,"mmluPro":0.814,"gpqa":0.712,"hle":0.073,"liveCodeBench":0.669,"sciCode":0.404,"math500":0.51,"aime":0.474,"aime2025":0.38,"ifBench":0.298,"lcr":0.465,"priceBlended":4.813,"priceInput":1.75,"priceOutput":14,"license":"proprietary"},
+            {"name":"gpt-oss-120B (low)","slug":"gpt-oss-120b-low","releaseDate":"2025-08-05","creator":"OpenAI","tps":327.144,"ttft":0.452,"intelligenceIndex":47.5,"codingIndex":37.2,"mathIndex":66.7,"mmluPro":0.775,"gpqa":0.672,"hle":0.052,"liveCodeBench":0.707,"sciCode":0.36,"math500":0.667,"aime":0.583,"aime2025":0.437,"ifBench":0.05,"lcr":0.45,"priceBlended":0.263,"priceInput":0.15,"priceOutput":0.595,"license":"proprietary"},
+            {"name":"MiMo-V2-Flash (Non-reasoning)","slug":"mimo-v2-flash","releaseDate":"2025-12-16","creator":"Xiaomi","tps":115.439,"ttft":1.463,"intelligenceIndex":46.1,"codingIndex":30.1,"mathIndex":67.7,"mmluPro":0.744,"gpqa":0.656,"hle":0.08,"liveCodeBench":0.402,"sciCode":0.259,"math500":0.677,"aime":0.399,"aime2025":0.313,"ifBench":0.241,"lcr":0.839,"priceBlended":0.15,"priceInput":0.1,"priceOutput":0.3,"license":"open"},
+            {"name":"gpt-oss-20B (low)","slug":"gpt-oss-20b-low","releaseDate":"2025-08-05","creator":"OpenAI","tps":273.541,"ttft":0.589,"intelligenceIndex":44.3,"codingIndex":34.5,"mathIndex":62.3,"mmluPro":0.718,"gpqa":0.611,"hle":0.051,"liveCodeBench":0.652,"sciCode":0.34,"math500":0.623,"aime":0.578,"aime2025":0.31,"ifBench":0.043,"lcr":0.503,"priceBlended":0.1,"priceInput":0.07,"priceOutput":0.2,"license":"proprietary"},
+            {"name":"GPT-4.1","slug":"gpt-4-1","releaseDate":"2025-04-14","creator":"OpenAI","tps":116.474,"ttft":0.502,"intelligenceIndex":43.4,"codingIndex":32.2,"mathIndex":34.7,"mmluPro":0.806,"gpqa":0.666,"hle":0.046,"liveCodeBench":0.457,"sciCode":0.381,"math500":0.913,"aime":0.437,"aime2025":0.347,"ifBench":0.43,"lcr":0.61,"priceBlended":3.5,"priceInput":2,"priceOutput":8,"license":"proprietary"},
+            {"name":"Claude 4.5 Haiku (Non-reasoning)","slug":"claude-4-5-haiku","releaseDate":"2025-10-15","creator":"Anthropic","tps":104.605,"ttft":0.398,"intelligenceIndex":41.7,"codingIndex":37,"mathIndex":39,"mmluPro":0.8,"gpqa":0.646,"hle":0.043,"liveCodeBench":0.511,"sciCode":0.344,"math500":0.39,"aime":0.42,"aime2025":0.437,"ifBench":0.255,"lcr":0.325,"priceBlended":2,"priceInput":1,"priceOutput":5,"license":"proprietary"},
+            {"name":"Gemini 2.5 Flash (Non-reasoning)","slug":"gemini-2-5-flash","releaseDate":"2025-05-20","creator":"Google","tps":236.304,"ttft":0.384,"intelligenceIndex":40.4,"codingIndex":30,"mathIndex":60.3,"mmluPro":0.809,"gpqa":0.683,"hle":0.051,"liveCodeBench":0.495,"sciCode":0.291,"math500":0.932,"aime":0.5,"aime2025":0.603,"ifBench":0.39,"lcr":0.459,"priceBlended":0.85,"priceInput":0.3,"priceOutput":2.5,"license":"proprietary"},
+            {"name":"Mistral Large 3","slug":"mistral-large-3","releaseDate":"2025-12-02","creator":"Mistral","tps":47.908,"ttft":0.538,"intelligenceIndex":38.4,"codingIndex":32.5,"mathIndex":38,"mmluPro":0.807,"gpqa":0.68,"hle":0.041,"liveCodeBench":0.465,"sciCode":0.362,"math500":0.38,"aime":0.362,"aime2025":0.347,"ifBench":0.149,"lcr":0.246,"priceBlended":0.75,"priceInput":0.5,"priceOutput":1.5,"license":"open"},
+            {"name":"Llama 4 Maverick","slug":"llama-4-maverick","releaseDate":"2025-04-05","creator":"Meta","tps":131.828,"ttft":0.406,"intelligenceIndex":35.8,"codingIndex":26.4,"mathIndex":19.3,"mmluPro":0.809,"gpqa":0.671,"hle":0.048,"liveCodeBench":0.397,"sciCode":0.331,"math500":0.889,"aime":0.39,"aime2025":0.193,"ifBench":0.43,"lcr":0.46,"priceBlended":0.422,"priceInput":0.27,"priceOutput":0.85,"license":"open"},
+            {"name":"Llama 3.3 Instruct 70B","slug":"llama-3-3-instruct-70b","releaseDate":"2024-12-06","creator":"Meta","tps":115.874,"ttft":0.46,"intelligenceIndex":27.9,"codingIndex":19.2,"mathIndex":7.7,"mmluPro":0.713,"gpqa":0.498,"hle":0.04,"liveCodeBench":0.288,"sciCode":0.26,"math500":0.773,"aime":0.3,"aime2025":0.077,"ifBench":0.471,"lcr":0.15,"priceBlended":0.64,"priceInput":0.58,"priceOutput":0.71,"license":"open"},
+            {"name":"Llama 4 Scout","slug":"llama-4-scout","releaseDate":"2025-04-05","creator":"Meta","tps":116.548,"ttft":0.454,"intelligenceIndex":28.1,"codingIndex":16.1,"mathIndex":14,"mmluPro":0.752,"gpqa":0.587,"hle":0.043,"liveCodeBench":0.299,"sciCode":0.17,"math500":0.844,"aime":0.283,"aime2025":0.14,"ifBench":0.395,"lcr":0.258,"priceBlended":0.241,"priceInput":0.14,"priceOutput":0.545,"license":"open"},
+            {"name":"Llama 3.1 Instruct 405B","slug":"llama-3-1-instruct-405b","releaseDate":"2024-07-23","creator":"Meta","tps":24.988,"ttft":0.812,"intelligenceIndex":28.1,"codingIndex":22.2,"mathIndex":3,"mmluPro":0.732,"gpqa":0.515,"hle":0.042,"liveCodeBench":0.305,"sciCode":0.299,"math500":0.703,"aime":0.213,"aime2025":0.03,"ifBench":0.39,"lcr":0.243,"priceBlended":4.188,"priceInput":3.75,"priceOutput":6.75,"license":"open"},
+            {"name":"GPT-4o (Nov '24)","slug":"gpt-4o","releaseDate":"2024-11-20","creator":"OpenAI","tps":197.272,"ttft":0.365,"intelligenceIndex":27,"codingIndex":24,"mathIndex":6,"mmluPro":0.748,"gpqa":0.543,"hle":0.033,"liveCodeBench":0.309,"sciCode":0.333,"math500":0.759,"aime":0.15,"aime2025":0.06,"ifBench":0.343,"lcr":0,"priceBlended":4.375,"priceInput":2.5,"priceOutput":10,"license":"proprietary"},
+            {"name":"Gemma 3 27B Instruct","slug":"gemma-3-27b","releaseDate":"2025-03-12","creator":"Google","tps":46.857,"ttft":0.962,"intelligenceIndex":22.1,"codingIndex":12.8,"mathIndex":20.7,"mmluPro":0.669,"gpqa":0.428,"hle":0.047,"liveCodeBench":0.137,"sciCode":0.212,"math500":0.883,"aime":0.253,"aime2025":0.207,"ifBench":0.318,"lcr":0.057,"priceBlended":0,"priceInput":0,"priceOutput":0,"license":"open"},
+            {"name":"GPT-4o mini","slug":"gpt-4o-mini","releaseDate":"2024-07-18","creator":"OpenAI","tps":55.77,"ttft":0.578,"intelligenceIndex":21.2,"codingIndex":14.7,"mathIndex":0,"mmluPro":0.648,"gpqa":0.426,"hle":0.04,"liveCodeBench":0.234,"sciCode":0.229,"math500":0.789,"aime":0.117,"aime2025":0.147,"ifBench":0.31,"lcr":0.263,"priceBlended":0.263,"priceInput":0.15,"priceOutput":0.6,"license":"proprietary"}
+        ];
+
+        // State
+        let selectedModels = [];
+        let charts = {};
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeApp();
+        });
+
+        function initializeApp() {
+            populateModelSelect();
+            populateCreatorFilter();
+            setupEventListeners();
+            renderModelChips();
+            updateDashboard();
+            updateQuickStats();
+            document.getElementById('totalModels').textContent = modelData.length;
+            const maxIntel = Math.max(...modelData.map(m => m.intelligenceIndex || 0));
+            document.getElementById('maxIntelligence').textContent = maxIntel.toFixed(1);
+        }
+
+        function updateQuickStats() {
+            const validModels = modelData.filter(m => m.intelligenceIndex > 0);
+            
+            // Top performance model
+            const topPerf = validModels.reduce((a, b) => a.intelligenceIndex > b.intelligenceIndex ? a : b);
+            document.getElementById('topModel').textContent = topPerf.name.substring(0, 15) + (topPerf.name.length > 15 ? '...' : '');
+            
+            // Cheapest model with decent performance
+            const cheapModels = validModels.filter(m => m.priceBlended > 0 && m.intelligenceIndex > 30);
+            if (cheapModels.length > 0) {
+                const cheapest = cheapModels.reduce((a, b) => a.priceBlended < b.priceBlended ? a : b);
+                document.getElementById('cheapestModel').textContent = cheapest.name.substring(0, 15) + (cheapest.name.length > 15 ? '...' : '');
+            }
+            
+            // Fastest model
+            const fastest = validModels.filter(m => m.tps > 0).reduce((a, b) => a.tps > b.tps ? a : b);
+            document.getElementById('fastestModel').textContent = fastest.name.substring(0, 15) + (fastest.name.length > 15 ? '...' : '');
+            
+            // Best value
+            const valueModels = validModels.filter(m => m.priceBlended > 0);
+            if (valueModels.length > 0) {
+                const bestValue = valueModels.reduce((a, b) => 
+                    (a.intelligenceIndex / a.priceBlended) > (b.intelligenceIndex / b.priceBlended) ? a : b
+                );
+                document.getElementById('bestValueModel').textContent = bestValue.name.substring(0, 15) + (bestValue.name.length > 15 ? '...' : '');
+            }
+        }
+
+        function populateModelSelect() {
+            const select = document.getElementById('modelSelect');
+            const validModels = modelData.filter(m => m.priceInput > 0 || m.priceOutput > 0);
+            validModels.sort((a, b) => b.intelligenceIndex - a.intelligenceIndex);
+            
+            validModels.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model.slug;
+                option.textContent = `${model.name} (${model.creator}) - $${model.priceBlended.toFixed(2)}/1M`;
+                select.appendChild(option);
+            });
+        }
+
+        function populateCreatorFilter() {
+            const creators = [...new Set(modelData.map(m => m.creator))].filter(c => c).sort();
+            const select = document.getElementById('creatorFilter');
+            creators.forEach(creator => {
+                const option = document.createElement('option');
+                option.value = creator;
+                option.textContent = creator;
+                select.appendChild(option);
+            });
+        }
+
+        function setupEventListeners() {
+            document.getElementById('inputText').addEventListener('input', (e) => {
+                updateInputTokenCount();
+                document.getElementById('charCount').textContent = e.target.value.length;
+            });
+            document.getElementById('outputTokens').addEventListener('input', (e) => {
+                document.getElementById('outputTokenDisplay').textContent = parseInt(e.target.value).toLocaleString();
+            });
+        }
+
+        function updateInputTokenCount() {
+            const text = document.getElementById('inputText').value;
+            const tokens = Math.ceil(text.length / 3);
+            document.getElementById('inputTokenCount').textContent = tokens;
+        }
+
+        function showTab(tabName) {
+            document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active'));
+            
+            document.getElementById(`section-${tabName}`).classList.remove('hidden');
+            document.getElementById(`tab-${tabName}`).classList.add('tab-active');
+            
+            if (tabName === 'dashboard') setTimeout(updateDashboard, 100);
+            if (tabName === 'scatter') setTimeout(updateScatterPlot, 100);
+            if (tabName === 'heatmap') setTimeout(renderHeatmap, 100);
+            if (tabName === 'ranking') setTimeout(updateRanking, 100);
+        }
+
+        function calculateCost() {
+            const modelSlug = document.getElementById('modelSelect').value;
+            if (!modelSlug) { alert('모델을 선택해주세요'); return; }
+
+            const model = modelData.find(m => m.slug === modelSlug);
+            const inputText = document.getElementById('inputText').value;
+            let inputTokens = Math.ceil(inputText.length / 3) || 100;
+            let outputTokens = parseInt(document.getElementById('outputTokens').value);
+            const requestCount = parseInt(document.getElementById('requestCount').value) || 1;
+            
+            const isReasoning = document.getElementById('reasoningMode').checked;
+            const isAgent = document.getElementById('agentMode').checked;
+
+            let multiplier = 1;
+            if (isReasoning) multiplier *= 10;
+            if (isAgent) multiplier *= 20;
+
+            const effectiveInputTokens = inputTokens * multiplier;
+            const effectiveOutputTokens = outputTokens * multiplier;
+
+            const inputCost = (effectiveInputTokens / 1000000) * model.priceInput;
+            const outputCost = (effectiveOutputTokens / 1000000) * model.priceOutput;
+            const totalCost = inputCost + outputCost;
+            const monthlyCost = totalCost * requestCount;
+
+            const resultHTML = `
+                <div class="space-y-4">
+                    <div class="bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl p-6 text-center">
+                        <p class="text-sm opacity-80">1회 요청 비용</p>
+                        <p class="text-4xl font-bold mt-2">$${totalCost.toFixed(6)}</p>
+                        <p class="text-sm mt-2 opacity-80">≈ ₩${(totalCost * 1400).toFixed(2)}</p>
+                    </div>
+                    
+                    <div class="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl p-4 text-center">
+                        <p class="text-sm opacity-80">월간 예상 비용 (${requestCount.toLocaleString()}회)</p>
+                        <p class="text-2xl font-bold">$${monthlyCost.toFixed(2)} <span class="text-sm font-normal">(₩${(monthlyCost * 1400).toLocaleString()})</span></p>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-blue-50 rounded-lg p-4">
+                            <p class="text-sm text-blue-600 font-medium">입력 비용</p>
+                            <p class="text-xl font-bold text-blue-800">$${inputCost.toFixed(6)}</p>
+                            <p class="text-xs text-blue-500 mt-1">${effectiveInputTokens.toLocaleString()} 토큰</p>
+                        </div>
+                        <div class="bg-green-50 rounded-lg p-4">
+                            <p class="text-sm text-green-600 font-medium">출력 비용</p>
+                            <p class="text-xl font-bold text-green-800">$${outputCost.toFixed(6)}</p>
+                            <p class="text-xs text-green-500 mt-1">${effectiveOutputTokens.toLocaleString()} 토큰</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h4 class="font-semibold text-gray-700 mb-2">${model.name}</h4>
+                        <div class="grid grid-cols-3 gap-2 text-sm">
+                            <div class="text-center p-2 bg-white rounded">
+                                <p class="text-gray-500 text-xs">Intelligence</p>
+                                <p class="font-bold text-purple-600">${model.intelligenceIndex}</p>
+                            </div>
+                            <div class="text-center p-2 bg-white rounded">
+                                <p class="text-gray-500 text-xs">Coding</p>
+                                <p class="font-bold text-blue-600">${model.codingIndex}</p>
+                            </div>
+                            <div class="text-center p-2 bg-white rounded">
+                                <p class="text-gray-500 text-xs">Math</p>
+                                <p class="font-bold text-green-600">${model.mathIndex}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${multiplier > 1 ? `
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <p class="text-sm text-yellow-800">⚠️ 특수 옵션: 토큰 ${multiplier}배 증가</p>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+
+            document.getElementById('costResult').innerHTML = resultHTML;
+            showCostComparisonChart(effectiveInputTokens, effectiveOutputTokens, model.slug);
+        }
+
+        function showCostComparisonChart(inputTokens, outputTokens, currentSlug) {
+            const validModels = modelData.filter(m => (m.priceInput > 0 || m.priceOutput > 0));
+            
+            const comparisons = validModels.map(m => {
+                const cost = (inputTokens / 1000000) * m.priceInput + (outputTokens / 1000000) * m.priceOutput;
+                return { ...m, totalCost: cost };
+            }).sort((a, b) => a.totalCost - b.totalCost).slice(0, 10);
+
+            document.getElementById('costComparisonChart').classList.remove('hidden');
+            
+            const ctx = document.getElementById('costChart').getContext('2d');
+            if (charts.cost) charts.cost.destroy();
+            
+            charts.cost = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: comparisons.map(m => m.name.length > 20 ? m.name.substring(0, 20) + '...' : m.name),
+                    datasets: [{
+                        label: '예상 비용 ($)',
+                        data: comparisons.map(m => m.totalCost),
+                        backgroundColor: comparisons.map(m => m.slug === currentSlug ? 'rgba(99, 102, 241, 0.8)' : 'rgba(34, 197, 94, 0.6)'),
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function updateDashboard() {
+            const licenseFilter = document.getElementById('licenseFilter').value;
+            const minIntelligence = parseFloat(document.getElementById('minIntelligence').value) || 0;
+            const creatorFilter = document.getElementById('creatorFilter').value;
+
+            let filtered = modelData.filter(m => {
+                if (m.intelligenceIndex < minIntelligence) return false;
+                if (licenseFilter === 'proprietary' && m.license !== 'proprietary') return false;
+                if (licenseFilter === 'open' && m.license !== 'open') return false;
+                if (creatorFilter !== 'all' && m.creator !== creatorFilter) return false;
+                return true;
+            });
+
+            renderIntelligenceChart(filtered);
+            renderRadarChart(filtered);
+            renderCodingChart(filtered);
+            renderMathChart(filtered);
+            renderSpeedChart(filtered);
+            renderPriceDistChart(filtered);
+            renderLicenseChart(filtered);
+            renderCreatorChart(filtered);
+        }
+
+        function renderIntelligenceChart(data) {
+            const ctx = document.getElementById('intelligenceChart').getContext('2d');
+            const sorted = [...data].filter(d => d.intelligenceIndex > 0).sort((a, b) => b.intelligenceIndex - a.intelligenceIndex).slice(0, 15);
+            
+            if (charts.intelligence) charts.intelligence.destroy();
+            
+            charts.intelligence = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sorted.map(d => d.name.length > 25 ? d.name.substring(0, 25) + '...' : d.name),
+                    datasets: [{
+                        label: 'Intelligence Index',
+                        data: sorted.map(d => d.intelligenceIndex),
+                        backgroundColor: sorted.map(d => d.license === 'open' ? 'rgba(34, 197, 94, 0.7)' : 'rgba(99, 102, 241, 0.7)'),
+                        borderColor: sorted.map(d => d.license === 'open' ? 'rgb(34, 197, 94)' : 'rgb(99, 102, 241)'),
+                        borderWidth: 2,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { beginAtZero: true, max: 80 } }
+                }
+            });
+        }
+
+        function renderRadarChart(data) {
+            const ctx = document.getElementById('radarChart').getContext('2d');
+            const top5 = [...data].filter(d => d.intelligenceIndex > 0).sort((a, b) => b.intelligenceIndex - a.intelligenceIndex).slice(0, 5);
+            
+            if (charts.radar) charts.radar.destroy();
+            
+            const colors = ['rgba(99, 102, 241, 0.7)', 'rgba(34, 197, 94, 0.7)', 'rgba(249, 115, 22, 0.7)', 'rgba(236, 72, 153, 0.7)', 'rgba(14, 165, 233, 0.7)'];
+            
+            charts.radar = new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: ['Intelligence', 'Coding', 'Math', 'MMLU Pro', 'GPQA', 'Speed (norm)'],
+                    datasets: top5.map((m, i) => ({
+                        label: m.name.substring(0, 15),
+                        data: [
+                            m.intelligenceIndex,
+                            m.codingIndex,
+                            m.mathIndex,
+                            (m.mmluPro || 0) * 100,
+                            (m.gpqa || 0) * 100,
+                            Math.min(m.tps / 5, 100)
+                        ],
+                        backgroundColor: colors[i].replace('0.7', '0.2'),
+                        borderColor: colors[i],
+                        borderWidth: 2
+                    }))
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { r: { beginAtZero: true, max: 100 } }
+                }
+            });
+        }
+
+        function renderCodingChart(data) {
+            const ctx = document.getElementById('codingChart').getContext('2d');
+            const sorted = [...data].filter(d => d.codingIndex > 0).sort((a, b) => b.codingIndex - a.codingIndex).slice(0, 10);
+            
+            if (charts.coding) charts.coding.destroy();
+            
+            charts.coding = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sorted.map(d => d.name.length > 15 ? d.name.substring(0, 15) + '...' : d.name),
+                    datasets: [{
+                        label: 'Coding Index',
+                        data: sorted.map(d => d.codingIndex),
+                        backgroundColor: 'rgba(234, 179, 8, 0.7)',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function renderMathChart(data) {
+            const ctx = document.getElementById('mathChart').getContext('2d');
+            const sorted = [...data].filter(d => d.mathIndex > 0).sort((a, b) => b.mathIndex - a.mathIndex).slice(0, 10);
+            
+            if (charts.math) charts.math.destroy();
+            
+            charts.math = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sorted.map(d => d.name.length > 15 ? d.name.substring(0, 15) + '...' : d.name),
+                    datasets: [{
+                        label: 'Math Index',
+                        data: sorted.map(d => d.mathIndex),
+                        backgroundColor: 'rgba(239, 68, 68, 0.7)',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function renderSpeedChart(data) {
+            const ctx = document.getElementById('speedChart').getContext('2d');
+            const sorted = [...data].filter(d => d.tps > 0).sort((a, b) => b.tps - a.tps).slice(0, 10);
+            
+            if (charts.speed) charts.speed.destroy();
+            
+            charts.speed = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sorted.map(d => d.name.length > 15 ? d.name.substring(0, 15) + '...' : d.name),
+                    datasets: [{
+                        label: 'TPS',
+                        data: sorted.map(d => d.tps),
+                        backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function renderPriceDistChart(data) {
+            const ctx = document.getElementById('priceDistChart').getContext('2d');
+            const validData = data.filter(d => d.priceBlended > 0).sort((a, b) => a.priceBlended - b.priceBlended);
+            
+            if (charts.priceDist) charts.priceDist.destroy();
+            
+            // Group by price ranges
+            const ranges = ['$0-0.5', '$0.5-1', '$1-2', '$2-4', '$4-8', '$8+'];
+            const counts = [0, 0, 0, 0, 0, 0];
+            validData.forEach(d => {
+                if (d.priceBlended < 0.5) counts[0]++;
+                else if (d.priceBlended < 1) counts[1]++;
+                else if (d.priceBlended < 2) counts[2]++;
+                else if (d.priceBlended < 4) counts[3]++;
+                else if (d.priceBlended < 8) counts[4]++;
+                else counts[5]++;
+            });
+            
+            charts.priceDist = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ranges,
+                    datasets: [{
+                        label: '모델 수',
+                        data: counts,
+                        backgroundColor: ['rgba(34, 197, 94, 0.7)', 'rgba(59, 130, 246, 0.7)', 'rgba(168, 85, 247, 0.7)', 'rgba(249, 115, 22, 0.7)', 'rgba(239, 68, 68, 0.7)', 'rgba(107, 114, 128, 0.7)'],
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function renderLicenseChart(data) {
+            const ctx = document.getElementById('licenseChart').getContext('2d');
+            const proprietary = data.filter(d => d.license === 'proprietary').length;
+            const open = data.filter(d => d.license === 'open').length;
+            
+            if (charts.license) charts.license.destroy();
+            
+            charts.license = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Proprietary', 'Open Weights'],
+                    datasets: [{
+                        data: [proprietary, open],
+                        backgroundColor: ['rgba(99, 102, 241, 0.8)', 'rgba(34, 197, 94, 0.8)']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        }
+
+        function renderCreatorChart(data) {
+            const ctx = document.getElementById('creatorChart').getContext('2d');
+            const creatorCounts = {};
+            data.forEach(d => {
+                creatorCounts[d.creator] = (creatorCounts[d.creator] || 0) + 1;
+            });
+            
+            const sorted = Object.entries(creatorCounts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+            
+            if (charts.creator) charts.creator.destroy();
+            
+            charts.creator = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: sorted.map(s => s[0]),
+                    datasets: [{
+                        data: sorted.map(s => s[1]),
+                        backgroundColor: ['rgba(99, 102, 241, 0.8)', 'rgba(34, 197, 94, 0.8)', 'rgba(249, 115, 22, 0.8)', 'rgba(236, 72, 153, 0.8)', 'rgba(14, 165, 233, 0.8)', 'rgba(168, 85, 247, 0.8)']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } }
+                }
+            });
+        }
+
+        function renderModelChips() {
+            const container = document.getElementById('modelChips');
+            const validModels = modelData.filter(m => m.intelligenceIndex > 0).sort((a, b) => b.intelligenceIndex - a.intelligenceIndex);
+            
+            container.innerHTML = validModels.map(m => `
+                <button onclick="toggleModel('${m.slug}')" id="chip-${m.slug}" 
+                    class="model-chip px-3 py-1.5 rounded-full text-sm border border-gray-300 hover:border-purple-500 transition ${m.license === 'open' ? 'bg-green-50' : 'bg-gray-50'}">
+                    ${m.name}
+                </button>
+            `).join('');
+        }
+
+        function filterModels() {
+            const search = document.getElementById('modelSearch').value.toLowerCase();
+            const chips = document.querySelectorAll('#modelChips button');
+            chips.forEach(chip => {
+                const name = chip.textContent.toLowerCase();
+                chip.style.display = name.includes(search) ? '' : 'none';
+            });
+        }
+
+        function toggleModel(slug) {
+            const idx = selectedModels.indexOf(slug);
+            const chip = document.getElementById(`chip-${slug}`);
+            
+            if (idx > -1) {
+                selectedModels.splice(idx, 1);
+                chip.classList.remove('selected');
+            } else if (selectedModels.length < 5) {
+                selectedModels.push(slug);
+                chip.classList.add('selected');
+            } else {
+                alert('최대 5개의 모델만 선택할 수 있습니다');
+                return;
+            }
+            
+            updateSelectedModelsDisplay();
+            updateComparisonTable();
+            updateCompareCharts();
+        }
+
+        function updateSelectedModelsDisplay() {
+            const container = document.getElementById('selectedModels');
+            container.innerHTML = selectedModels.map(slug => {
+                const model = modelData.find(m => m.slug === slug);
+                return `
+                    <span class="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm">
+                        ${model.name}
+                        <button onclick="toggleModel('${slug}')" class="hover:text-purple-600 font-bold">×</button>
+                    </span>
+                `;
+            }).join('');
+        }
+
+        function updateCompareCharts() {
+            if (selectedModels.length < 2) return;
+            
+            const models = selectedModels.map(slug => modelData.find(m => m.slug === slug));
+            const colors = ['rgba(99, 102, 241, 0.7)', 'rgba(34, 197, 94, 0.7)', 'rgba(249, 115, 22, 0.7)', 'rgba(236, 72, 153, 0.7)', 'rgba(14, 165, 233, 0.7)'];
+            
+            // Radar comparison
+            const radarCtx = document.getElementById('compareRadarChart').getContext('2d');
+            if (charts.compareRadar) charts.compareRadar.destroy();
+            
+            charts.compareRadar = new Chart(radarCtx, {
+                type: 'radar',
+                data: {
+                    labels: ['Intelligence', 'Coding', 'Math', 'MMLU Pro', 'LiveCodeBench', 'Speed'],
+                    datasets: models.map((m, i) => ({
+                        label: m.name.substring(0, 15),
+                        data: [m.intelligenceIndex, m.codingIndex, m.mathIndex, (m.mmluPro || 0) * 100, (m.liveCodeBench || 0) * 100, Math.min(m.tps / 3, 100)],
+                        backgroundColor: colors[i].replace('0.7', '0.2'),
+                        borderColor: colors[i],
+                        borderWidth: 2
+                    }))
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { r: { beginAtZero: true, max: 100 } } }
+            });
+            
+            // Bar comparison
+            const barCtx = document.getElementById('compareBarChart').getContext('2d');
+            if (charts.compareBar) charts.compareBar.destroy();
+            
+            charts.compareBar = new Chart(barCtx, {
+                type: 'bar',
+                data: {
+                    labels: models.map(m => m.name.substring(0, 12)),
+                    datasets: [
+                        { label: 'Intelligence', data: models.map(m => m.intelligenceIndex), backgroundColor: 'rgba(99, 102, 241, 0.7)' },
+                        { label: 'Coding', data: models.map(m => m.codingIndex), backgroundColor: 'rgba(34, 197, 94, 0.7)' },
+                        { label: 'Math', data: models.map(m => m.mathIndex), backgroundColor: 'rgba(249, 115, 22, 0.7)' }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+
+        function updateComparisonTable() {
+            const container = document.getElementById('comparisonTable');
+            
+            if (selectedModels.length < 2) {
+                container.innerHTML = '<p class="text-center py-12 text-gray-400">비교할 모델을 2개 이상 선택하세요</p>';
+                return;
+            }
+
+            const models = selectedModels.map(slug => modelData.find(m => m.slug === slug));
+            
+            const benchmarks = [
+                { key: 'intelligenceIndex', name: 'Intelligence Index', format: v => v.toFixed(1) },
+                { key: 'codingIndex', name: 'Coding Index', format: v => v.toFixed(1) },
+                { key: 'mathIndex', name: 'Math Index', format: v => v.toFixed(1) },
+                { key: 'mmluPro', name: 'MMLU Pro', format: v => (v * 100).toFixed(1) + '%' },
+                { key: 'gpqa', name: 'GPQA', format: v => (v * 100).toFixed(1) + '%' },
+                { key: 'math500', name: 'MATH-500', format: v => (v * 100).toFixed(1) + '%' },
+                { key: 'aime', name: 'AIME', format: v => (v * 100).toFixed(1) + '%' },
+                { key: 'aime2025', name: 'AIME 2025', format: v => (v * 100).toFixed(1) + '%' },
+                { key: 'liveCodeBench', name: 'LiveCodeBench', format: v => (v * 100).toFixed(1) + '%' },
+                { key: 'hle', name: 'HLE', format: v => (v * 100).toFixed(1) + '%' },
+                { key: 'tps', name: 'TPS', format: v => v.toFixed(1) },
+                { key: 'ttft', name: 'TTFT (초)', format: v => v.toFixed(3) },
+                { key: 'priceInput', name: '입력 가격', format: v => '$' + v.toFixed(2) },
+                { key: 'priceOutput', name: '출력 가격', format: v => '$' + v.toFixed(2) }
+            ];
+
+            container.innerHTML = `
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase sticky left-0 bg-gray-50">벤치마크</th>
+                            ${models.map(m => `<th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">${m.name}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        ${benchmarks.map(b => {
+                            const values = models.map(m => m[b.key] || 0);
+                            const max = Math.max(...values);
+                            return `
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-3 text-sm font-medium text-gray-900 sticky left-0 bg-white">${b.name}</td>
+                                    ${models.map((m, i) => {
+                                        const val = m[b.key] || 0;
+                                        const isMax = val === max && val > 0;
+                                        return `<td class="px-4 py-3 text-sm text-center ${isMax ? 'bg-green-50 font-bold text-green-700' : 'text-gray-500'}">${b.format(val)}</td>`;
+                                    }).join('')}
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function updateScatterPlot() {
+            const xKey = document.getElementById('scatterX').value;
+            const yKey = document.getElementById('scatterY').value;
+            const sizeKey = document.getElementById('scatterSize').value;
+            const colorKey = document.getElementById('scatterColor').value;
+            
+            const validData = modelData.filter(m => m[xKey] > 0 && m[yKey] > 0);
+            
+            const ctx = document.getElementById('scatterChart').getContext('2d');
+            if (charts.scatter) charts.scatter.destroy();
+            
+            const creatorColors = {
+                'OpenAI': 'rgba(99, 102, 241, 0.7)',
+                'Google': 'rgba(34, 197, 94, 0.7)',
+                'Anthropic': 'rgba(249, 115, 22, 0.7)',
+                'xAI': 'rgba(236, 72, 153, 0.7)',
+                'DeepSeek': 'rgba(14, 165, 233, 0.7)',
+                'Meta': 'rgba(168, 85, 247, 0.7)',
+                'Mistral': 'rgba(245, 158, 11, 0.7)'
+            };
+            
+            const licenseColors = {
+                'proprietary': 'rgba(99, 102, 241, 0.7)',
+                'open': 'rgba(34, 197, 94, 0.7)'
+            };
+            
+            const maxSize = Math.max(...validData.map(d => d[sizeKey] || 1));
+            
+            charts.scatter = new Chart(ctx, {
+                type: 'bubble',
+                data: {
+                    datasets: [{
+                        label: 'Models',
+                        data: validData.map(d => ({
+                            x: d[xKey],
+                            y: d[yKey],
+                            r: Math.max(5, ((d[sizeKey] || 1) / maxSize) * 25),
+                            model: d
+                        })),
+                        backgroundColor: validData.map(d => 
+                            colorKey === 'license' ? licenseColors[d.license] || 'rgba(107, 114, 128, 0.7)' :
+                            creatorColors[d.creator] || 'rgba(107, 114, 128, 0.7)'
+                        )
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => {
+                                    const m = ctx.raw.model;
+                                    return [`${m.name}`, `${xKey}: ${m[xKey].toFixed(2)}`, `${yKey}: ${m[yKey].toFixed(2)}`];
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { title: { display: true, text: xKey } },
+                        y: { title: { display: true, text: yKey } }
+                    }
+                }
+            });
+
+            // Value charts
+            renderValueCharts();
+        }
+
+        function renderValueCharts() {
+            const validData = modelData.filter(m => m.priceBlended > 0 && m.intelligenceIndex > 0);
+            
+            // Intelligence per dollar
+            const valueData = validData.map(m => ({
+                ...m,
+                value: m.intelligenceIndex / m.priceBlended
+            })).sort((a, b) => b.value - a.value).slice(0, 10);
+            
+            const valueCtx = document.getElementById('valueChart').getContext('2d');
+            if (charts.value) charts.value.destroy();
+            
+            charts.value = new Chart(valueCtx, {
+                type: 'bar',
+                data: {
+                    labels: valueData.map(d => d.name.substring(0, 15)),
+                    datasets: [{
+                        label: 'Intelligence/$',
+                        data: valueData.map(d => d.value),
+                        backgroundColor: 'rgba(34, 197, 94, 0.7)',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+            
+            // Speed per dollar
+            const speedValueData = validData.filter(m => m.tps > 0).map(m => ({
+                ...m,
+                value: m.tps / m.priceBlended
+            })).sort((a, b) => b.value - a.value).slice(0, 10);
+            
+            const speedValueCtx = document.getElementById('speedValueChart').getContext('2d');
+            if (charts.speedValue) charts.speedValue.destroy();
+            
+            charts.speedValue = new Chart(speedValueCtx, {
+                type: 'bar',
+                data: {
+                    labels: speedValueData.map(d => d.name.substring(0, 15)),
+                    datasets: [{
+                        label: 'TPS/$',
+                        data: speedValueData.map(d => d.value),
+                        backgroundColor: 'rgba(249, 115, 22, 0.7)',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        function renderHeatmap() {
+            const count = parseInt(document.getElementById('heatmapCount').value);
+            const sortKey = document.getElementById('heatmapSort').value;
+            
+            const benchmarks = ['intelligenceIndex', 'codingIndex', 'mathIndex', 'mmluPro', 'gpqa', 'liveCodeBench', 'math500', 'aime'];
+            const benchmarkLabels = ['Intelligence', 'Coding', 'Math', 'MMLU Pro', 'GPQA', 'LiveCode', 'MATH-500', 'AIME'];
+            
+            const sorted = [...modelData].filter(m => m[sortKey] > 0).sort((a, b) => b[sortKey] - a[sortKey]).slice(0, count);
+            
+            // Get max values for normalization
+            const maxValues = {};
+            benchmarks.forEach(b => {
+                maxValues[b] = Math.max(...modelData.map(m => m[b] || 0));
+            });
+            
+            let html = `
+                <div class="overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead>
+                            <tr>
+                                <th class="px-3 py-2 text-left text-xs font-medium text-gray-500 sticky left-0 bg-white">모델</th>
+                                ${benchmarkLabels.map(l => `<th class="px-3 py-2 text-center text-xs font-medium text-gray-500">${l}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            sorted.forEach(m => {
+                html += `<tr><td class="px-3 py-2 text-sm font-medium text-gray-900 sticky left-0 bg-white">${m.name.substring(0, 25)}</td>`;
+                benchmarks.forEach(b => {
+                    const val = m[b] || 0;
+                    const normalized = val / maxValues[b];
+                    const hue = normalized * 120; // 0 = red, 120 = green
+                    const displayVal = b.includes('Index') ? val.toFixed(1) : (val * 100).toFixed(0) + '%';
+                    html += `<td class="px-3 py-2 text-center text-xs heatmap-cell" style="background: hsla(${hue}, 70%, 60%, 0.5)">${displayVal}</td>`;
+                });
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table></div>';
+            html += `<div class="mt-4 flex items-center justify-center gap-4 text-sm text-gray-500">
+                <span class="flex items-center gap-1"><span class="w-4 h-4 rounded" style="background: hsla(0, 70%, 60%, 0.5)"></span> 낮음</span>
+                <span class="flex items-center gap-1"><span class="w-4 h-4 rounded" style="background: hsla(60, 70%, 60%, 0.5)"></span> 중간</span>
+                <span class="flex items-center gap-1"><span class="w-4 h-4 rounded" style="background: hsla(120, 70%, 60%, 0.5)"></span> 높음</span>
+            </div>`;
+            
+            document.getElementById('heatmapContainer').innerHTML = html;
+            
+            // Correlation chart
+            renderCorrelationChart();
+        }
+
+        function renderCorrelationChart() {
+            const benchmarks = ['intelligenceIndex', 'codingIndex', 'mathIndex', 'mmluPro', 'gpqa'];
+            const labels = ['Intelligence', 'Coding', 'Math', 'MMLU', 'GPQA'];
+            
+            const ctx = document.getElementById('correlationChart').getContext('2d');
+            if (charts.correlation) charts.correlation.destroy();
+            
+            // Calculate correlations (simplified Pearson)
+            const validData = modelData.filter(m => benchmarks.every(b => m[b] > 0));
+            const correlationMatrix = [];
+            
+            for (let i = 0; i < benchmarks.length; i++) {
+                for (let j = 0; j < benchmarks.length; j++) {
+                    const x = validData.map(m => m[benchmarks[i]]);
+                    const y = validData.map(m => m[benchmarks[j]]);
+                    const corr = pearsonCorrelation(x, y);
+                    correlationMatrix.push({ x: i, y: j, v: corr });
+                }
+            }
+            
+            charts.correlation = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Correlation',
+                        data: correlationMatrix.map(c => ({
+                            x: c.x,
+                            y: c.y,
+                            v: c.v
+                        })),
+                        backgroundColor: correlationMatrix.map(c => `hsla(${c.v * 120}, 70%, 50%, 0.8)`),
+                        pointRadius: correlationMatrix.map(c => 25),
+                        pointStyle: 'rect'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { min: -0.5, max: 4.5, ticks: { callback: (v) => labels[v] || '' } },
+                        y: { min: -0.5, max: 4.5, ticks: { callback: (v) => labels[v] || '' } }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${labels[ctx.raw.x]} vs ${labels[ctx.raw.y]}: ${ctx.raw.v.toFixed(2)}`
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function pearsonCorrelation(x, y) {
+            const n = x.length;
+            const sumX = x.reduce((a, b) => a + b, 0);
+            const sumY = y.reduce((a, b) => a + b, 0);
+            const sumXY = x.reduce((total, xi, i) => total + xi * y[i], 0);
+            const sumX2 = x.reduce((total, xi) => total + xi * xi, 0);
+            const sumY2 = y.reduce((total, yi) => total + yi * yi, 0);
+            
+            const numerator = n * sumXY - sumX * sumY;
+            const denominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+            
+            return denominator === 0 ? 0 : numerator / denominator;
+        }
+
+        function updateRanking() {
+            const weights = {
+                intel: parseInt(document.getElementById('weightIntel').value),
+                coding: parseInt(document.getElementById('weightCoding').value),
+                math: parseInt(document.getElementById('weightMath').value),
+                speed: parseInt(document.getElementById('weightSpeed').value),
+                price: parseInt(document.getElementById('weightPrice').value)
+            };
+            
+            // Update displays
+            document.getElementById('weightIntelVal').textContent = weights.intel + '%';
+            document.getElementById('weightCodingVal').textContent = weights.coding + '%';
+            document.getElementById('weightMathVal').textContent = weights.math + '%';
+            document.getElementById('weightSpeedVal').textContent = weights.speed + '%';
+            document.getElementById('weightPriceVal').textContent = weights.price + '%';
+            
+            const total = Object.values(weights).reduce((a, b) => a + b, 0);
+            
+            // Normalize values
+            const maxVals = {
+                intel: Math.max(...modelData.map(m => m.intelligenceIndex || 0)),
+                coding: Math.max(...modelData.map(m => m.codingIndex || 0)),
+                math: Math.max(...modelData.map(m => m.mathIndex || 0)),
+                speed: Math.max(...modelData.map(m => m.tps || 0)),
+                price: Math.max(...modelData.filter(m => m.priceBlended > 0).map(m => m.priceBlended))
+            };
+            
+            const scored = modelData.filter(m => m.intelligenceIndex > 0).map(m => {
+                const score = (
+                    (m.intelligenceIndex / maxVals.intel) * weights.intel +
+                    ((m.codingIndex || 0) / maxVals.coding) * weights.coding +
+                    ((m.mathIndex || 0) / maxVals.math) * weights.math +
+                    ((m.tps || 0) / maxVals.speed) * weights.speed +
+                    (m.priceBlended > 0 ? (1 - m.priceBlended / maxVals.price) * weights.price : 0)
+                ) / total * 100;
+                
+                return { ...m, compositeScore: score };
+            }).sort((a, b) => b.compositeScore - a.compositeScore);
+            
+            // Ranking chart
+            const rankingCtx = document.getElementById('rankingChart').getContext('2d');
+            if (charts.ranking) charts.ranking.destroy();
+            
+            const top15 = scored.slice(0, 15);
+            
+            charts.ranking = new Chart(rankingCtx, {
+                type: 'bar',
+                data: {
+                    labels: top15.map(m => m.name.substring(0, 20)),
+                    datasets: [{
+                        label: '종합 점수',
+                        data: top15.map(m => m.compositeScore),
+                        backgroundColor: top15.map((m, i) => 
+                            i === 0 ? 'rgba(255, 215, 0, 0.8)' :
+                            i === 1 ? 'rgba(192, 192, 192, 0.8)' :
+                            i === 2 ? 'rgba(205, 127, 50, 0.8)' :
+                            'rgba(99, 102, 241, 0.7)'
+                        ),
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { x: { beginAtZero: true, max: 100 } }
+                }
+            });
+            
+            // Category winners
+            const categoryWinnersCtx = document.getElementById('categoryWinnersChart').getContext('2d');
+            if (charts.categoryWinners) charts.categoryWinners.destroy();
+            
+            const categories = ['Intelligence', 'Coding', 'Math', 'Speed', 'Value'];
+            const winners = [
+                modelData.filter(m => m.intelligenceIndex > 0).sort((a, b) => b.intelligenceIndex - a.intelligenceIndex)[0],
+                modelData.filter(m => m.codingIndex > 0).sort((a, b) => b.codingIndex - a.codingIndex)[0],
+                modelData.filter(m => m.mathIndex > 0).sort((a, b) => b.mathIndex - a.mathIndex)[0],
+                modelData.filter(m => m.tps > 0).sort((a, b) => b.tps - a.tps)[0],
+                modelData.filter(m => m.priceBlended > 0 && m.intelligenceIndex > 30)
+                    .sort((a, b) => (b.intelligenceIndex / b.priceBlended) - (a.intelligenceIndex / a.priceBlended))[0]
+            ];
+            
+            charts.categoryWinners = new Chart(categoryWinnersCtx, {
+                type: 'bar',
+                data: {
+                    labels: categories,
+                    datasets: [{
+                        label: '1위 점수',
+                        data: [
+                            winners[0]?.intelligenceIndex || 0,
+                            winners[1]?.codingIndex || 0,
+                            winners[2]?.mathIndex || 0,
+                            winners[3]?.tps || 0,
+                            winners[4] ? (winners[4].intelligenceIndex / winners[4].priceBlended) * 10 : 0
+                        ],
+                        backgroundColor: ['rgba(99, 102, 241, 0.7)', 'rgba(34, 197, 94, 0.7)', 'rgba(249, 115, 22, 0.7)', 'rgba(236, 72, 153, 0.7)', 'rgba(14, 165, 233, 0.7)'],
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                afterLabel: (ctx) => `Winner: ${winners[ctx.dataIndex]?.name || 'N/A'}`
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Ranking table
+            renderRankingTable(scored.slice(0, 20));
+        }
+
+        function renderRankingTable(data) {
+            const html = `
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">순위</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500">모델</th>
+                            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500">종합</th>
+                            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500">Intel</th>
+                            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500">Coding</th>
+                            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500">Math</th>
+                            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500">TPS</th>
+                            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500">가격</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        ${data.map((m, i) => `
+                            <tr class="${i < 3 ? 'bg-yellow-50' : 'bg-white'}">
+                                <td class="px-4 py-3 text-sm font-bold ${i === 0 ? 'text-yellow-600' : i === 1 ? 'text-gray-400' : i === 2 ? 'text-amber-700' : 'text-gray-600'}">
+                                    ${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                                </td>
+                                <td class="px-4 py-3 text-sm font-medium text-gray-900">${m.name}</td>
+                                <td class="px-4 py-3 text-sm text-center font-bold text-purple-600">${m.compositeScore.toFixed(1)}</td>
+                                <td class="px-4 py-3 text-sm text-center">${m.intelligenceIndex.toFixed(1)}</td>
+                                <td class="px-4 py-3 text-sm text-center">${(m.codingIndex || 0).toFixed(1)}</td>
+                                <td class="px-4 py-3 text-sm text-center">${(m.mathIndex || 0).toFixed(1)}</td>
+                                <td class="px-4 py-3 text-sm text-center">${(m.tps || 0).toFixed(0)}</td>
+                                <td class="px-4 py-3 text-sm text-center">$${(m.priceBlended || 0).toFixed(2)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            
+            document.getElementById('rankingTable').innerHTML = html;
+        }
+    </script>
+</body>
+</html>

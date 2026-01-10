@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+body { font-family: 'Noto Sans KR', sans-serif; overflow: hidden; background: #0f172a; touch-action: none; }
+canvas { display: block; width: 100%; height: 100%; }
+
+.ui-overlay { position: fixed; pointer-events: none; z-index: 10; }
+.ui-element { pointer-events: auto; }
+.glow-text { text-shadow: 0 0 10px currentColor; }
+
+.btn-game {
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+    box-shadow: 0 4px 0 #4c1d95;
+    transition: all 0.1s;
+}
+.btn-game:active { transform: translateY(4px); box-shadow: 0 0 0 #4c1d95; }
+
+.modal-overlay {
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(10px);
+}
+
+.skill-btn {
+    transition: all 0.2s;
+    border: 2px solid transparent;
+}
+.skill-btn:hover { transform: scale(1.05); }
+.skill-btn:active { transform: scale(0.95); }
+
+/* 모바일 버튼 스타일 */
+.mobile-btn {
+    transition: all 0.1s;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+}
+.mobile-btn:active { transform: scale(0.9); background: rgba(255,255,255,0.3); }
+
+.achievement-popup {
+    animation: achievementSlide 3s ease-out forwards;
+}
+@keyframes achievementSlide {
+    0% { transform: translateX(100%); opacity: 0; }
+    10% { transform: translateX(0); opacity: 1; }
+    90% { transform: translateX(0); opacity: 1; }
+    100% { transform: translateX(100%); opacity: 0; }
+}
+
+.minimap {
+    background: rgba(0,0,0,0.7);
+    border: 2px solid rgba(255,255,255,0.2);
+}
+
+.boss-health-bar {
+    background: linear-gradient(90deg, #ef4444, #f97316);
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+}
+
+.pet-bounce {
+    animation: petBounce 0.5s ease-in-out infinite;
+}
+@keyframes petBounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+}
+
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 4px; }

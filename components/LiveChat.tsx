@@ -39,9 +39,14 @@ const LiveChat: React.FC = () => {
         if (!currentChannel || !isOpen) return;
 
         // Unsubscribe previous if any (handled by useEffect cleanup)
-        const unsubscribe = storage.subscribeMessages(currentChannel.id, (msgs) => {
-            const chatMsgs: ChatMessage[] = msgs.map(m => {
-                const sender = storage.getUserByRawId(m.sender_id);
+        const unsubscribe = storage.subscribeMessages(currentChannel.id, async (msgs) => {
+            // Fetch user data for each sender (async to handle Firestore fallback)
+            const chatMsgs: ChatMessage[] = await Promise.all(msgs.map(async m => {
+                let sender = storage.getUserByRawId(m.sender_id);
+                if (!sender) {
+                    // Try fetching from Firestore
+                    sender = await storage.fetchUserById(m.sender_id);
+                }
                 return {
                     id: m.id,
                     user_id: m.sender_id,
@@ -50,7 +55,7 @@ const LiveChat: React.FC = () => {
                     timestamp: m.created_at,
                     user_level: sender ? sender.level : 1
                 };
-            });
+            }));
             setMessages(chatMsgs);
         });
         return () => unsubscribe();
@@ -130,8 +135,12 @@ const LiveChat: React.FC = () => {
                                 <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
                                     {showHeader && (
                                         <div className="flex items-center gap-2 mb-1 mt-1">
-                                            <UserAvatar profile={storage.getUserByRawId(msg.user_id) as any} size="sm" />
-                                            <UserNickname profile={storage.getUserByRawId(msg.user_id) as any} className="text-[11px]" />
+                                            {storage.getUserByRawId(msg.user_id) && <UserAvatar profile={storage.getUserByRawId(msg.user_id) as any} size="sm" />}
+                                            {storage.getUserByRawId(msg.user_id) ? (
+                                                <UserNickname profile={storage.getUserByRawId(msg.user_id) as any} className="text-[11px]" />
+                                            ) : (
+                                                <span className="text-[11px] font-bold text-gray-500">{msg.username || 'Unknown'}</span>
+                                            )}
                                             <span className="text-[10px] text-gray-400">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                         </div>
                                     )}

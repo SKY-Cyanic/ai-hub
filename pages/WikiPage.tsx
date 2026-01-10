@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { storage } from '../services/storage';
 import { WikiPage as WikiPageType } from '../types';
-import { Book, Edit3, Save, ArrowLeft, Globe, Clock, User as UserIcon, Network, FileText, Share2, Maximize, X } from 'lucide-react';
+import { Book, Edit3, Save, ArrowLeft, Globe, Clock, User as UserIcon, Network, FileText, Share2, Maximize, X, Sparkles, Loader } from 'lucide-react';
 import WikiGraphView from '../components/WikiGraph/WikiGraphView';
 import SystemStatus from '../components/SystemStatus';
+import ReactMarkdown from 'react-markdown';
 
 const WikiPage: React.FC = () => {
     const { slug } = useParams<{ slug: string }>();
@@ -21,6 +23,21 @@ const WikiPage: React.FC = () => {
     const [wikiLang, setWikiLang] = useState<'ko' | 'en'>('ko');
     const [wikiContent, setWikiContent] = useState<string>('');
     const [wikiLoading, setWikiLoading] = useState(false);
+    const [isSummarizing, setIsSummarizing] = useState(false);
+    const [summaryContent, setSummaryContent] = useState<string>('');
+
+    // Helper: Convert [[wiki links]] and [1] references to internal links
+    const processWikiLinks = (content: string): string => {
+        // Convert [[Link Text]] to markdown links
+        let processed = content.replace(/\[\[([^\]]+)\]\]/g, (_, linkText) => {
+            return `[${linkText}](/wiki/${encodeURIComponent(linkText)})`;
+        });
+        // Convert [number] references to wiki links (e.g., [1] -> link to related topic)
+        processed = processed.replace(/\[([1-9]\d*)\]/g, (_, num) => {
+            return `<sup class="text-blue-500 cursor-pointer hover:underline" title="참조 ${num}">[${num}]</sup>`;
+        });
+        return processed;
+    };
 
     const fetchWikipedia = async (title: string, lang: 'ko' | 'en') => {
         // Skip fetch for new document slugs
@@ -31,20 +48,97 @@ const WikiPage: React.FC = () => {
         setWikiLoading(true);
         setWikiContent('');
         try {
-            const endpoint = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
-            const res = await fetch(endpoint);
-            if (res.ok) {
-                const data = await res.json();
-                let html = `<h2>${data.title}</h2><p>${data.extract || '요약 정보가 없습니다.'}</p>`;
-                if (data.content_urls?.desktop?.page) {
-                    html += `<p class="mt-4"><a href="${data.content_urls.desktop.page}" target="_blank" class="text-blue-600 hover:underline">위키백과에서 전체 문서 보기 →</a></p>`;
+            // Fetch summary first
+            const summaryRes = await fetch(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`);
+
+            // Fetch full article HTML
+            const htmlRes = await fetch(`https://${lang}.wikipedia.org/api/rest_v1/page/html/${encodeURIComponent(title)}`);
+
+            if (summaryRes.ok) {
+                const summaryData = await summaryRes.json();
+                let content = '';
+
+                // Title and thumbnail
+                content += `<div class="wiki-article">`;
+                content += `<h1 class="text-2xl font-black text-gray-800 dark:text-white mb-4">${summaryData.title}</h1>`;
+
+                // Thumbnail image if exists
+                if (summaryData.thumbnail?.source) {
+                    content += `<div class="float-right ml-4 mb-4 max-w-[200px]">`;
+                    content += `<img src="${summaryData.thumbnail.source}" alt="${summaryData.title}" class="rounded-lg shadow-lg w-full" />`;
+                    content += `</div>`;
                 }
-                setWikiContent(html);
+
+                // Summary/Extract
+                content += `<p class="text-gray-700 dark:text-gray-300 leading-relaxed mb-6 text-base">${summaryData.extract || '요약 정보가 없습니다.'}</p>`;
+
+                // Full content if available
+                if (htmlRes.ok) {
+                    const htmlText = await htmlRes.text();
+                    // Parse and extract main content sections
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(htmlText, 'text/html');
+
+                    // Get all section headings and content
+                    const sections = doc.querySelectorAll('section[data-mw-section-id]');
+                    sections.forEach((section, idx) => {
+                        if (idx > 0 && idx < 6) { // Skip lead, limit sections
+                            const heading = section.querySelector('h2, h3');
+                            const paragraphs = section.querySelectorAll('p');
+                            if (heading && paragraphs.length > 0) {
+                                content += `<h2 class="text-lg font-bold text-gray-800 dark:text-gray-200 mt-6 mb-3 border-b border-gray-200 dark:border-gray-700 pb-2">${heading.textContent}</h2>`;
+                                paragraphs.forEach(p => {
+                                    if (p.textContent && p.textContent.trim().length > 20) {
+                                        // Get paragraph HTML and convert wiki links to internal links
+                                        let pHtml = p.innerHTML || p.textContent;
+                                        // Convert Wikipedia internal links to our wiki links
+                                        pHtml = pHtml.replace(/<a[^>]*href="\/wiki\/([^"#]+)[^"]*"[^>]*>([^<]+)<\/a>/g,
+                                            (_, linkTarget, linkText) => {
+                                                const decoded = decodeURIComponent(linkTarget);
+                                                return `<a href="/wiki/${encodeURIComponent(decoded)}" class="text-blue-600 dark:text-blue-400 hover:underline cursor-pointer" data-internal="true">${linkText}</a>`;
+                                            }
+                                        );
+                                        // Remove external link formatting [1] etc and style them
+                                        pHtml = pHtml.replace(/\[(\d+)\]/g, '<sup class="text-blue-500 text-xs">[$1]</sup>');
+                                        content += `<p class="text-gray-600 dark:text-gray-400 leading-relaxed mb-3">${pHtml}</p>`;
+                                    }
+                                });
+                            }
+                        }
+                    });
+                }
+
+                // Related Links Section
+                content += `<div class="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">`;
+                content += `<h3 class="text-sm font-black text-gray-500 uppercase tracking-wider mb-3">🔗 관련 링크</h3>`;
+                content += `<div class="flex flex-wrap gap-2">`;
+
+                // Wikipedia link
+                if (summaryData.content_urls?.desktop?.page) {
+                    content += `<a href="${summaryData.content_urls.desktop.page}" target="_blank" class="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-xs font-medium hover:bg-blue-200 dark:hover:bg-blue-800 transition">📖 Wikipedia</a>`;
+                }
+
+                // YouTube search link
+                content += `<a href="https://www.youtube.com/results?search_query=${encodeURIComponent(title)}" target="_blank" class="inline-flex items-center gap-1 px-3 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg text-xs font-medium hover:bg-red-200 dark:hover:bg-red-800 transition">🎬 YouTube</a>`;
+
+                // Google Scholar link
+                content += `<a href="https://scholar.google.com/scholar?q=${encodeURIComponent(title)}" target="_blank" class="inline-flex items-center gap-1 px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded-lg text-xs font-medium hover:bg-green-200 dark:hover:bg-green-800 transition">📚 Scholar</a>`;
+
+                // Namu Wiki link (Korean)
+                if (lang === 'ko') {
+                    content += `<a href="https://namu.wiki/w/${encodeURIComponent(title)}" target="_blank" class="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg text-xs font-medium hover:bg-purple-200 dark:hover:bg-purple-800 transition">🌿 나무위키</a>`;
+                }
+
+                content += `</div></div>`;
+                content += `</div>`;
+
+                setWikiContent(content);
             } else {
-                setWikiContent('');
+                setWikiContent('<div class="text-center py-10 text-gray-400">위키백과에서 해당 문서를 찾을 수 없습니다.</div>');
             }
         } catch (e) {
-            setWikiContent('');
+            console.error('Wikipedia fetch error:', e);
+            setWikiContent('<div class="text-center py-10 text-gray-400">위키백과 로드 중 오류가 발생했습니다.</div>');
         } finally {
             setWikiLoading(false);
         }
@@ -174,7 +268,7 @@ const WikiPage: React.FC = () => {
                         <FileText size={16} /> 문서 뷰
                     </button>
                     <button
-                        onClick={() => setViewMode('graph')}
+                        onClick={() => { console.log('Graph view clicked'); setViewMode('graph'); }}
                         className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${viewMode === 'graph' ? 'bg-white dark:bg-gray-700 shadow text-indigo-600 dark:text-indigo-300' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}
                     >
                         <Network size={16} /> 그래프 뷰
@@ -271,8 +365,79 @@ const WikiPage: React.FC = () => {
                                 <div className="p-6 prose dark:prose-invert max-w-none min-h-[400px]">
                                     {sourceTab === 'community' ? (
                                         page ? (
-                                            <div className="whitespace-pre-wrap leading-relaxed text-gray-700 dark:text-gray-300">
-                                                {page.content}
+                                            <div className="wiki-content">
+                                                {/* AI Summarization Button */}
+                                                <div className="flex justify-end mb-4">
+                                                    <button
+                                                        onClick={async () => {
+                                                            setIsSummarizing(true);
+                                                            try {
+                                                                // Simple extractive summarization (first 2-3 sentences of each paragraph)
+                                                                const sentences = page.content.split(/[.!?]\s+/).filter(s => s.length > 20);
+                                                                const summary = sentences.slice(0, Math.min(5, sentences.length)).join('. ') + '.';
+                                                                setSummaryContent(summary);
+                                                            } catch (e) {
+                                                                setSummaryContent('요약 생성에 실패했습니다.');
+                                                            }
+                                                            setIsSummarizing(false);
+                                                        }}
+                                                        className="flex items-center gap-2 px-3 py-1.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-lg text-xs font-medium hover:bg-purple-200 dark:hover:bg-purple-800 transition"
+                                                        disabled={isSummarizing}
+                                                    >
+                                                        {isSummarizing ? <Loader size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                                                        AI 요약
+                                                    </button>
+                                                </div>
+
+                                                {/* Summary Display */}
+                                                {summaryContent && (
+                                                    <div className="mb-6 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-200 dark:border-purple-800">
+                                                        <h4 className="text-sm font-bold text-purple-700 dark:text-purple-300 mb-2 flex items-center gap-2">
+                                                            <Sparkles size={14} /> AI 요약
+                                                        </h4>
+                                                        <p className="text-sm text-purple-600 dark:text-purple-400 leading-relaxed">{summaryContent}</p>
+                                                    </div>
+                                                )}
+
+                                                {/* Markdown Content with Internal Wiki Links */}
+                                                <ReactMarkdown
+                                                    components={{
+                                                        a: ({ href, children }) => {
+                                                            // Check if it's an internal wiki link
+                                                            if (href?.startsWith('/wiki/')) {
+                                                                return (
+                                                                    <Link
+                                                                        to={href}
+                                                                        className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                                                                    >
+                                                                        {children}
+                                                                    </Link>
+                                                                );
+                                                            }
+                                                            // External link
+                                                            return (
+                                                                <a
+                                                                    href={href}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="text-blue-600 dark:text-blue-400 hover:underline"
+                                                                >
+                                                                    {children}
+                                                                </a>
+                                                            );
+                                                        },
+                                                        h1: ({ children }) => <h1 className="text-2xl font-black text-gray-800 dark:text-white mb-4 mt-6">{children}</h1>,
+                                                        h2: ({ children }) => <h2 className="text-xl font-bold text-gray-800 dark:text-white mb-3 mt-5 border-b border-gray-200 dark:border-gray-700 pb-2">{children}</h2>,
+                                                        h3: ({ children }) => <h3 className="text-lg font-bold text-gray-700 dark:text-gray-200 mb-2 mt-4">{children}</h3>,
+                                                        p: ({ children }) => <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-4">{children}</p>,
+                                                        ul: ({ children }) => <ul className="list-disc list-inside mb-4 space-y-1 text-gray-700 dark:text-gray-300">{children}</ul>,
+                                                        ol: ({ children }) => <ol className="list-decimal list-inside mb-4 space-y-1 text-gray-700 dark:text-gray-300">{children}</ol>,
+                                                        code: ({ children }) => <code className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-sm font-mono text-pink-600 dark:text-pink-400">{children}</code>,
+                                                        blockquote: ({ children }) => <blockquote className="border-l-4 border-indigo-500 pl-4 italic text-gray-600 dark:text-gray-400 my-4">{children}</blockquote>,
+                                                    }}
+                                                >
+                                                    {processWikiLinks(page.content)}
+                                                </ReactMarkdown>
                                             </div>
                                         ) : (
                                             <div className="text-center py-16 bg-gray-50 dark:bg-gray-900/50 rounded-xl">
@@ -305,7 +470,42 @@ const WikiPage: React.FC = () => {
                                             {wikiLoading ? (
                                                 <div className="text-center py-10 text-gray-400 animate-pulse">위키백과에서 불러오는 중...</div>
                                             ) : wikiContent ? (
-                                                <div className="text-gray-700 dark:text-gray-300 leading-relaxed" dangerouslySetInnerHTML={{ __html: wikiContent }} />
+                                                <div>
+                                                    <div
+                                                        className="text-gray-700 dark:text-gray-300 leading-relaxed"
+                                                        onClick={(e) => {
+                                                            // Handle clicks on internal wiki links
+                                                            const target = e.target as HTMLAnchorElement;
+                                                            if (target.tagName === 'A' && target.getAttribute('data-internal') === 'true') {
+                                                                e.preventDefault();
+                                                                const href = target.getAttribute('href');
+                                                                if (href) {
+                                                                    navigate(href);
+                                                                }
+                                                            }
+                                                        }}
+                                                        dangerouslySetInnerHTML={{ __html: wikiContent }}
+                                                    />
+                                                    <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                                                        <button
+                                                            onClick={() => {
+                                                                // Extract text from wikiContent HTML
+                                                                const tempDiv = document.createElement('div');
+                                                                tempDiv.innerHTML = wikiContent;
+                                                                const plainText = tempDiv.textContent || tempDiv.innerText || '';
+                                                                // Set to community edit mode
+                                                                setEditContent(`# ${slug}\n\n${plainText.substring(0, 3000)}...\n\n---\n*위키백과에서 가져온 내용입니다. 자유롭게 수정해주세요.*`);
+                                                                setEditTitle(slug || '');
+                                                                setSourceTab('community');
+                                                                setIsEditing(true);
+                                                            }}
+                                                            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg"
+                                                        >
+                                                            <Edit3 size={16} /> 커뮤니티 위키로 가져오기
+                                                        </button>
+                                                        <p className="text-xs text-gray-400 mt-2">위키백과 내용을 가져와 커뮤니티에서 자유롭게 편집할 수 있습니다.</p>
+                                                    </div>
+                                                </div>
                                             ) : (
                                                 <div className="text-center py-10 text-gray-400">위키백과에서 해당 문서를 찾을 수 없습니다.</div>
                                             )}
@@ -353,9 +553,9 @@ const WikiPage: React.FC = () => {
                 </aside>
             </div>
 
-            {/* Full Screen Graph Modal */}
-            {viewMode === 'graph' && (
-                <div className="fixed inset-0 z-50 bg-slate-900/95 backdrop-blur-sm flex items-center justify-center p-4">
+            {/* Full Screen Graph Modal - Using Portal */}
+            {viewMode === 'graph' && createPortal(
+                <div className="fixed inset-0 z-[9999] bg-slate-900/95 backdrop-blur-sm flex items-center justify-center p-4">
                     <div className="w-full h-full max-w-7xl max-h-[90vh] bg-slate-900 rounded-3xl overflow-hidden shadow-2xl border border-gray-700 flex flex-col relative">
                         <button
                             onClick={() => setViewMode('text')}
@@ -363,11 +563,12 @@ const WikiPage: React.FC = () => {
                         >
                             <X size={24} />
                         </button>
-                        <div className="flex-1 relative">
-                            <WikiGraphView initialSlug={slug} onNodeSelect={(s) => { handleNodeSelect(s); setViewMode('text'); }} />
+                        <div className="flex-1 relative min-h-[500px]">
+                            <WikiGraphView initialSlug={slug} onNodeSelect={handleNodeSelect} />
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

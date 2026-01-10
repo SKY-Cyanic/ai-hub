@@ -1,0 +1,3702 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🦠 바이러스 랩 - Virus Lab: AI & Science</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=Orbitron:wght@400;700;900&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #0a0a0a;
+            font-family: 'Noto Sans KR', 'Orbitron', sans-serif;
+        }
+
+        #gameCanvas {
+            display: block;
+        }
+
+        .game-font {
+            font-family: 'Orbitron', 'Noto Sans KR', sans-serif;
+        }
+
+        .korean-font {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+
+        .ui-panel {
+            background: linear-gradient(135deg, rgba(10, 10, 30, 0.95), rgba(30, 10, 50, 0.9));
+            backdrop-filter: blur(15px);
+            border: 2px solid rgba(138, 43, 226, 0.4);
+            box-shadow: 0 0 40px rgba(138, 43, 226, 0.3), inset 0 0 20px rgba(138, 43, 226, 0.1);
+        }
+
+        .science-panel {
+            background: linear-gradient(135deg, rgba(0, 50, 80, 0.95), rgba(0, 30, 60, 0.9));
+            border: 2px solid rgba(0, 200, 255, 0.4);
+            box-shadow: 0 0 40px rgba(0, 200, 255, 0.3);
+        }
+
+        .challenge-panel {
+            background: linear-gradient(135deg, rgba(80, 0, 0, 0.95), rgba(50, 0, 0, 0.9));
+            border: 2px solid rgba(255, 50, 50, 0.6);
+            box-shadow: 0 0 40px rgba(255, 0, 0, 0.5);
+        }
+
+        .glow-text {
+            text-shadow: 0 0 10px rgba(138, 43, 226, 0.8), 0 0 20px rgba(138, 43, 226, 0.5);
+        }
+
+        .glow-red {
+            text-shadow: 0 0 10px rgba(255, 0, 0, 0.8), 0 0 20px rgba(255, 0, 0, 0.5);
+        }
+
+        .xp-bar {
+            background: linear-gradient(90deg, #8b5cf6, #d946ef, #8b5cf6);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite linear;
+        }
+
+        .hp-bar {
+            background: linear-gradient(90deg, #ef4444, #f97316, #ef4444);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite linear;
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: 200% 0;
+            }
+
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
+        @keyframes float {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-5px);
+            }
+        }
+
+        @keyframes danger-pulse {
+
+            0%,
+            100% {
+                opacity: 0.3;
+            }
+
+            50% {
+                opacity: 0.8;
+            }
+        }
+
+        .pulse-anim {
+            animation: pulse 1.5s infinite;
+        }
+
+        .float-anim {
+            animation: float 2s infinite ease-in-out;
+        }
+
+        .danger-flash {
+            animation: danger-pulse 0.5s infinite;
+        }
+
+        .skill-btn {
+            transition: all 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .skill-btn:hover:not(:disabled) {
+            transform: scale(1.1);
+            box-shadow: 0 0 20px rgba(138, 43, 226, 0.6);
+        }
+
+        .skill-cooldown {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.7);
+        }
+
+        .quiz-option {
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .quiz-option:hover {
+            transform: translateX(10px);
+            background: rgba(0, 200, 255, 0.3);
+        }
+
+        .warning-border {
+            border: 3px solid red;
+            animation: danger-pulse 0.3s infinite;
+        }
+
+        .mission-panel {
+            background: linear-gradient(135deg, rgba(255, 165, 0, 0.9), rgba(200, 100, 0, 0.8));
+            border: 2px solid rgba(255, 215, 0, 0.6);
+            box-shadow: 0 0 20px rgba(255, 165, 0, 0.4);
+        }
+
+        .strain-active {
+            border: 2px solid #ffffff;
+            transform: scale(1.1);
+            box-shadow: 0 0 15px currentColor;
+        }
+    </style>
+</head>
+
+<body class="bg-black">
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- 도전 모드 경고 오버레이 -->
+    <div id="challengeOverlay" class="fixed inset-0 pointer-events-none z-10 hidden">
+        <div class="absolute inset-0 bg-red-900/20 danger-flash"></div>
+    </div>
+
+    <!-- 과학 팁 팝업 -->
+    <div id="scienceTip"
+        class="fixed bottom-24 left-1/2 -translate-x-1/2 pointer-events-none opacity-0 transition-opacity duration-500 z-30">
+        <div class="science-panel rounded-xl px-6 py-4 max-w-lg">
+            <div class="flex items-center gap-3">
+                <div class="text-3xl" id="tipIcon">🔬</div>
+                <div>
+                    <div class="text-cyan-400 font-bold text-sm korean-font">과학 상식</div>
+                    <div class="text-white korean-font" id="tipText">팁 내용</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI 분석 패널 -->
+    <div id="aiAnalysis" class="fixed top-20 right-4 pointer-events-none opacity-0 transition-opacity z-30">
+        <div class="science-panel rounded-xl px-4 py-3 w-64">
+            <div class="flex items-center gap-2 mb-2">
+                <div class="text-xl">🤖</div>
+                <div class="text-pink-400 font-bold text-sm korean-font">AI 분석</div>
+            </div>
+            <div class="text-white text-sm korean-font" id="aiText">분석 중...</div>
+        </div>
+    </div>
+
+    <!-- 돌발 미션 패널 -->
+    <div id="missionDisplay" class="fixed top-44 right-4 z-20 transition-all duration-500 transform translate-x-full">
+        <div class="mission-panel rounded-xl px-5 py-4 w-64">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl animate-bounce">🎯</span>
+                    <span class="text-white font-bold text-sm korean-font">긴급 미션</span>
+                </div>
+                <span id="missionTimer" class="text-red-900 font-bold bg-white/30 px-2 rounded text-xs">30s</span>
+            </div>
+            <div id="missionText" class="text-white text-sm font-bold mb-2 korean-font shadow-black drop-shadow-md">세포
+                10마리 감염</div>
+            <div class="w-full bg-black/30 rounded-full h-2">
+                <div id="missionProgress" class="bg-white h-full rounded-full transition-all duration-300"
+                    style="width: 0%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 연구 포인트 -->
+    <div id="researchDisplay" class="fixed top-4 left-1/2 -translate-x-1/2 z-20">
+        <div class="science-panel rounded-full px-6 py-2 flex items-center gap-4">
+            <div class="flex items-center gap-2">
+                <span class="text-2xl">🔬</span>
+                <span class="text-cyan-400 font-bold game-font" id="researchPoints">0</span>
+                <span class="text-gray-400 text-sm korean-font">연구</span>
+            </div>
+            <div class="w-px h-6 bg-cyan-800"></div>
+            <div class="flex items-center gap-2">
+                <span class="text-2xl">🧬</span>
+                <span class="text-green-400 font-bold game-font" id="dnaCollected">0</span>
+                <span class="text-gray-400 text-sm korean-font">DNA</span>
+            </div>
+            <div class="w-px h-6 bg-cyan-800"></div>
+            <div id="difficultyBadge" class="px-3 py-1 rounded-full text-xs font-bold korean-font bg-green-600">학습</div>
+        </div>
+    </div>
+
+    <!-- 보스 HP 바 -->
+    <div id="bossHpContainer" class="fixed top-24 left-1/2 -translate-x-1/2 w-1/2 max-w-2xl hidden z-20">
+        <div class="flex justify-between text-red-400 font-black mb-1 game-font text-lg shadow-black drop-shadow-md">
+            <span id="bossName">BOSS</span>
+            <span id="bossHpText">100%</span>
+        </div>
+        <div class="w-full h-6 bg-black/70 border-2 border-red-600 rounded-full overflow-hidden">
+            <div id="bossHpBar"
+                class="h-full bg-gradient-to-r from-red-600 via-orange-500 to-red-600 transition-all duration-200"
+                style="width: 100%"></div>
+        </div>
+    </div>
+
+    <!-- 스테이지 알림 -->
+    <div id="stageDisplay" class="fixed top-4 left-4 z-20">
+        <div class="science-panel rounded-xl px-4 py-2">
+            <div class="text-xs text-cyan-400 korean-font">현재 위치</div>
+            <div class="text-xl font-bold text-white korean-font" id="stageName">혈관</div>
+            <div class="text-xs text-gray-400 korean-font" id="stageDesc">강한 혈류</div>
+        </div>
+    </div>
+
+    <!-- UI 오버레이 -->
+    <div id="ui" class="fixed top-12 left-0 w-full p-4 pointer-events-none">
+        <div class="flex justify-between items-start max-w-7xl mx-auto">
+            <!-- 왼쪽 상태 패널 -->
+            <div class="ui-panel rounded-2xl p-5 pointer-events-auto" id="leftPanel">
+                <button id="soundBtn"
+                    class="absolute -top-12 left-0 bg-gray-800/80 p-2 rounded-lg text-xl border border-gray-600 hover:bg-gray-700 transition">🔊</button>
+                <div class="flex items-center gap-4 mb-4">
+                    <div class="text-5xl pulse-anim float-anim" id="playerIcon">🦠</div>
+                    <div>
+                        <h2 class="text-white font-black text-xl glow-text game-font">LV.<span id="level"
+                                class="text-purple-400">1</span></h2>
+                        <p class="text-gray-400 text-sm korean-font">크기: <span id="size"
+                                class="text-green-400 font-bold">10</span>nm</p>
+                        <p class="text-gray-400 text-sm korean-font">웨이브: <span id="currentWave"
+                                class="text-red-400 font-bold">1</span></p>
+                        <p class="text-gray-400 text-sm korean-font" id="sizeDebuff"></p>
+                    </div>
+                </div>
+
+                <!-- 형질 변이 시스템 -->
+                <div class="mb-3 bg-black/30 p-2 rounded-lg">
+                    <div class="text-xs text-gray-400 mb-1 flex justify-between">
+                        <span>현재 형질 (키: 1, 2, 3)</span>
+                        <span id="currentStrainName" class="text-cyan-400 font-bold">기본형</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <div id="strain1"
+                            class="flex-1 bg-blue-900/50 p-1 rounded text-center cursor-pointer hover:bg-blue-800 transition text-blue-300 text-xs"
+                            title="신속형: 속도++ 방어--">
+                            <div class="text-lg">⚡</div>
+                            <div>신속</div>
+                        </div>
+                        <div id="strain2"
+                            class="flex-1 bg-green-900/50 p-1 rounded text-center cursor-pointer hover:bg-green-800 transition text-green-300 text-xs"
+                            title="갑옷형: 방어++ 속도--">
+                            <div class="text-lg">🛡️</div>
+                            <div>갑옷</div>
+                        </div>
+                        <div id="strain3"
+                            class="flex-1 bg-red-900/50 p-1 rounded text-center cursor-pointer hover:bg-red-800 transition text-red-300 text-xs"
+                            title="감염형: 감염++ 피해++">
+                            <div class="text-lg">☠️</div>
+                            <div>감염</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- HP 바 -->
+                <div class="mb-2">
+                    <div class="flex justify-between text-xs text-gray-400 mb-1 korean-font">
+                        <span>체력</span>
+                        <span><span id="hp">100</span>/<span id="hpMax">100</span></span>
+                    </div>
+                    <div class="w-56 h-3 bg-gray-900 rounded-full overflow-hidden border border-red-900">
+                        <div id="hpBar" class="hp-bar h-full rounded-full transition-all duration-300"
+                            style="width: 100%"></div>
+                    </div>
+                </div>
+
+                <!-- XP 바 -->
+                <div class="mb-3">
+                    <div class="flex justify-between text-xs text-gray-400 mb-1 korean-font">
+                        <span>진화 게이지</span>
+                        <span><span id="xp">0</span>/<span id="xpMax">100</span></span>
+                    </div>
+                    <div class="w-56 h-4 bg-gray-900 rounded-full overflow-hidden border border-purple-900">
+                        <div id="xpBar" class="xp-bar h-full rounded-full transition-all duration-300"
+                            style="width: 0%"></div>
+                    </div>
+                </div>
+
+                <!-- 스탯 -->
+                <div class="grid grid-cols-3 gap-2 text-xs mb-3">
+                    <div class="bg-black/40 rounded-lg p-2">
+                        <span class="text-gray-500 korean-font">속도</span>
+                        <div class="text-cyan-400 font-bold" id="statSpeed">100%</div>
+                    </div>
+                    <div class="bg-black/40 rounded-lg p-2">
+                        <span class="text-gray-500 korean-font">감염력</span>
+                        <div class="text-pink-400 font-bold" id="statAbsorb">100%</div>
+                    </div>
+                    <div class="bg-black/40 rounded-lg p-2">
+                        <span class="text-gray-500 korean-font">방어</span>
+                        <div class="text-yellow-400 font-bold" id="statDefense">0%</div>
+                    </div>
+                </div>
+
+                <!-- 감염 수 -->
+                <div class="text-center pt-3 border-t border-purple-900/50">
+                    <span class="text-gray-400 text-sm korean-font">감염 세포</span>
+                    <p class="text-3xl font-black text-red-400 glow-text game-font" id="infected">0</p>
+                </div>
+            </div>
+
+            <!-- 중앙 스킬 패널 -->
+            <div class="ui-panel rounded-2xl p-4 pointer-events-auto mt-4">
+                <div class="text-center text-gray-400 text-xs mb-2 korean-font">바이러스 능력</div>
+                <div class="flex gap-3">
+                    <div class="skill-btn w-14 h-14 bg-gradient-to-br from-green-600 to-green-900 rounded-xl flex items-center justify-center text-2xl cursor-pointer border-2 border-green-400"
+                        id="skillQ" title="독소 분비 (Q)">
+                        ☠️
+                        <div class="skill-cooldown" id="cooldownQ" style="height: 0%"></div>
+                    </div>
+                    <div class="skill-btn w-14 h-14 bg-gradient-to-br from-blue-600 to-blue-900 rounded-xl flex items-center justify-center text-2xl cursor-pointer border-2 border-blue-400"
+                        id="skillE" title="수용체 결합 (E) - 너프됨">
+                        🧲
+                        <div class="skill-cooldown" id="cooldownE" style="height: 0%"></div>
+                    </div>
+                    <div class="skill-btn w-14 h-14 bg-gradient-to-br from-red-600 to-red-900 rounded-xl flex items-center justify-center text-2xl cursor-pointer border-2 border-red-400"
+                        id="skillR" title="복제 방출 (R) - 숙주 파열">
+                        💥
+                        <div class="skill-cooldown" id="cooldownR" style="height: 0%"></div>
+                    </div>
+                    <div class="skill-btn w-14 h-14 bg-gradient-to-br from-purple-600 to-purple-900 rounded-xl flex items-center justify-center text-2xl cursor-pointer border-2 border-purple-400"
+                        id="skillF" title="캡시드 강화 (F)">
+                        🛡️
+                        <div class="skill-cooldown" id="cooldownF" style="height: 0%"></div>
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-1 text-center">
+                    <div class="w-14 text-xs text-gray-500">Q</div>
+                    <div class="w-14 text-xs text-gray-500">E</div>
+                    <div class="w-14 text-xs text-gray-500">R</div>
+                    <div class="w-14 text-xs text-gray-500">F</div>
+                </div>
+            </div>
+
+            <!-- 오른쪽 정보 패널 -->
+            <div class="ui-panel rounded-2xl p-5 text-right pointer-events-auto">
+                <div class="text-gray-400 text-sm mb-1 korean-font">생존 시간</div>
+                <div class="text-3xl font-black text-white glow-text game-font" id="time">00:00</div>
+
+                <div class="mt-4 pt-3 border-t border-purple-900/50">
+                    <div class="text-gray-400 text-sm mb-1 korean-font">최대 콤보</div>
+                    <div class="text-2xl font-bold text-yellow-400 game-font" id="maxCombo">0</div>
+                </div>
+
+                <div class="mt-3 pt-3 border-t border-purple-900/50">
+                    <div class="text-gray-400 text-sm mb-1 korean-font">적 처치</div>
+                    <div class="text-xl font-bold text-red-400 game-font" id="enemiesKilled">0</div>
+                </div>
+
+                <div class="mt-3 pt-3 border-t border-purple-900/50">
+                    <div class="text-gray-400 text-sm mb-2 korean-font">활성 효과</div>
+                    <div id="activeEffects" class="flex gap-1 justify-end flex-wrap"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 하단 조작 안내 -->
+    <div class="fixed bottom-4 left-1/2 -translate-x-1/2 ui-panel rounded-xl px-6 py-3 z-20">
+        <div class="flex gap-6 text-sm korean-font">
+            <div class="text-gray-300"><span class="text-purple-400 font-bold">WASD</span> 이동</div>
+            <div class="text-gray-300"><span class="text-purple-400 font-bold">SPACE</span> 대시</div>
+            <div class="text-gray-300"><span class="text-purple-400 font-bold">1/2/3</span> 형질변경</div>
+            <div class="text-gray-300"><span class="text-yellow-400 font-bold">H</span> AI시각화</div>
+            <div class="text-gray-300"><span class="text-pink-400 font-bold">V</span> 잠복(회복)</div>
+            <div class="text-gray-300"><span class="text-cyan-400 font-bold">TAB</span> 도감</div>
+            <div class="text-gray-300"><span class="text-green-400 font-bold">B</span> 연구소</div>
+            <div class="text-gray-300"><span class="text-emerald-300 font-bold">G</span> 포탈 진입</div>
+        </div>
+    </div>
+
+    <!-- 시작 화면 -->
+    <div id="startScreen" class="fixed inset-0 flex items-center justify-center bg-black/90 backdrop-blur-md z-50">
+        <div class="ui-panel rounded-3xl p-12 text-center max-w-3xl">
+            <div class="text-8xl mb-6 pulse-anim float-anim">🦠</div>
+            <h1 class="text-5xl font-black text-white mb-3 glow-text game-font">바이러스 랩</h1>
+            <p class="text-cyan-300 mb-4 text-xl game-font">VIRUS LAB: AI & SCIENCE</p>
+            <p class="text-gray-400 mb-6 korean-font">바이러스학과 AI를 배우며 성장하는 교육용 게임</p>
+
+            <div class="text-left bg-black/40 rounded-xl p-4 mb-6 text-sm korean-font">
+                <div class="text-cyan-400 font-bold mb-2">🔬 과학 학습 요소</div>
+                <div class="grid grid-cols-2 gap-2 text-gray-300 mb-4">
+                    <div>🦠 바이러스 구조와 복제</div>
+                    <div>🧬 DNA/RNA 유전정보</div>
+                    <div>🛡️ 면역 시스템 원리</div>
+                    <div>🔄 변이와 진화</div>
+                </div>
+                <div class="text-pink-400 font-bold mb-2">🤖 AI 학습 요소</div>
+                <div class="grid grid-cols-2 gap-2 text-gray-300">
+                    <div>🎯 경로 탐색 알고리즘</div>
+                    <div>🧠 신경망 기초</div>
+                    <div>📊 패턴 인식</div>
+                    <div>🔮 예측 모델</div>
+                </div>
+            </div>
+
+            <div class="flex gap-4 justify-center mb-6">
+                <button
+                    class="mode-btn bg-gradient-to-r from-green-600 to-green-800 px-6 py-3 rounded-lg text-white font-bold border-2 border-green-400 korean-font hover:scale-105 transition"
+                    data-mode="learn">
+                    📚 학습 모드
+                    <div class="text-xs text-green-200 mt-1">쉬움 • 퀴즈 중심</div>
+                </button>
+                <button
+                    class="mode-btn bg-gradient-to-r from-blue-600 to-blue-800 px-6 py-3 rounded-lg text-white font-bold border-2 border-blue-400 korean-font hover:scale-105 transition"
+                    data-mode="normal">
+                    🎮 일반 모드
+                    <div class="text-xs text-blue-200 mt-1">보통 • 밸런스</div>
+                </button>
+                <button
+                    class="mode-btn bg-gradient-to-r from-red-600 to-red-900 px-6 py-3 rounded-lg text-white font-bold border-2 border-red-400 korean-font hover:scale-105 transition animate-pulse"
+                    data-mode="challenge">
+                    💀 도전 모드
+                    <div class="text-xs text-red-200 mt-1">극한 • 생존불가</div>
+                </button>
+            </div>
+
+            <div id="challengeWarning"
+                class="hidden bg-red-900/50 border-2 border-red-500 rounded-xl p-4 mb-6 text-left">
+                <div class="text-red-400 font-bold mb-2 korean-font">⚠️ 도전 모드 경고</div>
+                <div class="text-red-200 text-sm korean-font grid grid-cols-2 gap-2">
+                    <div>💀 크기 증가 = 속도 감소</div>
+                    <div>👾 적이 3배 더 많이 생성</div>
+                    <div>⚡ 웨이브 2배 빠름</div>
+                    <div>🚀 적 속도 50% 증가</div>
+                    <div>💥 피해량 2배</div>
+                    <div>🧲 자석 스킬 대폭 너프</div>
+                    <div>❌ 퀴즈 오답 시 피해</div>
+                    <div>🎯 유도 미사일 등장</div>
+                    <div>☠️ 독성 지역 더 많음</div>
+                    <div>🔄 체력 회복 50% 감소</div>
+                </div>
+            </div>
+
+            <button id="startBtn"
+                class="bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 hover:from-purple-500 hover:via-pink-500 hover:to-purple-500 text-white font-black py-5 px-16 rounded-full text-xl transition-all transform hover:scale-110 shadow-2xl shadow-purple-500/50 korean-font">
+                🔬 연구 시작
+            </button>
+
+            <!-- Premium Shop -->
+            <div class="mt-6">
+                <button onclick="buyPremiumItem('Research Pack', 50)"
+                    class="bg-black/50 hover:bg-black/70 border border-cyan-500 text-cyan-400 font-bold py-2 px-6 rounded-full transition korean-font flex items-center gap-2 mx-auto">
+                    <span>💎</span> 연구 포인트 1000 + DNA 500 (50 CR)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 퀴즈 화면 -->
+    <div id="quizScreen"
+        class="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-md z-50 hidden">
+        <div class="science-panel rounded-3xl p-8 text-center max-w-xl" id="quizPanel">
+            <div class="flex items-center justify-center gap-3 mb-6">
+                <div class="text-4xl" id="quizIcon">🔬</div>
+                <div class="text-2xl font-black text-cyan-400 korean-font" id="quizCategory">과학 퀴즈</div>
+            </div>
+            <div id="quizTimer" class="text-red-400 font-bold mb-4 hidden korean-font">남은 시간: <span
+                    id="quizTimeLeft">10</span>초</div>
+            <div class="text-xl text-white mb-8 korean-font leading-relaxed" id="quizQuestion">질문이 여기에 표시됩니다</div>
+            <div class="space-y-3" id="quizOptions"></div>
+            <div class="mt-6 text-gray-400 text-sm korean-font" id="quizReward">정답 시 연구 포인트 +50, 오답 시 +10</div>
+        </div>
+    </div>
+
+    <!-- 미션 완료 및 보스 처치 알림 등 -->
+    <div id="notificationArea" class="fixed top-1/4 left-1/2 -translate-x-1/2 pointer-events-none z-40"></div>
+
+    <!-- 도감 화면 -->
+    <div id="encyclopediaScreen"
+        class="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-md z-50 hidden">
+        <div class="science-panel rounded-3xl p-8 max-w-3xl max-h-[80vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-6">
+                <div class="text-3xl font-black text-cyan-400 korean-font">📖 과학 도감</div>
+                <button id="closeEncyclopedia"
+                    class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-full korean-font">닫기</button>
+            </div>
+            <div id="encyclopediaContent" class="space-y-4"></div>
+        </div>
+    </div>
+
+    <!-- 연구소 화면 (업그레이드) -->
+    <div id="labScreen" class="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-md z-50 hidden">
+        <div class="science-panel rounded-3xl p-8 max-w-3xl w-[90vw] max-h-[85vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <div class="text-3xl font-black text-cyan-400 korean-font">🏛️ 연구소</div>
+                    <div class="text-gray-300 text-sm korean-font">연구 포인트로 영구 업그레이드를 구매하세요 (게임 내에서도 즉시 적용)</div>
+                </div>
+                <button id="closeLab"
+                    class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-full korean-font">닫기 (B)</button>
+            </div>
+
+            <div class="flex flex-wrap gap-3 mb-6">
+                <div class="bg-black/40 rounded-xl px-4 py-3 flex items-center gap-2">
+                    <span class="text-2xl">🔬</span>
+                    <div>
+                        <div class="text-xs text-gray-400 korean-font">보유 연구</div>
+                        <div class="text-xl font-black text-cyan-300 game-font" id="labRp">0</div>
+                    </div>
+                </div>
+                <div class="bg-black/40 rounded-xl px-4 py-3 flex items-center gap-2">
+                    <span class="text-2xl">🧬</span>
+                    <div>
+                        <div class="text-xs text-gray-400 korean-font">보유 DNA</div>
+                        <div class="text-xl font-black text-green-300 game-font" id="labDna">0</div>
+                    </div>
+                </div>
+                <div class="bg-black/40 rounded-xl px-4 py-3 flex items-center gap-2">
+                    <span class="text-2xl">🚨</span>
+                    <div>
+                        <div class="text-xs text-gray-400 korean-font">면역 경보</div>
+                        <div class="text-xl font-black text-yellow-300 game-font" id="labAlert">0%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-4" id="labUpgrades"></div>
+
+            <div class="mt-6 bg-black/30 rounded-xl p-4">
+                <div class="text-cyan-300 font-bold korean-font mb-2">ℹ️ 안내</div>
+                <div class="text-gray-300 text-sm korean-font leading-relaxed">
+                    • <span class="text-white font-bold">보스(5웨이브마다)</span>를 처치하면 <span
+                        class="text-white font-bold">포탈</span>이 열립니다. 포탈 근처에서 <span
+                        class="text-white font-bold">G</span>를 눌러 다음 스테이지로 전이하세요.<br>
+                    • 업그레이드는 <span class="text-white font-bold">브라우저에 저장</span>되어 다음 플레이에도 유지됩니다.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 진화 선택 화면 -->
+    <div id="evolutionScreen"
+        class="fixed inset-0 flex items-center justify-center bg-black/80 backdrop-blur-md z-50 hidden">
+        <div class="text-center">
+            <div class="text-5xl font-black text-purple-400 mb-4 glow-text korean-font">🧬 돌연변이 발생!</div>
+            <div class="text-gray-300 mb-2 korean-font">진화 방향을 선택하세요</div>
+            <div class="text-yellow-400 text-sm mb-8 korean-font" id="evolutionWarning"></div>
+            <div class="flex gap-6" id="evolutionChoices"></div>
+        </div>
+    </div>
+
+    <!-- 게임 오버 화면 -->
+    <div id="gameOverScreen"
+        class="fixed inset-0 flex items-center justify-center bg-black/90 backdrop-blur-md z-50 hidden">
+        <div class="ui-panel rounded-3xl p-12 text-center max-w-lg">
+            <div class="text-8xl mb-6">🧫</div>
+            <h1 class="text-4xl font-black text-red-500 mb-2 game-font">면역 시스템 승리</h1>
+            <p class="text-gray-400 mb-6 korean-font">바이러스가 면역 세포에 의해 제거되었습니다</p>
+
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="bg-black/50 rounded-xl p-4">
+                    <div class="text-gray-400 text-sm korean-font">최종 레벨</div>
+                    <div class="text-3xl font-black text-purple-400 game-font" id="finalLevel">1</div>
+                </div>
+                <div class="bg-black/50 rounded-xl p-4">
+                    <div class="text-gray-400 text-sm korean-font">감염 세포</div>
+                    <div class="text-3xl font-black text-red-400 game-font" id="finalInfected">0</div>
+                </div>
+                <div class="bg-black/50 rounded-xl p-4">
+                    <div class="text-gray-400 text-sm korean-font">생존 시간</div>
+                    <div class="text-3xl font-black text-cyan-400 game-font" id="finalTime">00:00</div>
+                </div>
+                <div class="bg-black/50 rounded-xl p-4">
+                    <div class="text-gray-400 text-sm korean-font">적 처치</div>
+                    <div class="text-3xl font-black text-green-400 game-font" id="finalKills">0</div>
+                </div>
+            </div>
+
+            <div class="bg-cyan-900/30 rounded-xl p-4 mb-6 text-left">
+                <div class="text-cyan-400 font-bold mb-2 korean-font">💡 오늘 배운 것</div>
+                <div class="text-gray-300 text-sm korean-font" id="learnedToday"></div>
+            </div>
+
+            <button id="restartBtn"
+                class="bg-gradient-to-r from-purple-600 via-pink-600 to-purple-600 text-white font-black py-4 px-12 rounded-full text-xl transition-all transform hover:scale-110 korean-font">
+                🔄 다시 연구
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // 게임 모드
+        let gameMode = 'learn';
+
+        // 난이도 설정
+        const difficultySettings = {
+            learn: {
+                enemySpawnMult: 0.5,
+                enemySpeedMult: 0.8,
+                damageMult: 0.5,
+                waveSpeed: 2400,
+                magnetRange: 4,
+                magnetForce: 2,
+                magnetDuration: 120,
+                magnetCooldown: 360,
+                healMult: 1.5,
+                sizeSpeedPenalty: 0,
+                quizPenalty: false,
+                missiles: false,
+                toxicZones: 0,
+                xpMult: 1.5
+            },
+            normal: {
+                enemySpawnMult: 1,
+                enemySpeedMult: 1,
+                damageMult: 1,
+                waveSpeed: 1800,
+                magnetRange: 3,
+                magnetForce: 1.5,
+                magnetDuration: 90,
+                magnetCooldown: 480,
+                healMult: 1,
+                sizeSpeedPenalty: 0.002,
+                quizPenalty: false,
+                missiles: false,
+                toxicZones: 2,
+                xpMult: 1
+            },
+            challenge: {
+                enemySpawnMult: 3,
+                enemySpeedMult: 1.5,
+                damageMult: 2,
+                waveSpeed: 900,
+                magnetRange: 1.5,
+                magnetForce: 0.5,
+                magnetDuration: 45,
+                magnetCooldown: 900,
+                healMult: 0.5,
+                sizeSpeedPenalty: 0.01,
+                quizPenalty: true,
+                missiles: true,
+                toxicZones: 8,
+                xpMult: 0.7
+            }
+        };
+
+        let difficulty = difficultySettings.learn;
+
+        // 사운드 매니저 (Web Audio API)
+        const SoundManager = {
+            ctx: null,
+            muted: false,
+            init: function () {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            },
+            toggle: function () {
+                this.muted = !this.muted;
+                const btn = document.getElementById('soundBtn');
+                btn.textContent = this.muted ? '🔇' : '🔊';
+                return this.muted;
+            },
+            play: function (type) {
+                if (this.muted || !this.ctx) return;
+
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                const now = this.ctx.currentTime;
+
+                if (type === 'shoot') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(800, now);
+                    osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                } else if (type === 'hit') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.exponentialRampToValueAtTime(50, now + 0.1);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                } else if (type === 'collect') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(600, now);
+                    osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                    osc.start(now);
+                    osc.stop(now + 0.1);
+                } else if (type === 'levelUp') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(400, now);
+                    osc.frequency.setValueAtTime(600, now + 0.1);
+                    osc.frequency.setValueAtTime(1000, now + 0.2);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.linearRampToValueAtTime(0, now + 0.6);
+                    osc.start(now);
+                    osc.stop(now + 0.6);
+                } else if (type === 'dash') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(300, now);
+                    osc.frequency.linearRampToValueAtTime(100, now + 0.2);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.linearRampToValueAtTime(0, now + 0.2);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                }
+            }
+        };
+
+        // 과학 데이터
+        const scienceData = {
+            viruses: [
+                { id: 'basic', name: '기본 바이러스', icon: '🦠', desc: '단순한 구조의 RNA 바이러스', fact: '바이러스는 살아있는 세포 없이는 복제할 수 없습니다.', unlocked: true },
+                { id: 'corona', name: '코로나바이러스', icon: '👑', desc: '왕관 모양의 스파이크 단백질 보유', fact: '코로나바이러스의 스파이크 단백질은 숙주 세포의 ACE2 수용체에 결합합니다.', unlocked: false },
+                { id: 'bacterio', name: '박테리오파지', icon: '🔷', desc: '박테리아만 감염시키는 바이러스', fact: '박테리오파지는 항생제 내성 박테리아 치료에 연구되고 있습니다.', unlocked: false },
+                { id: 'retro', name: '레트로바이러스', icon: '🔄', desc: 'RNA를 DNA로 역전사하는 바이러스', fact: 'HIV는 역전사효소를 이용해 자신의 유전정보를 숙주 DNA에 삽입합니다.', unlocked: false }
+            ],
+            immuneCells: [
+                { id: 'whiteblood', name: '백혈구', icon: '⚪', desc: '일반적인 면역 세포', fact: '백혈구는 혈액 1μL당 4,000~11,000개가 있습니다.', unlocked: true },
+                { id: 'macrophage', name: '대식세포', icon: '🔴', desc: '병원체를 삼켜서 제거', fact: '대식세포는 그리스어로 "큰 먹는 자"라는 뜻입니다.', unlocked: false },
+                { id: 'tcell', name: 'T세포', icon: '🟣', desc: '감염된 세포를 직접 공격', fact: 'T세포는 흉선(Thymus)에서 성숙하여 이름이 붙었습니다.', unlocked: false },
+                { id: 'antibody', name: '항체', icon: '🟡', desc: '바이러스를 표시하고 중화', fact: '항체는 Y자 모양이며 특정 항원에만 결합합니다.', unlocked: false },
+                { id: 'nkcell', name: 'NK세포', icon: '💜', desc: '자연살해세포, 암세포도 공격', fact: 'NK세포는 바이러스 감염 세포를 MHC 없이도 인식합니다.', unlocked: false }
+            ],
+            aiConcepts: [
+                { id: 'pathfinding', name: '경로 탐색', icon: '🎯', desc: 'A* 알고리즘으로 최단 경로 찾기', fact: '게임 속 적들은 A* 알고리즘으로 플레이어를 추적합니다.', unlocked: true, learned: 100 },
+                { id: 'neural', name: '신경망', icon: '🧠', desc: '뉴런처럼 연결된 인공 신경망', fact: '인공 신경망은 인간 뇌의 뉴런 연결을 모방합니다.', unlocked: false, learned: 0 },
+                { id: 'pattern', name: '패턴 인식', icon: '📊', desc: '데이터에서 패턴을 찾는 AI', fact: 'AI는 바이러스 변이 패턴을 분석해 백신 개발에 도움을 줍니다.', unlocked: false, learned: 0 },
+                { id: 'prediction', name: '예측 모델', icon: '🔮', desc: '미래를 예측하는 AI 모델', fact: 'AI는 전염병 확산을 예측하는데 사용됩니다.', unlocked: false, learned: 0 },
+                { id: 'genetic', name: '유전 알고리즘', icon: '🧬', desc: '진화를 모방한 최적화 알고리즘', fact: '유전 알고리즘은 자연선택을 모방하여 최적의 해를 찾습니다.', unlocked: false, learned: 0 }
+            ]
+        };
+
+        // 퀴즈 데이터
+        const quizzes = {
+            science: [
+                { q: '바이러스의 유전 물질은 무엇으로 구성되어 있나요?', options: ['DNA 또는 RNA', '단백질만', '탄수화물', '지방'], answer: 0, category: '바이러스학' },
+                { q: '바이러스가 세포에 침입할 때 사용하는 단백질은?', options: ['스파이크 단백질', '헤모글로빈', '인슐린', '콜라겐'], answer: 0, category: '바이러스학' },
+                { q: '백혈구의 주요 기능은 무엇인가요?', options: ['산소 운반', '면역 방어', '호르몬 생산', '소화'], answer: 1, category: '면역학' },
+                { q: '항체의 모양은 어떤 알파벳과 비슷한가요?', options: ['X', 'Y', 'T', 'O'], answer: 1, category: '면역학' },
+                { q: 'T세포는 어느 기관에서 성숙하나요?', options: ['간', '흉선', '비장', '골수'], answer: 1, category: '면역학' },
+                { q: '바이러스의 외부 껍질을 무엇이라고 하나요?', options: ['캡시드', '세포막', '세포벽', '엽록체'], answer: 0, category: '바이러스학' },
+                { q: 'DNA의 이중나선 구조를 발견한 과학자는?', options: ['아인슈타인', '왓슨과 크릭', '다윈', '멘델'], answer: 1, category: '분자생물학' },
+                { q: '레트로바이러스의 특징은?', options: ['광합성', 'RNA를 DNA로 변환', '포자 형성', '분열 번식'], answer: 1, category: '바이러스학' }
+            ],
+            ai: [
+                { q: 'A* 알고리즘은 주로 어떤 용도로 사용되나요?', options: ['이미지 처리', '경로 탐색', '음성 인식', '번역'], answer: 1, category: 'AI 알고리즘' },
+                { q: '인공 신경망은 무엇을 모방한 것인가요?', options: ['컴퓨터 회로', '인간의 뇌', '태양계', '식물 구조'], answer: 1, category: '딥러닝' },
+                { q: '머신러닝에서 "훈련 데이터"의 역할은?', options: ['AI를 끄기', 'AI가 패턴을 학습', '프로그램 삭제', '하드웨어 점검'], answer: 1, category: '머신러닝' },
+                { q: '유전 알고리즘은 어떤 자연 현상을 모방하나요?', options: ['지진', '진화와 자연선택', '광합성', '조력'], answer: 1, category: 'AI 알고리즘' },
+                { q: 'AI가 바이러스 연구에 기여하는 방법은?', options: ['바이러스 생성', '변이 패턴 분석', '면역력 약화', '없음'], answer: 1, category: 'AI 응용' },
+                { q: '강화학습에서 AI가 학습하는 방식은?', options: ['교과서 읽기', '시행착오와 보상', '수면', '명상'], answer: 1, category: '강화학습' }
+            ]
+        };
+
+        // 과학 팁
+        const scienceTips = [
+            { icon: '🦠', text: '바이러스는 숙주 세포의 복제 기관을 "납치"하여 자신을 복제합니다.' },
+            { icon: '🧬', text: 'RNA 바이러스는 DNA 바이러스보다 변이가 빠르게 일어납니다.' },
+            { icon: '🛡️', text: '백신은 면역 시스템이 병원체를 "기억"하도록 훈련시킵니다.' },
+            { icon: '🔬', text: '바이러스의 크기는 약 20~300 나노미터로, 세균보다 훨씬 작습니다.' },
+            { icon: '🧠', text: '신경망 AI는 이미지에서 바이러스를 자동으로 탐지할 수 있습니다.' },
+            { icon: '📊', text: 'AI는 수백만 개의 분자 조합에서 백신 후보를 찾는데 사용됩니다.' },
+            { icon: '🎯', text: '경로 탐색 알고리즘은 게임 AI부터 GPS까지 널리 사용됩니다.' },
+            { icon: '💉', text: 'mRNA 백신은 바이러스 유전정보 일부를 사용해 면역을 유도합니다.' }
+        ];
+
+        // 게임 상태
+        const game = {
+            running: false,
+            paused: false,
+            worldSize: 4000,
+            startTime: 0,
+            infected: 0,
+            enemiesKilled: 0,
+            zoom: 1,
+            targetZoom: 1,
+            wave: 1,
+            waveTimer: 0,
+            combo: 0,
+            maxCombo: 0,
+            comboTimer: 0,
+            cameraShake: 0,
+            researchPoints: 0,
+            dnaCollected: 0,
+            quizCorrect: 0,
+            quizTotal: 0,
+            tipTimer: 0,
+            learnedFacts: [],
+            quizTimerInterval: null,
+            mission: null,
+            missionTimer: 0,
+            aiDebugMode: false,
+            stormActive: false,
+            stormTimer: 0,
+            highScore: localStorage.getItem('virusLabHighScore') || 0,
+            // 스테이지 시스템 추가
+            stage: 1,
+            bossActive: false,
+            boss: null,
+            artifacts: [], // 보스 처치 보상
+            // 면역 경보(Heat) 시스템: 감염/전투가 많을수록 면역 반응이 강화됨
+            immuneAlert: 0, // 0~100
+            immuneAlertDecay: 0.01,
+            // 보스 처치 후 포탈 생성 (G로 진입)
+            portal: null,
+            // 저장되는 영구 업그레이드 (연구소)
+            persistent: {
+                version: 1,
+                upgrades: {
+                    receptorDampener: 0, // 자석 효과 억제(추가 너프)
+                    capsidPlating: 0, // 방어
+                    replicationBoost: 0, // XP 획득
+                    metabolism: 0, // 회복
+                    stealthCoat: 0 // 면역 경보 축적 감소
+                }
+            },
+            stageData: [
+                { id: 1, name: '혈관 (Bloodstream)', desc: '강한 혈류가 흐르는 곳', colorStart: '#2a0808', colorEnd: '#0a0202', flow: { x: 0.5, y: 0 }, friction: 0.99 },
+                { id: 2, name: '폐 (Lungs)', desc: '공기 흐름과 기침 주의', colorStart: '#081a2a', colorEnd: '#02050a', flow: { x: 0, y: 0 }, friction: 0.98 },
+                { id: 3, name: '신경계 (Nervous Sys)', desc: '전기 신호와 복잡한 구조', colorStart: '#1a082a', colorEnd: '#05020a', flow: { x: 0, y: 0 }, friction: 0.99 }
+            ]
+        };
+
+        // 플레이어
+        const player = {
+            x: 2000,
+            y: 2000,
+            size: 25,
+            baseSpeed: 5,
+            speed: 5,
+            level: 1,
+            xp: 0,
+            xpToLevel: 100,
+            hp: 100,
+            maxHp: 100,
+            dashCooldown: 0,
+            dashActive: false,
+            tentacles: [],
+            color: { h: 280, s: 80, l: 55 },
+            speedMult: 1,
+            absorbMult: 1,
+            defenseMult: 0,
+            regen: 0,
+            strain: 'basic', // basic, speed, tank, infect
+            strainStats: {
+                basic: { speed: 1, def: 0, absorb: 1, color: { h: 280, s: 80, l: 55 }, name: '기본형' },
+                speed: { speed: 1.5, def: -0.3, absorb: 0.8, color: { h: 200, s: 90, l: 60 }, name: '신속형' },
+                tank: { speed: 0.7, def: 0.5, absorb: 0.8, color: { h: 120, s: 70, l: 40 }, name: '갑옷형' },
+                infect: { speed: 0.9, def: -0.2, absorb: 1.5, color: { h: 0, s: 90, l: 50 }, name: '감염형' }
+            },
+            skills: {
+                toxin: { cooldown: 0, maxCooldown: 300, active: false, duration: 0 },
+                magnet: { cooldown: 0, maxCooldown: 480, active: false, duration: 0 },
+                split: { cooldown: 0, maxCooldown: 480, active: false },
+                shield: { cooldown: 0, maxCooldown: 600, active: false, duration: 0 }
+            },
+            powerups: { invincible: 0, magnet: 0 },
+            splitlings: []
+        };
+
+        let cells = [];
+        let particles = [];
+        let enemies = [];
+        let powerups = [];
+        let floatingTexts = [];
+        let backgroundElements = [];
+        let dnaPickups = [];
+        let missiles = [];
+        let toxicZones = [];
+        let stormProjectiles = [];
+
+        // 진화 옵션
+        const evolutionOptions = [
+            { id: 'speed', name: '⚡ 복제 가속', desc: '이동 속도 +15%', icon: '⚡', color: 'from-cyan-500 to-blue-600', fact: '바이러스 복제 속도는 숙주 세포의 상태에 따라 달라집니다.', apply: () => { player.speedMult += 0.15; } },
+            { id: 'absorb', name: '🧲 수용체 친화', desc: '감염력 +20%', icon: '🧲', color: 'from-pink-500 to-rose-600', fact: '바이러스는 특정 세포 수용체에 결합하여 침입합니다.', apply: () => { player.absorbMult += 0.2; } },
+            { id: 'defense', name: '🛡️ 외피 강화', desc: '받는 피해 -15%', icon: '🛡️', color: 'from-yellow-500 to-orange-600', fact: '일부 바이러스는 세포막에서 외피를 획득합니다.', apply: () => { player.defenseMult += 0.15; } },
+            { id: 'hp', name: '❤️ 구조 안정화', desc: '최대 체력 +25', icon: '❤️', color: 'from-red-500 to-pink-600', fact: '바이러스 구조의 안정성은 생존에 중요합니다.', apply: () => { player.maxHp += 25; player.hp += 25; } },
+            { id: 'regen', name: '🔄 자가 수복', desc: '체력 자동 회복', icon: '🔄', color: 'from-lime-500 to-green-600', fact: '일부 바이러스는 손상된 구조를 복구할 수 있습니다.', apply: () => { player.regen = (player.regen || 0) + 0.05; } },
+            { id: 'dash', name: '💨 고속 이동', desc: '대시 쿨다운 -30%', icon: '💨', color: 'from-indigo-500 to-purple-600', fact: '빠른 이동은 면역 세포 회피에 도움됩니다.', apply: () => { player.dashCooldownMult = (player.dashCooldownMult || 1) * 0.7; } }
+        ];
+
+        // 키 입력
+        const keys = {};
+        window.addEventListener('keydown', e => {
+            keys[e.code] = true;
+
+            if (e.code === 'Space' && player.dashCooldown <= 0 && game.running && !game.paused) {
+                player.dashActive = true;
+                player.dashCooldown = 90 * (player.dashCooldownMult || 1);
+                setTimeout(() => player.dashActive = false, 180);
+                game.cameraShake = 5;
+            }
+
+            if (e.code === 'KeyQ' && player.skills.toxin.cooldown <= 0 && game.running && !game.paused) {
+                activateToxin();
+            }
+            if (e.code === 'KeyE' && player.skills.magnet.cooldown <= 0 && game.running && !game.paused) {
+                activateMagnet();
+            }
+            if (e.code === 'KeyR' && player.skills.split.cooldown <= 0 && game.running && !game.paused) {
+                activateBurst();
+            }
+            if (e.code === 'KeyF' && player.skills.shield.cooldown <= 0 && game.running && !game.paused) {
+                activateShield();
+            }
+            if (e.code === 'KeyV' && game.running && !game.paused) {
+                toggleHide();
+            }
+            if (e.code === 'Tab' && game.running) {
+                e.preventDefault();
+                toggleEncyclopedia();
+            }
+            if (e.code === 'Digit1') changeStrain('speed');
+            if (e.code === 'Digit2') changeStrain('tank');
+            if (e.code === 'Digit3') changeStrain('infect');
+            if (e.code === 'KeyH') {
+                game.aiDebugMode = !game.aiDebugMode;
+                createFloatingText(player.x, player.y - 50, game.aiDebugMode ? "AI 시각화 켜짐" : "AI 시각화 꺼짐", "#ffffff");
+            }
+
+            // 연구소 토글
+            if (e.code === 'KeyB' && game.running) {
+                toggleLab();
+            }
+
+            // 포탈 진입
+            if (e.code === 'KeyG' && game.running && !game.paused) {
+                tryEnterPortal();
+            }
+
+            // ESC: 오버레이 닫기
+            if (e.code === 'Escape' && game.running) {
+                if (!document.getElementById('labScreen').classList.contains('hidden')) toggleLab(false);
+                if (!document.getElementById('encyclopediaScreen').classList.contains('hidden')) {
+                    game.paused = false;
+                    document.getElementById('encyclopediaScreen').classList.add('hidden');
+                }
+            }
+        });
+        window.addEventListener('keyup', e => keys[e.code] = false);
+
+        function changeStrain(strain) {
+            if (player.strain === strain) {
+                player.strain = 'basic';
+            } else {
+                player.strain = strain;
+            }
+
+            const stats = player.strainStats[player.strain];
+            player.color = stats.color;
+            createParticles(player.x, player.y, `hsl(${stats.color.h}, 100%, 70%)`, 20);
+            createFloatingText(player.x, player.y - 60, `${stats.name} 전환!`, `hsl(${stats.color.h}, 100%, 70%)`);
+            game.cameraShake = 5;
+            updateUI();
+        }
+
+        // 스킬 버튼
+        document.getElementById('skillQ').addEventListener('click', () => {
+            if (player.skills.toxin.cooldown <= 0 && game.running && !game.paused) activateToxin();
+        });
+        document.getElementById('skillE').addEventListener('click', () => {
+            if (player.skills.magnet.cooldown <= 0 && game.running && !game.paused) activateMagnet();
+        });
+        document.getElementById('skillR').addEventListener('click', () => {
+            if (player.skills.split.cooldown <= 0 && game.running && !game.paused) activateBurst();
+        });
+        document.getElementById('skillF').addEventListener('click', () => {
+            if (player.skills.shield.cooldown <= 0 && game.running && !game.paused) activateShield();
+        });
+
+        // 스킬 함수들
+        function activateToxin() {
+            player.skills.toxin.cooldown = player.skills.toxin.maxCooldown;
+            player.skills.toxin.active = true;
+            player.skills.toxin.duration = 60;
+            game.cameraShake = 8;
+
+            showAIAnalysis('독소 분비 활성화');
+
+            const range = player.size * 2.5;
+            cells.forEach(cell => {
+                const dist = Math.hypot(player.x - cell.x, player.y - cell.y);
+                if (dist < range && cell.size < player.size * 1.2) {
+                    cell.poisoned = true;
+                    cell.poisonTimer = 120;
+                    createParticles(cell.x, cell.y, 'rgba(0, 255, 0, 0.8)', 5);
+                }
+            });
+        }
+
+        function activateMagnet() {
+            player.skills.magnet.cooldown = difficulty.magnetCooldown;
+            player.skills.magnet.active = true;
+            player.skills.magnet.duration = difficulty.magnetDuration;
+            game.cameraShake = 3;
+            showAIAnalysis('수용체 결합 강화 (제한적 효과)');
+        }
+
+        function activateBurst() {
+            player.skills.split.cooldown = player.skills.split.maxCooldown;
+            game.cameraShake = 10;
+            showAIAnalysis('숙주 파열: 바이러스 입자 방출');
+
+            createFloatingText(player.x, player.y - 50, "Viral Burst!", "#ff00ff");
+
+            // 바이러스는 분열하지 않고 복제 후 방출됨을 표현
+            for (let i = 0; i < 6; i++) {
+                const angle = (Math.PI * 2 / 6) * i;
+                player.splitlings.push({
+                    x: player.x,
+                    y: player.y,
+                    vx: Math.cos(angle) * 18,
+                    vy: Math.sin(angle) * 18,
+                    size: player.size * 0.25,
+                    life: 90
+                });
+            }
+        }
+
+        function toggleHide() {
+            if (player.isHidden) {
+                // 나오기
+                player.isHidden = false;
+                if (player.hostCell) {
+                    createParticles(player.hostCell.x, player.hostCell.y, '#ff0000', 20);
+                    // 숙주 파괴 보상
+                    player.xp += player.hostCell.size * 2;
+                    // 숙주 세포 제거 or 축소 (여기선 제거하고 새 세포 생성)
+                    const idx = cells.indexOf(player.hostCell);
+                    if (idx !== -1) {
+                        cells.splice(idx, 1);
+                        cells.push(createCell());
+                    }
+                    player.hostCell = null;
+                    game.cameraShake = 10;
+                    createFloatingText(player.x, player.y - 50, "용해 주기 (Lysis)!", "#ff0000");
+                }
+            } else {
+                // 들어가기
+                // 가장 가까운 충분히 큰 세포 찾기
+                let target = null;
+                let minDist = 1000;
+
+                cells.forEach(cell => {
+                    const dist = Math.hypot(player.x - cell.x, player.y - cell.y);
+                    if (dist < player.size + cell.size + 20 && cell.size > player.size * 0.8) {
+                        if (dist < minDist) {
+                            minDist = dist;
+                            target = cell;
+                        }
+                    }
+                });
+
+                if (target) {
+                    player.isHidden = true;
+                    player.hostCell = target;
+                    player.x = target.x;
+                    player.y = target.y;
+                    createFloatingText(player.x, player.y - 50, "잠복 (Lysogenic)", "#00ff00");
+                    showAIAnalysis('바이러스 잠복: 면역 회피 및 자가 치유');
+                } else {
+                    createFloatingText(player.x, player.y - 50, "숨을 숙주가 없음!", "#ffaaaa");
+                }
+            }
+        }
+
+        function activateShield() {
+            player.skills.shield.cooldown = player.skills.shield.maxCooldown;
+            player.skills.shield.active = true;
+            player.skills.shield.duration = 120;
+            game.cameraShake = 5;
+            showAIAnalysis('캡시드 강화: 3초간 무적');
+        }
+
+        // 과학 팁 표시
+        function showScienceTip() {
+            const tip = scienceTips[Math.floor(Math.random() * scienceTips.length)];
+            document.getElementById('tipIcon').textContent = tip.icon;
+            document.getElementById('tipText').textContent = tip.text;
+            document.getElementById('scienceTip').classList.remove('opacity-0');
+
+            if (!game.learnedFacts.includes(tip.text)) {
+                game.learnedFacts.push(tip.text);
+            }
+
+            setTimeout(() => {
+                document.getElementById('scienceTip').classList.add('opacity-0');
+            }, 5000);
+        }
+
+        // AI 분석 표시
+        function showAIAnalysis(text) {
+            document.getElementById('aiText').textContent = text;
+            document.getElementById('aiAnalysis').classList.remove('opacity-0');
+
+            setTimeout(() => {
+                document.getElementById('aiAnalysis').classList.add('opacity-0');
+            }, 3000);
+        }
+
+        // 퀴즈 표시
+        function showQuiz() {
+            game.paused = true;
+            const category = Math.random() < 0.5 ? 'science' : 'ai';
+            const quiz = quizzes[category][Math.floor(Math.random() * quizzes[category].length)];
+
+            document.getElementById('quizCategory').textContent = quiz.category;
+            document.getElementById('quizIcon').textContent = category === 'science' ? '🔬' : '🤖';
+            document.getElementById('quizQuestion').textContent = quiz.q;
+
+            // 도전 모드에서 퀴즈 타이머
+            if (gameMode === 'challenge') {
+                document.getElementById('quizTimer').classList.remove('hidden');
+                document.getElementById('quizPanel').classList.add('challenge-panel');
+                document.getElementById('quizPanel').classList.remove('science-panel');
+                document.getElementById('quizReward').textContent = '⚠️ 오답 시 피해 30! 시간 초과도 피해!';
+                let timeLeft = 8;
+                document.getElementById('quizTimeLeft').textContent = timeLeft;
+
+                game.quizTimerInterval = setInterval(() => {
+                    timeLeft--;
+                    document.getElementById('quizTimeLeft').textContent = timeLeft;
+                    if (timeLeft <= 0) {
+                        clearInterval(game.quizTimerInterval);
+                        player.hp -= 30;
+                        game.cameraShake = 15;
+                        createFloatingText(player.x, player.y - 50, '시간 초과! -30 HP', '#ff0000');
+                        document.getElementById('quizScreen').classList.add('hidden');
+                        game.paused = false;
+                    }
+                }, 1000);
+            } else {
+                document.getElementById('quizTimer').classList.add('hidden');
+                document.getElementById('quizPanel').classList.remove('challenge-panel');
+                document.getElementById('quizPanel').classList.add('science-panel');
+                document.getElementById('quizReward').textContent = '정답 시 연구 포인트 +50, 오답 시 +10';
+            }
+
+            const optionsContainer = document.getElementById('quizOptions');
+            optionsContainer.innerHTML = '';
+
+            quiz.options.forEach((opt, i) => {
+                const btn = document.createElement('div');
+                btn.className = 'quiz-option bg-black/40 rounded-xl p-4 text-left text-white korean-font border border-cyan-800';
+                btn.innerHTML = `<span class="text-cyan-400 font-bold mr-3">${['A', 'B', 'C', 'D'][i]}.</span>${opt}`;
+                btn.addEventListener('click', () => {
+                    if (game.quizTimerInterval) clearInterval(game.quizTimerInterval);
+                    game.quizTotal++;
+
+                    if (i === quiz.answer) {
+                        game.quizCorrect++;
+                        game.researchPoints += 50;
+                        player.xp += 30;
+                        createFloatingText(player.x, player.y - 50, '정답! +50 연구포인트', '#00ffaa');
+                        btn.classList.add('border-green-500', 'bg-green-900/40');
+                    } else {
+                        game.researchPoints += 10;
+                        if (difficulty.quizPenalty) {
+                            player.hp -= 30;
+                            createFloatingText(player.x, player.y - 50, '오답! -30 HP', '#ff0000');
+                            game.cameraShake = 15;
+                        } else {
+                            createFloatingText(player.x, player.y - 50, '오답... +10 연구포인트', '#ff6666');
+                        }
+                        btn.classList.add('border-red-500', 'bg-red-900/40');
+                        optionsContainer.children[quiz.answer].classList.add('border-green-500', 'bg-green-900/40');
+                    }
+
+                    setTimeout(() => {
+                        document.getElementById('quizScreen').classList.add('hidden');
+                        game.paused = false;
+                    }, 1000);
+                });
+                optionsContainer.appendChild(btn);
+            });
+
+            document.getElementById('quizScreen').classList.remove('hidden');
+        }
+
+        // 도감 토글
+        function toggleEncyclopedia() {
+            const screen = document.getElementById('encyclopediaScreen');
+            if (screen.classList.contains('hidden')) {
+                game.paused = true;
+                screen.classList.remove('hidden');
+                renderEncyclopedia();
+            } else {
+                game.paused = false;
+                screen.classList.add('hidden');
+            }
+        }
+
+        document.getElementById('closeEncyclopedia').addEventListener('click', () => {
+            game.paused = false;
+            document.getElementById('encyclopediaScreen').classList.add('hidden');
+        });
+
+        function renderEncyclopedia() {
+            const content = document.getElementById('encyclopediaContent');
+            content.innerHTML = '';
+
+            content.innerHTML += '<div class="text-xl font-bold text-cyan-400 mb-3 korean-font">🦠 바이러스</div>';
+            scienceData.viruses.forEach(v => {
+                const div = document.createElement('div');
+                div.className = `bg-black/40 rounded-xl p-4 ${v.unlocked ? '' : 'opacity-50'}`;
+                div.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="text-3xl">${v.icon}</div>
+                        <div>
+                            <div class="text-white font-bold korean-font">${v.name} ${v.unlocked ? '' : '🔒'}</div>
+                            <div class="text-gray-400 text-sm korean-font">${v.desc}</div>
+                            ${v.unlocked ? `<div class="text-cyan-400 text-sm mt-1 korean-font">💡 ${v.fact}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+                content.appendChild(div);
+            });
+
+            content.innerHTML += '<div class="text-xl font-bold text-red-400 mt-6 mb-3 korean-font">🛡️ 면역 세포</div>';
+            scienceData.immuneCells.forEach(c => {
+                const div = document.createElement('div');
+                div.className = `bg-black/40 rounded-xl p-4 ${c.unlocked ? '' : 'opacity-50'}`;
+                div.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="text-3xl">${c.icon}</div>
+                        <div>
+                            <div class="text-white font-bold korean-font">${c.name} ${c.unlocked ? '' : '🔒'}</div>
+                            <div class="text-gray-400 text-sm korean-font">${c.desc}</div>
+                            ${c.unlocked ? `<div class="text-red-400 text-sm mt-1 korean-font">💡 ${c.fact}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+                content.appendChild(div);
+            });
+
+            content.innerHTML += '<div class="text-xl font-bold text-pink-400 mt-6 mb-3 korean-font">🤖 AI 개념</div>';
+            scienceData.aiConcepts.forEach(a => {
+                const div = document.createElement('div');
+                div.className = `bg-black/40 rounded-xl p-4 ${a.unlocked ? '' : 'opacity-50'}`;
+                div.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="text-3xl">${a.icon}</div>
+                        <div class="flex-1">
+                            <div class="text-white font-bold korean-font">${a.name} ${a.unlocked ? '' : '🔒'}</div>
+                            <div class="text-gray-400 text-sm korean-font">${a.desc}</div>
+                            ${a.unlocked ? `<div class="text-pink-400 text-sm mt-1 korean-font">💡 ${a.fact}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+                content.appendChild(div);
+            });
+        }
+
+        // ====== 큰 업데이트 1) 연구소(영구 업그레이드 + 저장) ======
+        const PERSIST_KEY = 'virusLabPersistent_v1';
+
+        function loadPersistent() {
+            try {
+                const raw = localStorage.getItem(PERSIST_KEY);
+                if (!raw) return;
+                const data = JSON.parse(raw);
+                if (!data || typeof data !== 'object') return;
+                // 간단 마이그레이션
+                game.persistent = game.persistent || { version: 1, upgrades: {} };
+                game.persistent.version = 1;
+                game.persistent.upgrades = { ...game.persistent.upgrades, ...(data.upgrades || {}) };
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        function savePersistent() {
+            try {
+                localStorage.setItem(PERSIST_KEY, JSON.stringify(game.persistent));
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        const labUpgradeDefs = {
+            capsidPlating: {
+                name: '🛡️ 캡시드 도금',
+                desc: '방어력 증가 (받는 피해 감소)',
+                max: 6,
+                baseCost: 250,
+                costMult: 1.55,
+                apply: (lv) => {
+                    // 방어는 0~0.6 정도로 제한
+                    player.defenseMult += Math.min(0.45, lv * 0.06);
+                }
+            },
+            replicationBoost: {
+                name: '⚡ 복제 최적화',
+                desc: '획득 XP 증가 (성장 가속)',
+                max: 8,
+                baseCost: 200,
+                costMult: 1.45,
+                apply: (lv) => {
+                    game.xpBonusMult = 1 + lv * 0.08;
+                }
+            },
+            metabolism: {
+                name: '🔄 대사 개선',
+                desc: '회복 효율 증가 (힐/재생 강화)',
+                max: 6,
+                baseCost: 220,
+                costMult: 1.5,
+                apply: (lv) => {
+                    game.healBonusMult = 1 + lv * 0.12;
+                }
+            },
+            stealthCoat: {
+                name: '🫥 은폐 코팅',
+                desc: '면역 경보(Heat) 축적 감소',
+                max: 6,
+                baseCost: 260,
+                costMult: 1.5,
+                apply: (lv) => {
+                    game.alertGainMult = Math.max(0.35, 1 - lv * 0.12);
+                }
+            },
+            receptorDampener: {
+                name: '🧪 항체 교란',
+                desc: '항체 폭풍 확률 감소 + 폭풍 쿨다운 증가',
+                max: 5,
+                baseCost: 300,
+                costMult: 1.65,
+                apply: (lv) => {
+                    game.stormSuppress = Math.min(0.65, lv * 0.14); // 확률 감소율
+                }
+            },
+            companion: {
+                name: '🛸 나노 공생체',
+                desc: '주변 DNA 수집 및 적 공격 지원',
+                max: 3,
+                baseCost: 500,
+                costMult: 2.0,
+                apply: (lv) => {
+                    player.companionCount = lv;
+                }
+            }
+        };
+
+        function getUpgradeLevel(id) {
+            return (game.persistent?.upgrades?.[id] || 0);
+        }
+
+        function getUpgradeCost(id) {
+            const def = labUpgradeDefs[id];
+            const lv = getUpgradeLevel(id);
+            return Math.floor(def.baseCost * Math.pow(def.costMult, lv));
+        }
+
+        function applyPersistentUpgrades() {
+            // 기본값
+            game.xpBonusMult = 1;
+            game.healBonusMult = 1;
+            game.alertGainMult = 1;
+            game.stormSuppress = 0;
+
+            const ups = game.persistent?.upgrades || {};
+            Object.keys(labUpgradeDefs).forEach(id => {
+                const lv = Math.min(labUpgradeDefs[id].max, ups[id] || 0);
+                labUpgradeDefs[id].apply(lv);
+            });
+        }
+
+        function renderLab() {
+            document.getElementById('labRp').textContent = game.researchPoints;
+            document.getElementById('labDna').textContent = game.dnaCollected;
+            document.getElementById('labAlert').textContent = Math.floor(game.immuneAlert) + '%';
+
+            const container = document.getElementById('labUpgrades');
+            container.innerHTML = '';
+
+            Object.entries(labUpgradeDefs).forEach(([id, def]) => {
+                const lv = getUpgradeLevel(id);
+                const cost = getUpgradeCost(id);
+                const canBuy = game.researchPoints >= cost && lv < def.max;
+
+                const card = document.createElement('div');
+                card.className = 'bg-black/40 rounded-2xl p-5 border border-cyan-900';
+                card.innerHTML = `
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <div class="text-white font-black korean-font text-lg">${def.name}</div>
+                            <div class="text-gray-300 text-sm korean-font mt-1">${def.desc}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs text-gray-400 korean-font">레벨</div>
+                            <div class="text-xl font-black text-cyan-300 game-font">${lv}/${def.max}</div>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex items-center justify-between">
+                        <div class="text-gray-300 text-sm korean-font">비용: <span class="text-cyan-300 font-bold">${cost}</span> 🔬</div>
+                        <button class="px-4 py-2 rounded-lg korean-font font-bold ${canBuy ? 'bg-cyan-600 hover:bg-cyan-500 text-black' : 'bg-gray-700 text-gray-400 cursor-not-allowed'}" ${canBuy ? '' : 'disabled'}>
+                            ${lv >= def.max ? 'MAX' : '구매'}
+                        </button>
+                    </div>
+                `;
+
+                const btn = card.querySelector('button');
+                btn.addEventListener('click', () => {
+                    buyUpgrade(id);
+                });
+
+                container.appendChild(card);
+            });
+        }
+
+        function toggleLab(forceOpen = null) {
+            const screen = document.getElementById('labScreen');
+            const isHidden = screen.classList.contains('hidden');
+            const open = (forceOpen === null) ? isHidden : forceOpen;
+
+            if (open) {
+                game.paused = true;
+                screen.classList.remove('hidden');
+                renderLab();
+            } else {
+                screen.classList.add('hidden');
+                game.paused = false;
+            }
+        }
+
+        function buyUpgrade(id) {
+            const def = labUpgradeDefs[id];
+            const lv = getUpgradeLevel(id);
+            if (lv >= def.max) return;
+            const cost = getUpgradeCost(id);
+            if (game.researchPoints < cost) return;
+
+            game.researchPoints -= cost;
+            game.persistent.upgrades[id] = lv + 1;
+            savePersistent();
+
+            // 적용은 즉시
+            applyPersistentUpgrades();
+
+            createFloatingText(player.x, player.y - 80, `${def.name} 업그레이드!`, '#00ffff');
+            showAIAnalysis(`연구 성공: ${def.name} (LV.${lv + 1})`);
+            renderLab();
+            updateUI();
+        }
+
+        document.getElementById('closeLab').addEventListener('click', () => toggleLab(false));
+
+        // ====== 큰 업데이트 2) 포탈 기반 스테이지 전이(수동) ======
+        function createPortalAt(x, y) {
+            game.portal = {
+                x, y,
+                radius: 90,
+                phase: Math.random() * Math.PI * 2,
+                hintShown: false
+            };
+            createFloatingText(x, y - 120, '🌀 포탈 생성! (G로 진입)', '#00ffcc');
+            showAIAnalysis('전이 포탈 활성화: G로 다음 스테이지로 이동');
+        }
+
+        function tryEnterPortal() {
+            if (!game.portal) return;
+            const d = Math.hypot(player.x - game.portal.x, player.y - game.portal.y);
+            if (d < player.size + game.portal.radius) {
+                game.portal = null;
+                nextStage();
+            } else {
+                createFloatingText(player.x, player.y - 60, '포탈에 더 가까이!', '#ffffff');
+            }
+        }
+
+        // ====== 큰 업데이트 3) 면역 경보(Heat) 기반 동적 난이도 ======
+        function updateImmuneAlert() {
+            if (game.lastInfected === undefined) {
+                game.lastInfected = game.infected;
+                game.lastKills = game.enemiesKilled;
+            }
+
+            const di = Math.max(0, game.infected - game.lastInfected);
+            const dk = Math.max(0, game.enemiesKilled - game.lastKills);
+
+            // 은폐 코팅 업그레이드로 축적 감소
+            const gainMult = (game.alertGainMult || 1);
+
+            // 감염/킬에 따른 경보 상승
+            game.immuneAlert += (di * 0.35 + dk * 1.2) * gainMult;
+
+            // 시간이 지나면 조금 감소
+            const decay = game.immuneAlertDecay * (gameMode === 'challenge' ? 0.6 : 1);
+            game.immuneAlert = Math.max(0, Math.min(100, game.immuneAlert - decay));
+
+            game.lastInfected = game.infected;
+            game.lastKills = game.enemiesKilled;
+        }
+
+        // 세포 생성
+        function createCell() {
+            const type = Math.random() < 0.6 ? 'normal' : Math.random() < 0.7 ? 'nutrient' : 'bonus';
+            const baseSize = 10 + Math.random() * 25 + game.wave * 1.5;
+
+            let cell = {
+                x: Math.random() * game.worldSize,
+                y: Math.random() * game.worldSize,
+                size: baseSize,
+                type,
+                vx: (Math.random() - 0.5) * 2,
+                vy: (Math.random() - 0.5) * 2,
+                pulsePhase: Math.random() * Math.PI * 2,
+                organelles: []
+            };
+
+            for (let i = 0; i < 3; i++) {
+                cell.organelles.push({
+                    rx: (Math.random() - 0.5) * 0.6,
+                    ry: (Math.random() - 0.5) * 0.6,
+                    size: 0.1 + Math.random() * 0.2,
+                    phase: Math.random() * Math.PI * 2
+                });
+            }
+
+            if (type === 'normal') {
+                cell.color = { h: 350 + Math.random() * 20, s: 70, l: 45 };
+            } else if (type === 'nutrient') {
+                cell.color = { h: 45 + Math.random() * 15, s: 85, l: 55 };
+            } else {
+                cell.color = { h: 200 + Math.random() * 40, s: 80, l: 55 };
+            }
+
+            return cell;
+        }
+
+        // 적 생성
+        function createEnemy(type = 'whiteBlood') {
+            const baseStats = {
+                whiteBlood: { size: 40, speed: 1.5, hp: 50, icon: '⚪', name: '백혈구', id: 'whiteblood' },
+                antibody: { size: 18, speed: 4.5, hp: 15, icon: '🟡', name: '항체', id: 'antibody' },
+                macrophage: { size: 70, speed: 0.9, hp: 120, icon: '🔴', name: '대식세포', id: 'macrophage' },
+                tcell: { size: 32, speed: 3.5, hp: 45, icon: '🟣', name: 'T세포', id: 'tcell' },
+                nkcell: { size: 38, speed: 4, hp: 60, icon: '💜', name: 'NK세포', id: 'nkcell' }
+            };
+
+            const stats = baseStats[type];
+            const isElite = Math.random() < 0.1 + (gameMode === 'challenge' ? 0.1 : 0); // 10% 확률로 엘리트
+
+            // 도감 해금
+            const immuneCell = scienceData.immuneCells.find(c => c.id === stats.id);
+            if (immuneCell && !immuneCell.unlocked) {
+                immuneCell.unlocked = true;
+                showAIAnalysis(`면역 세포 발견: ${immuneCell.name}`);
+            }
+
+            // 플레이어에게서 멀리 스폰
+            let x, y;
+            do {
+                x = Math.random() * game.worldSize;
+                y = Math.random() * game.worldSize;
+            } while (Math.hypot(x - player.x, y - player.y) < 400);
+
+            const waveMult = 1 + game.wave * 0.15;
+            let hp = stats.hp * waveMult;
+            let speed = (stats.speed + game.wave * 0.08) * difficulty.enemySpeedMult;
+            let size = stats.size + game.wave * 2;
+
+            if (isElite) {
+                hp *= 2.5;
+                speed *= 1.2;
+                size *= 1.3;
+            }
+
+            return {
+                x, y,
+                size: size,
+                speed: speed,
+                type,
+                hp: hp,
+                maxHp: hp,
+                icon: stats.icon,
+                name: (isElite ? '엘리트 ' : '') + stats.name,
+                angle: Math.random() * Math.PI * 2,
+                wobble: Math.random() * Math.PI * 2,
+                aiState: 'patrol',
+                aiTimer: 0,
+                attackCooldown: 0,
+                isElite: isElite
+            };
+        }
+
+        // 미사일 생성 (도전 모드)
+        function createMissile(x, y) {
+            missiles.push({
+                x, y,
+                speed: 3 + game.wave * 0.2,
+                angle: Math.atan2(player.y - y, player.x - x),
+                life: 300,
+                trail: []
+            });
+        }
+
+        // 독성 지역 생성
+        function createToxicZone() {
+            toxicZones.push({
+                x: Math.random() * game.worldSize,
+                y: Math.random() * game.worldSize,
+                radius: 100 + Math.random() * 150,
+                pulsePhase: Math.random() * Math.PI * 2
+            });
+        }
+
+        // DNA 픽업 생성
+        function createDNAPickup(x, y) {
+            dnaPickups.push({
+                x: x + (Math.random() - 0.5) * 30,
+                y: y + (Math.random() - 0.5) * 30,
+                bobPhase: Math.random() * Math.PI * 2,
+                life: 300
+            });
+        }
+
+        // 파워업 생성
+        function createPowerup() {
+            const types = ['invincible', 'xpBoost', 'heal', 'research'];
+            const type = types[Math.floor(Math.random() * types.length)];
+
+            const colors = {
+                invincible: { h: 60, s: 100, l: 60, icon: '⭐' },
+                xpBoost: { h: 280, s: 80, l: 60, icon: '✨' },
+                heal: { h: 0, s: 80, l: 55, icon: '❤️' },
+                research: { h: 180, s: 90, l: 50, icon: '🔬' }
+            };
+
+            return {
+                x: Math.random() * game.worldSize,
+                y: Math.random() * game.worldSize,
+                type,
+                color: colors[type],
+                size: 25,
+                bobPhase: Math.random() * Math.PI * 2
+            };
+        }
+
+        // 배경 요소 생성
+        function createBackgroundElements() {
+            backgroundElements = [];
+            for (let i = 0; i < 300; i++) {
+                backgroundElements.push({
+                    x: Math.random() * game.worldSize,
+                    y: Math.random() * game.worldSize,
+                    size: 1 + Math.random() * 3,
+                    twinkle: Math.random() * Math.PI * 2,
+                    type: Math.random() < 0.3 ? 'molecule' : 'particle'
+                });
+            }
+        }
+
+        // 파티클 생성
+        function createParticles(x, y, color, count, speed = 8) {
+            for (let i = 0; i < count; i++) {
+                const angle = (Math.PI * 2 / count) * i + Math.random() * 0.5;
+                particles.push({
+                    x, y,
+                    vx: Math.cos(angle) * speed * (0.5 + Math.random()),
+                    vy: Math.sin(angle) * speed * (0.5 + Math.random()),
+                    size: 3 + Math.random() * 6,
+                    color,
+                    life: 40 + Math.random() * 20
+                });
+            }
+        }
+
+        // 플로팅 텍스트
+        function createFloatingText(x, y, text, color) {
+            floatingTexts.push({ x, y, text, color, life: 60, vy: -2 });
+        }
+
+        // 게임 초기화
+        function initGame() {
+            difficulty = difficultySettings[gameMode];
+
+            // 저장된 연구 업그레이드 로드
+            loadPersistent();
+
+            player.x = game.worldSize / 2;
+            player.y = game.worldSize / 2;
+            player.size = 25;
+            player.level = 1;
+            player.xp = 0;
+            player.xpToLevel = 100;
+            player.hp = 100;
+            player.maxHp = 100;
+            player.dashCooldown = 0;
+            player.speedMult = 1;
+            player.absorbMult = 1;
+            player.defenseMult = 0;
+            player.regen = 0;
+            player.dashCooldownMult = 1;
+            player.splitlings = [];
+            player.companions = [];
+            player.companionCount = 0;
+            player.companionTimer = 0;
+            player.isHidden = false;
+            player.hostCell = null;
+            player.color = { h: 280, s: 80, l: 55 };
+            Object.keys(player.skills).forEach(k => {
+                player.skills[k].cooldown = 0;
+                player.skills[k].active = false;
+            });
+            player.skills.magnet.maxCooldown = difficulty.magnetCooldown;
+            Object.keys(player.powerups).forEach(k => player.powerups[k] = 0);
+
+            game.infected = 0;
+            game.enemiesKilled = 0;
+            game.startTime = Date.now();
+            game.zoom = 1;
+            game.wave = 1;
+            game.waveTimer = 0;
+            game.combo = 0;
+            game.maxCombo = 0;
+            game.researchPoints = 0;
+            game.dnaCollected = 0;
+            game.quizCorrect = 0;
+            game.quizTotal = 0;
+            game.tipTimer = 0;
+            game.learnedFacts = [];
+            game.stage = 1; // 스테이지 초기화
+            game.bossActive = false;
+            game.boss = null;
+            game.portal = null;
+            game.immuneAlert = 0;
+            game.lastInfected = 0;
+            game.lastKills = 0;
+            game.stormActive = false;
+            game.stormTimer = 0;
+            game.stormCooldown = 0;
+            game.feverTimer = 0;
+            game.feverActive = false;
+            document.getElementById('bossHpContainer').classList.add('hidden');
+
+            // 스테이지 UI 초기화
+            document.getElementById('stageName').textContent = game.stageData[0].name;
+            document.getElementById('stageDesc').textContent = game.stageData[0].desc;
+
+            cells = [];
+            enemies = [];
+            particles = [];
+            powerups = [];
+            floatingTexts = [];
+            dnaPickups = [];
+            missiles = [];
+            toxicZones = [];
+            stormProjectiles = [];
+
+            // 도감 초기화
+            scienceData.viruses.forEach((v, i) => v.unlocked = i === 0);
+            scienceData.immuneCells.forEach((c, i) => c.unlocked = i === 0);
+            scienceData.aiConcepts.forEach((a, i) => { a.unlocked = i === 0; a.learned = i === 0 ? 100 : 0; });
+
+            for (let i = 0; i < 200; i++) cells.push(createCell());
+
+            const enemyCount = gameMode === 'challenge' ? 8 : 3;
+            for (let i = 0; i < enemyCount; i++) enemies.push(createEnemy('whiteBlood'));
+            if (gameMode === 'challenge') {
+                for (let i = 0; i < 3; i++) enemies.push(createEnemy('antibody'));
+            }
+
+            for (let i = 0; i < 5; i++) powerups.push(createPowerup());
+
+            // 독성 지역 생성
+            for (let i = 0; i < difficulty.toxicZones; i++) {
+                createToxicZone();
+            }
+
+            player.tentacles = [];
+            for (let i = 0; i < 12; i++) {
+                player.tentacles.push({
+                    angle: (Math.PI * 2 / 12) * i,
+                    length: 1,
+                    wave: Math.random() * Math.PI * 2,
+                    thickness: 0.5 + Math.random() * 0.5
+                });
+            }
+
+            createBackgroundElements();
+
+            // 영구 업그레이드 적용 (초기 스탯/멀티플라이어)
+            applyPersistentUpgrades();
+
+            // UI 업데이트
+            const badge = document.getElementById('difficultyBadge');
+            // 모드 변경 시 경고 테두리 초기화
+            document.getElementById('leftPanel').classList.remove('warning-border');
+            document.getElementById('challengeOverlay').classList.add('hidden');
+
+            if (gameMode === 'learn') {
+                badge.textContent = '📚 학습';
+                badge.className = 'px-3 py-1 rounded-full text-xs font-bold korean-font bg-green-600';
+            } else if (gameMode === 'normal') {
+                badge.textContent = '🎮 일반';
+                badge.className = 'px-3 py-1 rounded-full text-xs font-bold korean-font bg-blue-600';
+            } else {
+                badge.textContent = '💀 도전';
+                badge.className = 'px-3 py-1 rounded-full text-xs font-bold korean-font bg-red-600 animate-pulse';
+                document.getElementById('challengeOverlay').classList.remove('hidden');
+                document.getElementById('leftPanel').classList.add('warning-border');
+            }
+
+            setTimeout(showScienceTip, 3000);
+        }
+
+        // 진화 선택
+        function showEvolutionScreen() {
+            game.paused = true;
+            document.getElementById('evolutionScreen').classList.remove('hidden');
+
+            // 도전 모드 경고
+            if (gameMode === 'challenge') {
+                document.getElementById('evolutionWarning').textContent = '⚠️ 크기 증가 시 속도가 크게 감소합니다!';
+            } else if (gameMode === 'normal') {
+                document.getElementById('evolutionWarning').textContent = '💡 크기가 커지면 약간 느려집니다';
+            } else {
+                document.getElementById('evolutionWarning').textContent = '';
+            }
+
+            const container = document.getElementById('evolutionChoices');
+            container.innerHTML = '';
+
+            const shuffled = [...evolutionOptions].sort(() => Math.random() - 0.5);
+            const choices = shuffled.slice(0, 3);
+
+            choices.forEach(opt => {
+                const card = document.createElement('div');
+                card.className = `ui-panel rounded-2xl p-8 w-64 bg-gradient-to-br ${opt.color} cursor-pointer hover:scale-105 transition`;
+                card.innerHTML = `
+                    <div class="text-6xl mb-4">${opt.icon}</div>
+                    <div class="text-2xl font-black text-white mb-2 korean-font">${opt.name}</div>
+                    <div class="text-gray-200 mb-4 korean-font">${opt.desc}</div>
+                    <div class="text-sm text-white/70 korean-font border-t border-white/20 pt-3">💡 ${opt.fact}</div>
+                `;
+                card.addEventListener('click', () => {
+                    opt.apply();
+                    document.getElementById('evolutionScreen').classList.add('hidden');
+                    game.paused = false;
+                    createParticles(player.x, player.y, 'rgba(255, 255, 0, 0.8)', 30, 12);
+                    game.cameraShake = 10;
+
+                    // 바이러스 도감 해금
+                    const nextVirus = scienceData.viruses.find(v => !v.unlocked);
+                    if (nextVirus && Math.random() < 0.3) {
+                        nextVirus.unlocked = true;
+                        showAIAnalysis(`새 바이러스 변이 발견: ${nextVirus.name}`);
+                    }
+                });
+                container.appendChild(card);
+            });
+        }
+
+        // 레벨업
+        function levelUp() {
+            SoundManager.play('levelUp');
+            player.level++;
+            player.xp -= player.xpToLevel;
+            player.xpToLevel = Math.floor(player.xpToLevel * 1.5);
+            player.size += 2;
+
+            createParticles(player.x, player.y, 'rgba(138, 43, 226, 0.8)', 40, 15);
+            game.cameraShake = 15;
+
+            showEvolutionScreen();
+
+            // 학습 모드에서 퀴즈 출제
+            if (gameMode === 'learn' && player.level % 2 === 0) {
+                setTimeout(showQuiz, 500);
+            } else if (gameMode === 'challenge' && player.level % 3 === 0) {
+                setTimeout(showQuiz, 500);
+            }
+        }
+
+        // 웨이브 진행
+        function advanceWave() {
+            game.wave++;
+            game.waveTimer = 0;
+
+            // 스테이지별 보스 등장 (5웨이브 마다)
+            if (game.wave % 5 === 0) {
+                spawnBoss();
+                return;
+            }
+
+            const spawnCount = Math.ceil(difficulty.enemySpawnMult * (1 + game.wave * 0.3));
+
+            for (let i = 0; i < spawnCount; i++) {
+                enemies.push(createEnemy('whiteBlood'));
+            }
+
+            if (game.wave % 2 === 0) {
+                for (let i = 0; i < Math.ceil(spawnCount * 0.5); i++) {
+                    enemies.push(createEnemy('antibody'));
+                }
+            }
+            if (game.wave % 3 === 0) {
+                enemies.push(createEnemy('macrophage'));
+            }
+            if (game.wave >= 4) {
+                enemies.push(createEnemy('tcell'));
+            }
+            if (game.wave >= 6 && gameMode === 'challenge') {
+                enemies.push(createEnemy('nkcell'));
+            }
+
+            // 도전 모드에서 미사일 발사
+            if (difficulty.missiles && game.wave >= 3) {
+                for (let i = 0; i < game.wave - 2; i++) {
+                    const edge = Math.floor(Math.random() * 4);
+                    let x, y;
+                    if (edge === 0) { x = 0; y = Math.random() * game.worldSize; }
+                    else if (edge === 1) { x = game.worldSize; y = Math.random() * game.worldSize; }
+                    else if (edge === 2) { x = Math.random() * game.worldSize; y = 0; }
+                    else { x = Math.random() * game.worldSize; y = game.worldSize; }
+                    createMissile(x, y);
+                }
+            }
+
+            // 추가 독성 지역
+            if (gameMode === 'challenge' && game.wave % 2 === 0) {
+                createToxicZone();
+            }
+
+            showAIAnalysis(`웨이브 ${game.wave}: 면역 반응 강화!`);
+        }
+
+        // 스테이지 기믹 적용
+        function clampToWorld(obj, radius = 0) {
+            // 월드 경계 안으로 강제 (혈류/바람 등 스테이지 기믹으로 밀려나가는 문제 방지)
+            obj.x = Math.max(radius, Math.min(game.worldSize - radius, obj.x));
+            obj.y = Math.max(radius, Math.min(game.worldSize - radius, obj.y));
+        }
+
+        function applyStageMechanics() {
+            const currentStage = game.stageData[game.stage - 1] || game.stageData[0];
+
+            // 1. 혈관: 혈류 (플레이어와 모든 물체를 한쪽으로 밈)
+            if (game.stage === 1) {
+                const force = 0.3;
+                player.x += force;
+                cells.forEach(c => c.x += force * 0.8);
+                enemies.forEach(e => e.x += force * 0.5);
+
+                // 파티클로 흐름 표현
+                if (Math.random() < 0.1) {
+                    createParticles(0, Math.random() * game.worldSize, 'rgba(255,100,100,0.2)', 1, 10);
+                }
+            }
+
+            // 2. 폐: 기침 (주기적으로 강한 바람)
+            else if (game.stage === 2) {
+                if (Math.random() < 0.005) { // 기침 발생
+                    createFloatingText(player.x, player.y - 100, "⚠️ 기침 발생! ⚠️", "#ffffff");
+                    game.cameraShake = 20;
+                    const windDir = Math.random() * Math.PI * 2;
+                    const windForce = 15;
+
+                    // 플레이어 밀치기
+                    player.x += Math.cos(windDir) * windForce;
+                    player.y += Math.sin(windDir) * windForce;
+
+                    // 모든 객체 밀치기
+                    const objects = [...cells, ...enemies];
+                    objects.forEach(o => {
+                        o.x += Math.cos(windDir) * windForce * 1.5;
+                        o.y += Math.sin(windDir) * windForce * 1.5;
+                    });
+                }
+            }
+
+            // 3. 신경계: 전기 충격 (랜덤한 위치에 전기장 생성)
+            else if (game.stage === 3) {
+                if (Math.random() < 0.02) {
+                    const x = player.x + (Math.random() - 0.5) * 1000;
+                    const y = player.y + (Math.random() - 0.5) * 1000;
+                    stormProjectiles.push({
+                        x: x, y: y,
+                        vx: 0, vy: 0,
+                        life: 60,
+                        isStatic: true // 움직이지 않는 전기장
+                    });
+                }
+            }
+
+            // 스테이지 기믹 적용 후: 월드 밖으로 나가는 문제를 즉시 보정
+            clampToWorld(player, player.size);
+            cells.forEach(c => clampToWorld(c, c.size));
+            enemies.forEach(e => clampToWorld(e, e.size));
+            if (game.bossActive && game.boss) clampToWorld(game.boss, game.boss.size);
+            if (game.portal) clampToWorld(game.portal, game.portal.radius);
+        }
+
+        // 보스 생성
+        function spawnBoss() {
+            game.bossActive = true;
+            createFloatingText(player.x, player.y - 100, "⚠️ 보스 출현! ⚠️", "#ff0000");
+            game.cameraShake = 30;
+            showAIAnalysis("거대 면역 세포 감지! 주의하십시오.");
+
+            // 기존 적들 제거 (보스전에 집중)
+            enemies = [];
+
+            let bossType = 'giant';
+            let bossName = '거대 대식세포';
+            let bossHp = 2000 * game.stage;
+
+            if (game.stage === 2) { bossType = 'swarm'; bossName = '항체 군집체'; bossHp = 1500 * game.stage; }
+            if (game.stage === 3) { bossType = 'cyber'; bossName = '신경 방어 시스템'; bossHp = 3000 * game.stage; }
+
+            game.boss = {
+                x: player.x + 800, // 플레이어 근처 스폰
+                y: player.y,
+                size: 150,
+                type: bossType,
+                name: bossName,
+                hp: bossHp,
+                maxHp: bossHp,
+                angle: 0,
+                speed: 2 + game.stage * 0.5,
+                attackTimer: 0,
+                phase: 1
+            };
+
+            document.getElementById('bossHpContainer').classList.remove('hidden');
+            document.getElementById('bossName').textContent = bossName;
+            updateBossUI();
+        }
+
+        function updateBoss() {
+            if (!game.boss) return;
+            const b = game.boss;
+            const dist = Math.hypot(player.x - b.x, player.y - b.y);
+            const angle = Math.atan2(player.y - b.y, player.x - b.x);
+
+            // 이동
+            b.x += Math.cos(angle) * b.speed * (b.phase === 2 ? 1.5 : 1);
+            b.y += Math.sin(angle) * b.speed * (b.phase === 2 ? 1.5 : 1);
+
+            // 공격 패턴
+            b.attackTimer++;
+
+            // 보스 타입별 패턴
+            if (b.type === 'giant') {
+                // 1. 졸개 소환
+                if (b.attackTimer % 300 === 0) {
+                    for (let i = 0; i < 3; i++) {
+                        let e = createEnemy('whiteBlood');
+                        e.x = b.x; e.y = b.y;
+                        enemies.push(e);
+                    }
+                }
+                // 2. 돌진
+                if (b.attackTimer % 400 === 200) {
+                    b.speed = 8; // 돌진
+                    setTimeout(() => b.speed = 2, 1000);
+                }
+            } else if (b.type === 'swarm') {
+                // 탄막 발사
+                if (b.attackTimer % 100 === 0) {
+                    for (let i = 0; i < 8; i++) {
+                        const shotAngle = (Math.PI * 2 / 8) * i + b.angle;
+                        createMissile(b.x, b.y); // 유도 미사일 재활용
+                    }
+                }
+            } else if (b.type === 'cyber') {
+                // 전기장 생성
+                if (b.attackTimer % 60 === 0) {
+                    stormProjectiles.push({
+                        x: player.x, y: player.y, // 플레이어 위치에 생성
+                        vx: 0, vy: 0,
+                        life: 120,
+                        isStatic: true
+                    });
+                }
+            }
+
+            // 플레이어 충돌
+            if (dist < player.size + b.size) {
+                if (!player.skills.shield.active && player.powerups.invincible <= 0) {
+                    player.hp -= 1; // 접촉 시 지속 피해
+                    game.cameraShake = 2;
+                }
+            }
+
+            // 플레이어 공격 (충돌이 아니라 클릭 스킬 등으로 공격한다고 가정하지만, 여기선 몸박으로 공격)
+            // 바이러스 게임 특성상 몸박이나 스킬로 데미지
+            // 보스는 플레이어 크기에 비례한 피해를 조금씩 입음 (지속 싸움)
+            if (dist < player.size + b.size) {
+                b.hp -= player.size * 0.05 * player.absorbMult; // 미세한 피해
+            }
+
+            // 스킬 피해 (독소, 분열 등)
+            if (player.skills.toxin.active) {
+                const toxinDist = Math.hypot(player.x - b.x, player.y - b.y);
+                if (toxinDist < player.size * 2.5 + b.size) {
+                    b.hp -= 2 * player.absorbMult; // 독소 피해
+                    createParticles(b.x + (Math.random() - 0.5) * b.size, b.y + (Math.random() - 0.5) * b.size, '#00ff00', 1);
+                }
+            }
+
+            // 보스 처치
+            if (b.hp <= 0) {
+                killBoss();
+            }
+
+            updateBossUI();
+        }
+
+        function updateBossUI() {
+            if (!game.boss) return;
+            const pct = Math.max(0, (game.boss.hp / game.boss.maxHp) * 100);
+            document.getElementById('bossHpBar').style.width = pct + '%';
+            document.getElementById('bossHpText').textContent = Math.floor(pct) + '%';
+        }
+
+        function killBoss() {
+            game.bossActive = false;
+            game.boss = null;
+            document.getElementById('bossHpContainer').classList.add('hidden');
+
+            // 보상
+            createParticles(player.x, player.y, '#ffd700', 100);
+            createFloatingText(player.x, player.y, "BOSS CLEARED!", "#ffd700");
+            game.researchPoints += 500;
+            player.xp += 1000;
+
+            // 전이 (스테이지 이동)
+            setTimeout(nextStage, 2000);
+        }
+
+        function nextStage() {
+            if (game.stage >= 3) {
+                // 엔딩 또는 무한 모드
+                createFloatingText(player.x, player.y, "모든 기관 정복 완료! 무한 모드 진입", "#ffffff");
+                game.stage = 1; // 다시 루프 돌거나 엔딩 처리
+            } else {
+                game.stage++;
+            }
+
+            const stageInfo = game.stageData[game.stage - 1];
+
+            // 스테이지 전환 연출
+            game.paused = true;
+
+            // 오버레이 생성해서 보여주기
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-black z-50 flex items-center justify-center transition-opacity duration-1000';
+            overlay.innerHTML = `
+                <div class="text-center">
+                    <div class="text-6xl mb-4">🧬 전이 성공</div>
+                    <div class="text-4xl font-bold text-cyan-400 mb-2">${stageInfo.name} 진입</div>
+                    <div class="text-xl text-gray-400">${stageInfo.desc}</div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            setTimeout(() => {
+                // 데이터 초기화 및 이동
+                player.x = game.worldSize / 2;
+                player.y = game.worldSize / 2;
+                cells = [];
+                enemies = [];
+                for (let i = 0; i < 200; i++) cells.push(createCell());
+
+                // 스테이지 UI 업데이트
+                document.getElementById('stageName').textContent = stageInfo.name;
+                document.getElementById('stageDesc').textContent = stageInfo.desc;
+
+                game.wave = (game.stage - 1) * 5 + 1; // 웨이브 조정
+
+                game.paused = false;
+
+                // 오버레이 제거
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay.remove(), 1000);
+
+            }, 3000);
+        }
+
+        // 크기에 따른 속도 페널티 계산
+        function getSizeSpeedPenalty() {
+            const sizeOver = Math.max(0, player.size - 30);
+            return Math.max(0.3, 1 - sizeOver * difficulty.sizeSpeedPenalty);
+        }
+
+        // 업데이트
+        function update() {
+            if (!game.running || game.paused) return;
+
+            // 줌 조정 (과학적 스케일링: 크기가 커질수록 로그함수적으로 줌아웃)
+            // 기존 선형 줌보다 더 넓게 보여주어 화면 꽉 참 방지
+            game.targetZoom = Math.max(0.15, Math.min(1.2, 300 / (player.size * 2 + 200)));
+            game.zoom += (game.targetZoom - game.zoom) * 0.03;
+
+            // 잠복 상태 로직
+            if (player.isHidden && player.hostCell) {
+                player.x = player.hostCell.x;
+                player.y = player.hostCell.y;
+                player.hp = Math.min(player.maxHp, player.hp + 0.5); // 빠른 회복
+                // 숙주는 서서히 작아짐 (바이러스 생산 소모)
+                player.hostCell.size -= 0.05;
+                if (player.hostCell.size < player.size * 0.5) {
+                    toggleHide(); // 너무 작아지면 터짐
+                }
+            }
+
+            // 발열(Fever) 시스템
+            if (!game.bossActive) { // 보스전엔 방해 안되게
+                game.feverTimer++;
+                // 60초마다 10초간 발열
+                if (game.feverTimer > 3600 && !game.feverActive) {
+                    game.feverActive = true;
+                    game.feverTimer = 0;
+                    createFloatingText(player.x, player.y - 100, "🌡️ 면역 반응: 발열! 🌡️", "#ff5500");
+                    showAIAnalysis("고열 감지: 단백질 변성 위험! 활동 주의.");
+                } else if (game.feverActive && game.feverTimer > 600) {
+                    game.feverActive = false;
+                    game.feverTimer = 0;
+                    createFloatingText(player.x, player.y - 100, "체온 정상화", "#00ff00");
+                }
+
+                if (game.feverActive) {
+                    // 발열 시 지속 피해 (갑옷형은 면역)
+                    if (player.strain !== 'tank' && !player.isHidden) {
+                        player.hp -= 0.1;
+                    }
+                }
+            }
+
+            // 웨이브 타이머 (보스전 아닐 때만)
+            if (!game.bossActive) {
+                game.waveTimer++;
+                if (game.waveTimer >= difficulty.waveSpeed) advanceWave();
+            }
+
+            // 스테이지 기믹 효과
+            applyStageMechanics();
+
+            // 보스 업데이트
+            if (game.bossActive && game.boss) {
+                updateBoss();
+            }
+
+            // 콤보 타이머
+            if (game.comboTimer > 0) {
+                game.comboTimer--;
+                if (game.comboTimer <= 0) game.combo = 0;
+            }
+
+            // 팁 타이머
+            game.tipTimer++;
+            if (game.tipTimer >= 1200) {
+                game.tipTimer = 0;
+                if (Math.random() < 0.5) showScienceTip();
+            }
+
+            // 미션 시스템
+            if (!game.mission && Math.random() < 0.002 && game.wave > 1) {
+                generateMission();
+            }
+            if (game.mission) {
+                game.mission.duration--;
+                document.getElementById('missionTimer').textContent = Math.ceil(game.mission.duration / 60) + 's';
+                document.getElementById('missionProgress').style.width = (game.mission.current / game.mission.target * 100) + '%';
+
+                if (game.mission.duration <= 0) {
+                    createFloatingText(player.x, player.y - 50, "미션 실패...", "#ff4444");
+                    game.mission = null;
+                    document.getElementById('missionDisplay').classList.add('translate-x-full');
+                } else if (game.mission.current >= game.mission.target) {
+                    completeMission();
+                }
+            }
+
+            // 항체 폭풍 이벤트 (빈도/대미지 밸런스 수정)
+            // - 너무 자주 터지지 않도록 쿨다운 추가
+            // - 발사 빈도/탄 속도/탄 수를 조절
+            if (game.stormCooldown === undefined) game.stormCooldown = 0;
+            if (game.stormCooldown > 0) game.stormCooldown--;
+
+            // 모드별 스케일
+            const stormChanceBase = (gameMode === 'challenge') ? 0.00006 : (gameMode === 'normal' ? 0.00004 : 0.00002);
+            const stormWaveScale = Math.min(3, game.wave / 6); // 웨이브가 올라가도 과도하게 증가하지 않게 캡
+
+            if (!game.stormActive && game.stormCooldown <= 0 && Math.random() < stormChanceBase * stormWaveScale) {
+                game.stormActive = true;
+                game.stormTimer = (gameMode === 'challenge') ? 480 : 420; // 8s / 7s
+                game.stormCooldown = 2400; // 40초 쿨다운
+                createFloatingText(player.x, player.y - 80, "⚠️ 항체 폭풍 경보! ⚠️", "#ff0000");
+                showAIAnalysis("대규모 항체 반응 감지! 회피 기동 권장.");
+            }
+            if (game.stormActive) {
+                game.stormTimer--;
+
+                // 발사 간격 완화 (이전: 5프레임마다)
+                const interval = (gameMode === 'challenge') ? 12 : 14;
+                if (game.stormTimer % interval === 0) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const dist = 650;
+                    const sx = player.x + Math.cos(angle) * dist;
+                    const sy = player.y + Math.sin(angle) * dist;
+                    const targetX = player.x + (Math.random() - 0.5) * 240;
+                    const targetY = player.y + (Math.random() - 0.5) * 240;
+                    const shootAngle = Math.atan2(targetY - sy, targetX - sx);
+
+                    const projectileSpeed = (gameMode === 'challenge') ? 7.2 : 6.2;
+                    stormProjectiles.push({
+                        x: sx, y: sy,
+                        vx: Math.cos(shootAngle) * projectileSpeed,
+                        vy: Math.sin(shootAngle) * projectileSpeed,
+                        life: 160,
+                        isStorm: true
+                    });
+                }
+
+                if (game.stormTimer <= 0) {
+                    game.stormActive = false;
+                    createFloatingText(player.x, player.y - 80, "폭풍 종료", "#00ff00");
+                }
+            }
+
+            // 효과 감소
+            if (game.cameraShake > 0) game.cameraShake *= 0.9;
+
+            // 형질 재생 및 스탯 적용
+            const strain = player.strainStats[player.strain];
+            const currentRegen = (player.regen + (player.strain === 'tank' ? 0.05 : 0));
+            if (currentRegen > 0) {
+                player.hp = Math.min(player.maxHp, player.hp + currentRegen * difficulty.healMult);
+            }
+
+            // 독성 지역 피해
+            toxicZones.forEach(zone => {
+                zone.pulsePhase += 0.02;
+                const dist = Math.hypot(player.x - zone.x, player.y - zone.y);
+                if (dist < zone.radius) {
+                    player.hp -= 0.3 * difficulty.damageMult;
+                }
+            });
+
+            // 플레이어 이동
+            let dx = 0, dy = 0;
+            if (keys['KeyW'] || keys['ArrowUp']) dy -= 1;
+            if (keys['KeyS'] || keys['ArrowDown']) dy += 1;
+            if (keys['KeyA'] || keys['ArrowLeft']) dx -= 1;
+            if (keys['KeyD'] || keys['ArrowRight']) dx += 1;
+
+            if (dx !== 0 || dy !== 0) {
+                const len = Math.sqrt(dx * dx + dy * dy);
+                let speed = player.baseSpeed * player.speedMult * getSizeSpeedPenalty() * strain.speed;
+                if (player.dashActive) speed *= 3;
+                player.x += (dx / len) * speed;
+                player.y += (dy / len) * speed;
+            }
+
+            player.x = Math.max(player.size, Math.min(game.worldSize - player.size, player.x));
+            player.y = Math.max(player.size, Math.min(game.worldSize - player.size, player.y));
+
+            // 쿨다운
+            if (player.dashCooldown > 0) player.dashCooldown--;
+            Object.values(player.skills).forEach(s => {
+                if (s.cooldown > 0) s.cooldown--;
+                if (s.duration > 0) {
+                    s.duration--;
+                    if (s.duration <= 0) s.active = false;
+                }
+            });
+            Object.keys(player.powerups).forEach(k => {
+                if (player.powerups[k] > 0) player.powerups[k]--;
+            });
+
+            // 촉수 업데이트
+            player.tentacles.forEach(t => {
+                t.wave += 0.12;
+                t.length = 0.7 + Math.sin(t.wave) * 0.4;
+            });
+
+            // 분신 업데이트
+            player.splitlings = player.splitlings.filter(s => {
+                s.x += s.vx;
+                s.y += s.vy;
+                s.vx *= 0.95;
+                s.vy *= 0.95;
+                s.life--;
+
+                cells.forEach((cell, i) => {
+                    const dist = Math.hypot(s.x - cell.x, s.y - cell.y);
+                    if (dist < s.size + cell.size && cell.size < player.size * 0.8) {
+                        createParticles(cell.x, cell.y, `hsl(${cell.color.h}, 80%, 50%)`, 8);
+                        cells.splice(i, 1);
+                        cells.push(createCell());
+                        player.xp += Math.floor(cell.size * 0.3 * difficulty.xpMult);
+                        game.infected++;
+                    }
+                });
+
+                return s.life > 0;
+            });
+
+            // 공생체 업데이트
+            const desiredCompanions = player.companionCount || 0;
+            if (player.companions.length < desiredCompanions) {
+                player.companions.push({
+                    angle: (Math.PI * 2 / desiredCompanions) * player.companions.length,
+                    dist: 60 + player.size,
+                    laserCooldown: 0
+                });
+            }
+            // 수 줄이기 (업그레이드 초기화 등의 경우)
+            if (player.companions.length > desiredCompanions) {
+                player.companions = player.companions.slice(0, desiredCompanions);
+            }
+
+            player.companions.forEach((comp, i) => {
+                // 공전 및 자연스러운 추적 (Lerp)
+                comp.angle += 0.05;
+                comp.dist = 60 + player.size; // 플레이어 크기에 맞춰 거리 조절
+                const targetX = player.x + Math.cos(comp.angle) * comp.dist;
+                const targetY = player.y + Math.sin(comp.angle) * comp.dist;
+
+                // 기계적인 고정 대신 부드러운 따라오기 (Lerp)
+                if (!comp.x) { comp.x = targetX; comp.y = targetY; }
+                comp.x += (targetX - comp.x) * 0.1;
+                comp.y += (targetY - comp.y) * 0.1;
+
+                if (comp.laserCooldown > 0) comp.laserCooldown--;
+
+                // 자동 DNA 수집
+                dnaPickups.forEach(dna => {
+                    const d = Math.hypot(cx - dna.x, cy - dna.y);
+                    if (d < 100) { // 자석 효과
+                        dna.x += (cx - dna.x) * 0.1;
+                        dna.y += (cy - dna.y) * 0.1;
+                    }
+                });
+
+                // 적 공격 (레이저)
+                if (comp.laserCooldown <= 0) {
+                    let closest = null;
+                    let minDist = 300;
+                    enemies.forEach(e => {
+                        const d = Math.hypot(cx - e.x, cy - e.y);
+                        if (d < minDist) {
+                            minDist = d;
+                            closest = e;
+                        }
+                    });
+
+                    if (closest) {
+                        comp.laserCooldown = 40;
+                        closest.hp -= 10;
+                        SoundManager.play('shoot');
+                        // 레이저 시각 효과는 렌더링에서 처리하거나 별도 배열에 넣어야 함. 
+                        // 간단하게 파티클 생성으로 대체
+                        createParticles(closest.x, closest.y, '#00ffff', 5);
+
+                        // 레이저 트레일 (일시적)
+                        comp.targetX = closest.x;
+                        comp.targetY = closest.y;
+                        comp.fireFrame = 5;
+                    }
+                }
+                if (comp.fireFrame > 0) comp.fireFrame--;
+            });
+
+            // 세포 업데이트
+            cells.forEach((cell, index) => {
+                if (cell.poisoned) {
+                    cell.poisonTimer--;
+                    cell.size -= 0.2;
+                    if (cell.poisonTimer <= 0 || cell.size <= 5) {
+                        let xpGain = Math.floor(cell.size * player.absorbMult * difficulty.xpMult);
+                        player.xp += xpGain;
+                        game.infected++;
+                        game.researchPoints += 2;
+                        createDNAPickup(cell.x, cell.y);
+                        createParticles(cell.x, cell.y, 'rgba(0, 255, 0, 0.6)', 10);
+                        cells.splice(index, 1);
+                        cells.push(createCell());
+                        return;
+                    }
+                }
+
+                // 자석 효과 (너프됨)
+                if (player.skills.magnet.active || player.powerups.magnet > 0) {
+                    if (cell.size < player.size * 0.7) { // 더 작은 세포만
+                        const angle = Math.atan2(player.y - cell.y, player.x - cell.x);
+                        const dist = Math.hypot(player.x - cell.x, player.y - cell.y);
+                        if (dist < player.size * difficulty.magnetRange) {
+                            const force = (1 - dist / (player.size * difficulty.magnetRange)) * difficulty.magnetForce;
+                            cell.vx += Math.cos(angle) * force;
+                            cell.vy += Math.sin(angle) * force;
+                        }
+                    }
+                }
+
+                cell.pulsePhase += 0.05;
+                cell.x += cell.vx;
+                cell.y += cell.vy;
+                cell.vx *= 0.99;
+                cell.vy *= 0.99;
+
+                if (cell.x < cell.size || cell.x > game.worldSize - cell.size) cell.vx *= -1;
+                if (cell.y < cell.size || cell.y > game.worldSize - cell.size) cell.vy *= -1;
+
+                const dist = Math.hypot(player.x - cell.x, player.y - cell.y);
+                if (dist < player.size + cell.size * 0.5) {
+                    if (cell.size < player.size * 0.9) { // 자신보다 작은 세포만
+                        let xpGain = Math.floor(cell.size * player.absorbMult * difficulty.xpMult);
+                        if (cell.type === 'nutrient') xpGain *= 2;
+                        if (cell.type === 'bonus') xpGain *= 3;
+
+                        player.xp += xpGain;
+                        player.size += cell.size * 0.02;
+                        game.infected++;
+                        game.researchPoints += 1;
+                        game.combo++;
+                        game.comboTimer = 120;
+                        if (game.combo > game.maxCombo) game.maxCombo = game.combo;
+
+                        if (Math.random() < 0.2) createDNAPickup(cell.x, cell.y);
+                        createParticles(cell.x, cell.y, `hsl(${cell.color.h}, 80%, 50%)`, 15);
+                        createFloatingText(cell.x, cell.y, `+${xpGain}`, `hsl(${cell.color.h}, 100%, 70%)`);
+                        SoundManager.play('collect');
+
+                        cells.splice(index, 1);
+                        cells.push(createCell());
+
+                        if (player.xp >= player.xpToLevel) levelUp();
+                    }
+                }
+            });
+
+            // DNA 픽업 업데이트
+            dnaPickups = dnaPickups.filter(dna => {
+                dna.bobPhase += 0.1;
+                dna.life--;
+
+                const dist = Math.hypot(player.x - dna.x, player.y - dna.y);
+                if (dist < player.size + 15) {
+                    game.dnaCollected++;
+                    game.researchPoints += 5;
+                    createFloatingText(dna.x, dna.y, '+5 🔬', '#00ffaa');
+                    return false;
+                }
+
+                return dna.life > 0;
+            });
+
+            // 미사일 업데이트
+            missiles = missiles.filter(m => {
+                // 유도
+                const targetAngle = Math.atan2(player.y - m.y, player.x - m.x);
+                let angleDiff = targetAngle - m.angle;
+                while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+                while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+                m.angle += angleDiff * 0.03;
+
+                m.x += Math.cos(m.angle) * m.speed;
+                m.y += Math.sin(m.angle) * m.speed;
+                m.life--;
+
+                // 트레일
+                m.trail.push({ x: m.x, y: m.y });
+                if (m.trail.length > 20) m.trail.shift();
+
+                // 플레이어와 충돌
+                const dist = Math.hypot(player.x - m.x, player.y - m.y);
+                if (dist < player.size + 10) {
+                    if (!player.skills.shield.active && player.powerups.invincible <= 0) {
+                        let damage = 25 * difficulty.damageMult;
+                        if (player.strain === 'tank') damage *= 0.7; // 갑옷형 피해 감소
+                        if (player.strain === 'infect') damage *= 1.2; // 감염형 피해 증가
+
+                        player.hp -= damage;
+                        game.cameraShake = 20;
+                        createParticles(m.x, m.y, '#ff4444', 20);
+                        createFloatingText(m.x, m.y, `-${Math.floor(damage)} HP`, '#ff0000');
+                    }
+                    return false;
+                }
+
+                return m.life > 0 && m.x > 0 && m.x < game.worldSize && m.y > 0 && m.y < game.worldSize;
+            });
+
+            // 항체 폭풍 투사체 & 전기장 업데이트 (대미지/판정 밸런스)
+            stormProjectiles = stormProjectiles.filter(p => {
+                if (!p.isStatic) {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                }
+                p.life--;
+
+                // 플레이어 충돌
+                // - 전기장: 넓지만 틱 대미지로 완화
+                // - 폭풍 투사체: 히트박스/대미지 완화
+                const hitDist = p.isStatic ? 34 : (p.isStorm ? 6 : 5);
+                const dist = Math.hypot(player.x - p.x, player.y - p.y);
+
+                if (dist < player.size + hitDist) {
+                    if (!player.skills.shield.active && player.powerups.invincible <= 0) {
+                        let damage;
+                        if (p.isStatic) {
+                            // 전기장: 지속형이므로 한 번 맞을 때는 약하게
+                            damage = 4 * difficulty.damageMult;
+                        } else {
+                            // 폭풍/기타 투사체
+                            damage = 6 * difficulty.damageMult;
+                        }
+
+                        if (player.strain === 'tank') damage *= 0.7;
+                        if (player.strain === 'infect') damage *= 1.15;
+
+                        player.hp -= damage;
+                        game.cameraShake = p.isStatic ? 3 : 5;
+                        createParticles(p.x, p.y, p.isStatic ? '#00ffff' : '#ffff00', 8);
+                        createFloatingText(p.x, p.y, `-${Math.floor(damage)} HP`, '#ff0000');
+
+                        // 투사체는 사라짐 / 전기장은 남음(틱마다 맞게)
+                        if (!p.isStatic) return false;
+                    }
+                }
+
+                // 전기장 지속성
+                return p.life > 0;
+            });
+
+            // 적 업데이트
+            enemies.forEach((enemy, ei) => {
+                enemy.wobble += 0.05;
+                enemy.aiTimer++;
+                if (enemy.attackCooldown > 0) enemy.attackCooldown--;
+
+                const distToPlayer = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+
+                // 크기에 따른 추적 범위 증가 (큰 바이러스일수록 더 멀리서 추적)
+                const detectionRange = 250 + (player.size - 25) * 3;
+
+                if (enemy.aiState === 'patrol') {
+                    if (distToPlayer < detectionRange) {
+                        enemy.aiState = 'chase';
+                    }
+                    if (enemy.aiTimer % 60 === 0) {
+                        enemy.angle += (Math.random() - 0.5) * Math.PI;
+                    }
+                } else if (enemy.aiState === 'chase') {
+                    const angle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+                    enemy.angle += (angle - enemy.angle) * 0.08;
+
+                    if (distToPlayer > detectionRange * 2) {
+                        enemy.aiState = 'patrol';
+                    }
+                }
+
+                enemy.x += Math.cos(enemy.angle) * enemy.speed;
+                enemy.y += Math.sin(enemy.angle) * enemy.speed;
+
+                enemy.x = Math.max(enemy.size, Math.min(game.worldSize - enemy.size, enemy.x));
+                enemy.y = Math.max(enemy.size, Math.min(game.worldSize - enemy.size, enemy.y));
+
+                if (distToPlayer < player.size + enemy.size * 0.6 && enemy.attackCooldown <= 0) {
+                    if (player.powerups.invincible > 0 || player.skills.shield.active) {
+                        const pushAngle = Math.atan2(enemy.y - player.y, enemy.x - player.x);
+                        enemy.x += Math.cos(pushAngle) * 30;
+                        enemy.y += Math.sin(pushAngle) * 30;
+                        enemy.hp -= 15;
+                    } else if (player.size > enemy.size * 1.3) {
+                        player.xp += Math.floor(enemy.size * 2 * difficulty.xpMult);
+                        player.size += enemy.size * 0.05;
+                        game.researchPoints += 20;
+                        game.enemiesKilled++;
+                        createParticles(enemy.x, enemy.y, '#ffffff', 30);
+                        createFloatingText(enemy.x, enemy.y, `+${Math.floor(enemy.size * 2)}`, '#ffff00');
+                        enemies.splice(ei, 1);
+                        game.cameraShake = 15;
+                    } else {
+                        let damage = (10 + enemy.size * 0.2) * difficulty.damageMult * (1 - player.defenseMult - strain.def);
+                        if (player.strain === 'infect') damage *= 1.2;
+                        player.hp -= damage;
+                        game.cameraShake = 10;
+                        enemy.attackCooldown = 30;
+
+                        const pushAngle = Math.atan2(player.y - enemy.y, player.x - enemy.x);
+                        player.x += Math.cos(pushAngle) * 25;
+                        player.y += Math.sin(pushAngle) * 25;
+                    }
+                }
+
+                if (enemy.hp <= 0) {
+                    createParticles(enemy.x, enemy.y, '#ffffff', 20);
+                    game.researchPoints += 15;
+                    game.enemiesKilled++;
+                    if (game.mission && game.mission.type === 'kill') game.mission.current++;
+                    enemies.splice(ei, 1);
+                }
+            });
+
+            // 파워업 업데이트
+            powerups.forEach((pu, index) => {
+                pu.bobPhase += 0.08;
+
+                const dist = Math.hypot(player.x - pu.x, player.y - pu.y);
+                if (dist < player.size + pu.size) {
+                    if (pu.type === 'invincible') {
+                        player.powerups.invincible = 180;
+                    } else if (pu.type === 'xpBoost') {
+                        const xpGain = 80 * player.level * difficulty.xpMult;
+                        player.xp += xpGain;
+                        createFloatingText(pu.x, pu.y, `+${Math.floor(xpGain)} XP`, '#ff00ff');
+                    } else if (pu.type === 'heal') {
+                        const healAmount = 40 * difficulty.healMult;
+                        player.hp = Math.min(player.maxHp, player.hp + healAmount);
+                        createFloatingText(pu.x, pu.y, `+${Math.floor(healAmount)} HP`, '#ff6666');
+                    } else if (pu.type === 'research') {
+                        game.researchPoints += 50;
+                        createFloatingText(pu.x, pu.y, '+50 🔬', '#00ffff');
+                    }
+
+                    createParticles(pu.x, pu.y, `hsl(${pu.color.h}, 80%, 60%)`, 20);
+                    powerups.splice(index, 1);
+
+                    if (player.xp >= player.xpToLevel) levelUp();
+                }
+            });
+
+            if (powerups.length < 4 && Math.random() < 0.006) {
+                powerups.push(createPowerup());
+            }
+
+            // 파티클 업데이트
+            particles = particles.filter(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vx *= 0.94;
+                p.vy *= 0.94;
+                p.life--;
+                return p.life > 0;
+            });
+
+            // 플로팅 텍스트 업데이트
+            floatingTexts = floatingTexts.filter(t => {
+                t.y += t.vy;
+                t.life--;
+                return t.life > 0;
+            });
+
+            // 배경 요소 업데이트
+            backgroundElements.forEach(el => {
+                el.twinkle += 0.03;
+            });
+
+            // 화면 밖으로 나가는 것 방지 (스테이지 효과 때문에 필요)
+            player.x = Math.max(player.size, Math.min(game.worldSize - player.size, player.x));
+            player.y = Math.max(player.size, Math.min(game.worldSize - player.size, player.y));
+
+            // 체력 체크
+            if (player.hp <= 0) gameOver();
+
+            updateUI();
+        }
+
+        // UI 업데이트
+        function updateUI() {
+            document.getElementById('level').textContent = player.level;
+            document.getElementById('size').textContent = Math.floor(player.size);
+            document.getElementById('xp').textContent = Math.floor(player.xp);
+            document.getElementById('xpMax').textContent = player.xpToLevel;
+            document.getElementById('xpBar').style.width = Math.min(100, (player.xp / player.xpToLevel * 100)) + '%';
+            document.getElementById('hp').textContent = Math.floor(player.hp);
+            document.getElementById('hpMax').textContent = player.maxHp;
+            document.getElementById('hpBar').style.width = Math.max(0, (player.hp / player.maxHp * 100)) + '%';
+            document.getElementById('infected').textContent = game.infected;
+            document.getElementById('currentWave').textContent = game.wave;
+            document.getElementById('maxCombo').textContent = game.maxCombo;
+            document.getElementById('enemiesKilled').textContent = game.enemiesKilled;
+            document.getElementById('researchPoints').textContent = game.researchPoints;
+            document.getElementById('dnaCollected').textContent = game.dnaCollected;
+
+            const speedPenalty = getSizeSpeedPenalty();
+            document.getElementById('statSpeed').textContent = Math.floor(player.speedMult * speedPenalty * 100) + '%';
+            document.getElementById('statAbsorb').textContent = Math.floor(player.absorbMult * 100) + '%';
+            document.getElementById('statDefense').textContent = Math.floor(player.defenseMult * 100) + '%';
+
+            // 크기 페널티 표시
+            if (speedPenalty < 1) {
+                document.getElementById('sizeDebuff').innerHTML = `<span class="text-red-400">⚠️ 속도 ${Math.floor((1 - speedPenalty) * 100)}% 감소</span>`;
+            } else {
+                document.getElementById('sizeDebuff').textContent = '';
+            }
+
+            const elapsed = Math.floor((Date.now() - game.startTime) / 1000);
+            const mins = Math.floor(elapsed / 60).toString().padStart(2, '0');
+            const secs = (elapsed % 60).toString().padStart(2, '0');
+            document.getElementById('time').textContent = `${mins}:${secs}`;
+
+            document.getElementById('cooldownQ').style.height = (player.skills.toxin.cooldown / player.skills.toxin.maxCooldown * 100) + '%';
+            document.getElementById('cooldownE').style.height = (player.skills.magnet.cooldown / difficulty.magnetCooldown * 100) + '%';
+            document.getElementById('cooldownR').style.height = (player.skills.split.cooldown / player.skills.split.maxCooldown * 100) + '%';
+            document.getElementById('cooldownF').style.height = (player.skills.shield.cooldown / player.skills.shield.maxCooldown * 100) + '%';
+
+            const effectsContainer = document.getElementById('activeEffects');
+            effectsContainer.innerHTML = '';
+            if (player.powerups.invincible > 0 || player.skills.shield.active) {
+                effectsContainer.innerHTML += '<span class="bg-yellow-500/30 px-2 py-1 rounded text-yellow-400 text-xs korean-font">🛡️</span>';
+            }
+            if (player.powerups.magnet > 0 || player.skills.magnet.active) {
+                effectsContainer.innerHTML += '<span class="bg-blue-500/30 px-2 py-1 rounded text-blue-400 text-xs korean-font">🧲</span>';
+            }
+            if (player.strain === 'speed') {
+                document.getElementById('strain1').classList.add('strain-active');
+                document.getElementById('strain2').classList.remove('strain-active');
+                document.getElementById('strain3').classList.remove('strain-active');
+                document.getElementById('currentStrainName').textContent = '신속형';
+                document.getElementById('currentStrainName').className = 'text-blue-400 font-bold';
+            } else if (player.strain === 'tank') {
+                document.getElementById('strain1').classList.remove('strain-active');
+                document.getElementById('strain2').classList.add('strain-active');
+                document.getElementById('strain3').classList.remove('strain-active');
+                document.getElementById('currentStrainName').textContent = '갑옷형';
+                document.getElementById('currentStrainName').className = 'text-green-400 font-bold';
+            } else if (player.strain === 'infect') {
+                document.getElementById('strain1').classList.remove('strain-active');
+                document.getElementById('strain2').classList.remove('strain-active');
+                document.getElementById('strain3').classList.add('strain-active');
+                document.getElementById('currentStrainName').textContent = '감염형';
+                document.getElementById('currentStrainName').className = 'text-red-400 font-bold';
+            } else {
+                document.getElementById('strain1').classList.remove('strain-active');
+                document.getElementById('strain2').classList.remove('strain-active');
+                document.getElementById('strain3').classList.remove('strain-active');
+                document.getElementById('currentStrainName').textContent = '기본형';
+                document.getElementById('currentStrainName').className = 'text-gray-400 font-bold';
+            }
+        }
+
+        function generateMission() {
+            const types = ['infect', 'kill'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            let target = 0;
+            let description = '';
+
+            if (type === 'infect') {
+                target = 10 + Math.floor(game.wave * 1.5);
+                description = `세포 ${target}마리 감염시키기`;
+            } else {
+                target = 2 + Math.floor(game.wave * 0.5);
+                description = `적 ${target}마리 처치하기`;
+            }
+
+            game.mission = {
+                type,
+                target,
+                current: 0,
+                duration: 30 * 60, // 30초
+                description,
+                reward: 200 * player.level
+            };
+
+            document.getElementById('missionText').textContent = description;
+            document.getElementById('missionDisplay').classList.remove('translate-x-full');
+            createFloatingText(player.x, player.y - 80, "신규 미션!", "#ffffff");
+        }
+
+        function completeMission() {
+            game.researchPoints += game.mission.reward;
+            player.xp += game.mission.reward;
+            createFloatingText(player.x, player.y - 80, `미션 완료! +${game.mission.reward} RP`, "#00ff00");
+            createParticles(player.x, player.y, '#ffd700', 30);
+            game.mission = null;
+            document.getElementById('missionDisplay').classList.add('translate-x-full');
+            if (player.xp >= player.xpToLevel) levelUp();
+        }
+
+        // 렌더링
+        function render() {
+            // 배경 (스테이지별 색상)
+            const stageInfo = game.stageData[game.stage - 1] || game.stageData[0];
+
+            const bgGrad = ctx.createRadialGradient(
+                canvas.width / 2, canvas.height / 2, 0,
+                canvas.width / 2, canvas.height / 2, canvas.width
+            );
+
+            if (gameMode === 'challenge') {
+                bgGrad.addColorStop(0, '#1a0808');
+                bgGrad.addColorStop(0.5, '#0d0404');
+                bgGrad.addColorStop(1, '#050202');
+            } else {
+                bgGrad.addColorStop(0, stageInfo.colorStart);
+                bgGrad.addColorStop(0.5, '#000000');
+                bgGrad.addColorStop(1, stageInfo.colorEnd);
+            }
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const shakeX = (Math.random() - 0.5) * game.cameraShake;
+            const shakeY = (Math.random() - 0.5) * game.cameraShake;
+
+            ctx.save();
+            ctx.translate(canvas.width / 2 + shakeX, canvas.height / 2 + shakeY);
+            ctx.scale(game.zoom, game.zoom);
+            ctx.translate(-player.x, -player.y);
+
+            // 배경 요소
+            backgroundElements.forEach(el => {
+                const brightness = 0.2 + Math.sin(el.twinkle) * 0.15;
+                ctx.beginPath();
+                if (el.type === 'molecule') {
+                    ctx.arc(el.x, el.y, el.size * 2, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(0, 200, 255, ${brightness * 0.3})`;
+                } else {
+                    ctx.arc(el.x, el.y, el.size, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(150, 100, 255, ${brightness})`;
+                }
+                ctx.fill();
+            });
+
+            // 항체 폭풍 투사체 & 전기장
+            stormProjectiles.forEach(p => {
+                if (p.isStatic) {
+                    // 전기장 (신경계)
+                    const flicker = Math.random() * 0.5 + 0.5;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 30, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(100, 200, 255, ${0.3 * flicker})`;
+                    ctx.fill();
+                    ctx.strokeStyle = `rgba(200, 255, 255, ${0.8 * flicker})`;
+                    ctx.stroke();
+                    // 번개 효과
+                    ctx.beginPath();
+                    ctx.moveTo(p.x + (Math.random() - 0.5) * 20, p.y + (Math.random() - 0.5) * 20);
+                    ctx.lineTo(p.x + (Math.random() - 0.5) * 20, p.y + (Math.random() - 0.5) * 20);
+                    ctx.stroke();
+                } else {
+                    // 일반 투사체
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ffff00';
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
+                    ctx.fill();
+                }
+            });
+
+            // AI 디버그 시각화 (교육용)
+            if (game.aiDebugMode) {
+                enemies.forEach(e => {
+                    // 인식 범위 원
+                    const detectionRange = 250 + (player.size - 25) * 3;
+                    ctx.beginPath();
+                    ctx.arc(e.x, e.y, detectionRange, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 0, 0, 0.2)';
+                    ctx.setLineDash([5, 5]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // 추적 라인
+                    ctx.beginPath();
+                    ctx.moveTo(e.x, e.y);
+                    ctx.lineTo(player.x, player.y);
+
+                    const dist = Math.hypot(player.x - e.x, player.y - e.y);
+                    if (dist < detectionRange) {
+                        ctx.strokeStyle = 'rgba(255, 0, 0, 0.8)'; // 추적 중
+                        ctx.lineWidth = 2;
+
+                        // 알고리즘 텍스트
+                        ctx.fillStyle = '#ffaaaa';
+                        ctx.font = '10px monospace';
+                        ctx.fillText(`A* Target: Player (${Math.floor(dist)}m)`, e.x, e.y - 20);
+                    } else {
+                        ctx.strokeStyle = 'rgba(100, 100, 100, 0.3)'; // 대기 중
+                        ctx.lineWidth = 1;
+                        ctx.fillStyle = '#aaaaaa';
+                        ctx.font = '10px monospace';
+                        ctx.fillText('Patrol Mode', e.x, e.y - 20);
+                    }
+                    ctx.stroke();
+                });
+            }
+
+            // 그리드
+            ctx.strokeStyle = 'rgba(0, 100, 150, 0.08)';
+            ctx.lineWidth = 1;
+            const gridSize = 100;
+            for (let x = 0; x < game.worldSize; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, game.worldSize);
+                ctx.stroke();
+            }
+            for (let y = 0; y < game.worldSize; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(game.worldSize, y);
+                ctx.stroke();
+            }
+
+            // 독성 지역
+            toxicZones.forEach(zone => {
+                const pulse = 0.3 + Math.sin(zone.pulsePhase) * 0.2;
+                ctx.beginPath();
+                ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+                const grad = ctx.createRadialGradient(zone.x, zone.y, 0, zone.x, zone.y, zone.radius);
+                grad.addColorStop(0, `rgba(0, 255, 0, ${pulse * 0.4})`);
+                grad.addColorStop(0.7, `rgba(0, 200, 0, ${pulse * 0.2})`);
+                grad.addColorStop(1, 'transparent');
+                ctx.fillStyle = grad;
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(0, 255, 0, ${pulse * 0.5})`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+
+            // 월드 경계
+            ctx.strokeStyle = gameMode === 'challenge' ? 'rgba(255, 50, 50, 0.5)' : 'rgba(0, 200, 255, 0.5)';
+            ctx.lineWidth = 5;
+            ctx.strokeRect(0, 0, game.worldSize, game.worldSize);
+
+            // DNA 픽업
+            dnaPickups.forEach(dna => {
+                const bobY = Math.sin(dna.bobPhase) * 5;
+                ctx.save();
+                ctx.translate(dna.x, dna.y + bobY);
+                ctx.rotate(dna.bobPhase * 0.5);
+
+                ctx.beginPath();
+                for (let i = 0; i < 20; i++) {
+                    const t = i / 20;
+                    const x1 = Math.sin(t * Math.PI * 4) * 8;
+                    const y1 = (t - 0.5) * 20;
+                    ctx.lineTo(x1, y1);
+                }
+                ctx.strokeStyle = '#00ff88';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.beginPath();
+                for (let i = 0; i < 20; i++) {
+                    const t = i / 20;
+                    const x1 = -Math.sin(t * Math.PI * 4) * 8;
+                    const y1 = (t - 0.5) * 20;
+                    ctx.lineTo(x1, y1);
+                }
+                ctx.strokeStyle = '#00aaff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.restore();
+            });
+
+            // 파워업
+            powerups.forEach(pu => {
+                const bobY = Math.sin(pu.bobPhase) * 5;
+
+                ctx.beginPath();
+                ctx.arc(pu.x, pu.y + bobY, pu.size * 2, 0, Math.PI * 2);
+                const glow = ctx.createRadialGradient(pu.x, pu.y + bobY, 0, pu.x, pu.y + bobY, pu.size * 2);
+                glow.addColorStop(0, `hsla(${pu.color.h}, ${pu.color.s}%, ${pu.color.l}%, 0.4)`);
+                glow.addColorStop(1, 'transparent');
+                ctx.fillStyle = glow;
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(pu.x, pu.y + bobY, pu.size, 0, Math.PI * 2);
+                const grad = ctx.createRadialGradient(pu.x - 5, pu.y + bobY - 5, 0, pu.x, pu.y + bobY, pu.size);
+                grad.addColorStop(0, `hsl(${pu.color.h}, ${pu.color.s}%, ${pu.color.l + 20}%)`);
+                grad.addColorStop(1, `hsl(${pu.color.h}, ${pu.color.s}%, ${pu.color.l - 20}%)`);
+                ctx.fillStyle = grad;
+                ctx.fill();
+
+                ctx.font = `${pu.size}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(pu.color.icon, pu.x, pu.y + bobY);
+            });
+
+            // 세포
+            cells.forEach(cell => {
+                const pulse = Math.sin(cell.pulsePhase) * 0.05 + 1;
+                const size = cell.size * pulse;
+
+                ctx.beginPath();
+                ctx.arc(cell.x, cell.y, size * 1.3, 0, Math.PI * 2);
+                const outerGlow = ctx.createRadialGradient(cell.x, cell.y, size, cell.x, cell.y, size * 1.3);
+                outerGlow.addColorStop(0, `hsla(${cell.color.h}, ${cell.color.s}%, ${cell.color.l}%, 0.3)`);
+                outerGlow.addColorStop(1, 'transparent');
+                ctx.fillStyle = outerGlow;
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(cell.x, cell.y, size, 0, Math.PI * 2);
+                const membraneGrad = ctx.createRadialGradient(
+                    cell.x - size * 0.3, cell.y - size * 0.3, 0,
+                    cell.x, cell.y, size
+                );
+                membraneGrad.addColorStop(0, `hsl(${cell.color.h}, ${cell.color.s}%, ${cell.color.l + 25}%)`);
+                membraneGrad.addColorStop(0.7, `hsl(${cell.color.h}, ${cell.color.s}%, ${cell.color.l}%)`);
+                membraneGrad.addColorStop(1, `hsl(${cell.color.h}, ${cell.color.s - 10}%, ${cell.color.l - 15}%)`);
+                ctx.fillStyle = membraneGrad;
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(cell.x + size * 0.1, cell.y + size * 0.1, size * 0.35, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(${cell.color.h + 30}, ${cell.color.s}%, ${cell.color.l - 20}%, 0.7)`;
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(cell.x - size * 0.35, cell.y - size * 0.35, size * 0.2, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.fill();
+
+                if (cell.poisoned) {
+                    ctx.beginPath();
+                    ctx.arc(cell.x, cell.y, size * 1.2, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(0, 255, 0, 0.6)';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                }
+            });
+
+            // 미사일
+            missiles.forEach(m => {
+                // 트레일
+                if (m.trail.length > 1) {
+                    ctx.beginPath();
+                    ctx.moveTo(m.trail[0].x, m.trail[0].y);
+                    for (let i = 1; i < m.trail.length; i++) {
+                        ctx.lineTo(m.trail[i].x, m.trail[i].y);
+                    }
+                    ctx.strokeStyle = 'rgba(255, 100, 0, 0.5)';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                }
+
+                // 미사일 본체
+                ctx.save();
+                ctx.translate(m.x, m.y);
+                ctx.rotate(m.angle);
+
+                ctx.beginPath();
+                ctx.moveTo(15, 0);
+                ctx.lineTo(-10, -6);
+                ctx.lineTo(-10, 6);
+                ctx.closePath();
+                ctx.fillStyle = '#ff4400';
+                ctx.fill();
+
+                ctx.beginPath();
+                ctx.arc(0, 0, 8, 0, Math.PI * 2);
+                const missileGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, 12);
+                missileGlow.addColorStop(0, 'rgba(255, 200, 0, 0.8)');
+                missileGlow.addColorStop(1, 'transparent');
+                ctx.fillStyle = missileGlow;
+                ctx.fill();
+
+                ctx.restore();
+            });
+
+            // 적 & 보스 렌더링
+            const renderTarget = [...enemies];
+            if (game.bossActive && game.boss) {
+                renderTarget.push(game.boss);
+            }
+
+            renderTarget.forEach(enemy => {
+                const isBoss = !!enemy.phase; // 보스 구분
+                const wobble = Math.sin(game.waveTimer * 0.1) * 3; // 보스는 wobble 속성 없으므로 waveTimer 사용
+
+                // 엘리트 적 오라
+                if (enemy.isElite) {
+                    ctx.beginPath();
+                    ctx.arc(enemy.x, enemy.y, enemy.size * 2, 0, Math.PI * 2);
+                    const eliteGlow = ctx.createRadialGradient(enemy.x, enemy.y, enemy.size, enemy.x, enemy.y, enemy.size * 2);
+                    eliteGlow.addColorStop(0, 'rgba(255, 215, 0, 0.3)'); // 골드/오렌지 빛
+                    eliteGlow.addColorStop(1, 'transparent');
+                    ctx.fillStyle = eliteGlow;
+                    ctx.fill();
+
+                    // 회전하는 띠
+                    const time = Date.now() / 500;
+                    ctx.beginPath();
+                    ctx.arc(enemy.x, enemy.y, enemy.size * 1.6, time, time + Math.PI);
+                    ctx.strokeStyle = 'rgba(255, 215, 0, 0.6)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+
+                ctx.beginPath();
+                ctx.arc(enemy.x, enemy.y, enemy.size * 1.5, 0, Math.PI * 2);
+                const dangerGlow = ctx.createRadialGradient(enemy.x, enemy.y, enemy.size, enemy.x, enemy.y, enemy.size * 1.5);
+                dangerGlow.addColorStop(0, 'rgba(255, 100, 100, 0.2)');
+                dangerGlow.addColorStop(1, 'transparent');
+                ctx.fillStyle = dangerGlow;
+                ctx.fill();
+
+                ctx.beginPath();
+                if (enemy.type === 'macrophage' || enemy.type === 'giant') {
+                    for (let i = 0; i < 8; i++) {
+                        const a = (Math.PI * 2 / 8) * i;
+                        const r = enemy.size * (0.9 + Math.sin((enemy.wobble || 0) + i) * 0.15);
+                        if (i === 0) ctx.moveTo(enemy.x + Math.cos(a) * r, enemy.y + Math.sin(a) * r);
+                        else ctx.lineTo(enemy.x + Math.cos(a) * r, enemy.y + Math.sin(a) * r);
+                    }
+                    ctx.closePath();
+                } else {
+                    ctx.arc(enemy.x, enemy.y + wobble, enemy.size, 0, Math.PI * 2);
+                }
+
+                const enemyGrad = ctx.createRadialGradient(
+                    enemy.x - enemy.size * 0.3, enemy.y - enemy.size * 0.3, 0,
+                    enemy.x, enemy.y, enemy.size
+                );
+
+                if (isBoss) {
+                    enemyGrad.addColorStop(0, '#ff0000');
+                    enemyGrad.addColorStop(0.5, '#aa0000');
+                    enemyGrad.addColorStop(1, '#550000');
+                } else if (enemy.type === 'whiteBlood') {
+                    enemyGrad.addColorStop(0, '#ffffff');
+                    enemyGrad.addColorStop(0.6, '#dddddd');
+                    enemyGrad.addColorStop(1, '#888888');
+                } else if (enemy.type === 'antibody') {
+                    enemyGrad.addColorStop(0, '#ffdd00');
+                    enemyGrad.addColorStop(0.6, '#ffaa00');
+                    enemyGrad.addColorStop(1, '#885500');
+                } else if (enemy.type === 'tcell') {
+                    enemyGrad.addColorStop(0, '#cc88ff');
+                    enemyGrad.addColorStop(0.6, '#9944cc');
+                    enemyGrad.addColorStop(1, '#552288');
+                } else if (enemy.type === 'nkcell') {
+                    enemyGrad.addColorStop(0, '#ff88ff');
+                    enemyGrad.addColorStop(0.6, '#cc44cc');
+                    enemyGrad.addColorStop(1, '#882288');
+                } else {
+                    enemyGrad.addColorStop(0, '#ff8888');
+                    enemyGrad.addColorStop(0.6, '#ff4444');
+                    enemyGrad.addColorStop(1, '#881111');
+                }
+
+                ctx.fillStyle = enemyGrad;
+                ctx.fill();
+
+                // HP 바 (보스는 화면 상단에 별도로 있음)
+                if (!isBoss) {
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    ctx.fillRect(enemy.x - enemy.size, enemy.y - enemy.size - 15, enemy.size * 2, 8);
+                    ctx.fillStyle = '#ff4444';
+                    ctx.fillRect(enemy.x - enemy.size, enemy.y - enemy.size - 15, enemy.size * 2 * (enemy.hp / enemy.maxHp), 8);
+                }
+
+                // 아이콘
+                ctx.font = `bold ${enemy.size * 0.5}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = '#ff0000';
+                ctx.shadowColor = '#ff0000';
+                ctx.shadowBlur = 10;
+                ctx.fillText(isBoss ? '☠️' : '⚠', enemy.x, enemy.y + wobble);
+                ctx.shadowBlur = 0;
+            });
+
+            // 파티클
+            particles.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size * (p.life / 60), 0, Math.PI * 2);
+                ctx.fillStyle = p.color;
+                ctx.fill();
+            });
+
+            // 플레이어
+            const time = Date.now() / 1000;
+
+            // 쉴드 효과
+            if (player.skills.shield.active) {
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, player.size * 1.8, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(100, 200, 255, ${0.5 + Math.sin(time * 10) * 0.3})`;
+                ctx.lineWidth = 6;
+                ctx.stroke();
+            }
+
+            // 무적 효과
+            if (player.powerups.invincible > 0) {
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, player.size * 2, 0, Math.PI * 2);
+                const invGlow = ctx.createRadialGradient(player.x, player.y, player.size, player.x, player.y, player.size * 2);
+                invGlow.addColorStop(0, 'rgba(255, 215, 0, 0.4)');
+                invGlow.addColorStop(1, 'transparent');
+                ctx.fillStyle = invGlow;
+                ctx.fill();
+            }
+
+            // 외부 글로우
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.size * 2, 0, Math.PI * 2);
+            const outerGlow = ctx.createRadialGradient(player.x, player.y, player.size * 0.5, player.x, player.y, player.size * 2);
+            outerGlow.addColorStop(0, `hsla(${player.color.h}, ${player.color.s}%, ${player.color.l}%, 0.4)`);
+            outerGlow.addColorStop(1, 'transparent');
+            ctx.fillStyle = outerGlow;
+            ctx.fill();
+
+            // 촉수 (잠복 시 숨김)
+            if (!player.isHidden) {
+                player.tentacles.forEach((t, i) => {
+                    const angle = t.angle + time * 0.3;
+                    const length = player.size * (0.6 + t.length * 0.6);
+                    const thickness = 3 + t.thickness * 3;
+
+                    const startX = player.x + Math.cos(angle) * player.size * 0.6;
+                    const startY = player.y + Math.sin(angle) * player.size * 0.6;
+                    const endX = player.x + Math.cos(angle) * length;
+                    const endY = player.y + Math.sin(angle) * length;
+
+                    ctx.beginPath();
+                    ctx.moveTo(startX, startY);
+                    ctx.lineTo(endX, endY);
+
+                    const tentGrad = ctx.createLinearGradient(startX, startY, endX, endY);
+                    tentGrad.addColorStop(0, `hsla(${player.color.h}, ${player.color.s}%, ${player.color.l}%, 0.9)`);
+                    tentGrad.addColorStop(1, `hsla(${player.color.h + 30}, ${player.color.s}%, ${player.color.l + 20}%, 0.6)`);
+
+                    ctx.strokeStyle = tentGrad;
+                    ctx.lineWidth = thickness;
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.arc(endX, endY, thickness * 0.8, 0, Math.PI * 2);
+                    ctx.fillStyle = `hsl(${player.color.h + 40}, ${player.color.s}%, ${player.color.l + 25}%)`;
+                    ctx.fill();
+                });
+            }
+
+            // 본체 (잠복 시 숨김 or 반투명)
+            if (!player.isHidden) {
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
+                const bodyGrad = ctx.createRadialGradient(
+                    player.x - player.size * 0.3, player.y - player.size * 0.3, 0,
+                    player.x, player.y, player.size
+                );
+                bodyGrad.addColorStop(0, `hsl(${player.color.h}, ${player.color.s}%, ${player.color.l + 35}%)`);
+                bodyGrad.addColorStop(0.4, `hsl(${player.color.h}, ${player.color.s}%, ${player.color.l + 15}%)`);
+                bodyGrad.addColorStop(0.7, `hsl(${player.color.h}, ${player.color.s}%, ${player.color.l}%)`);
+                bodyGrad.addColorStop(1, `hsl(${player.color.h + 20}, ${player.color.s + 10}%, ${player.color.l - 25}%)`);
+                ctx.fillStyle = bodyGrad;
+                ctx.fill();
+            } else if (player.hostCell) {
+                // 숙주 안에 숨은 모습 (희미하게)
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, player.size * 0.5, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(${player.color.h}, ${player.color.s}%, 50%, 0.3)`;
+                ctx.fill();
+            }
+
+            // DNA 나선
+            ctx.save();
+            ctx.translate(player.x, player.y);
+            ctx.rotate(time);
+            for (let i = 0; i < 2; i++) {
+                ctx.beginPath();
+                for (let j = 0; j < 20; j++) {
+                    const a = (j / 20) * Math.PI * 2;
+                    const r = player.size * 0.3;
+                    const x = Math.cos(a + i * Math.PI) * r;
+                    const y = Math.sin(a) * r * 0.3 + (j - 10) * player.size * 0.03;
+                    if (j === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.strokeStyle = `hsla(${player.color.h + 60}, 80%, 70%, 0.6)`;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+            ctx.restore();
+
+            // 하이라이트
+            ctx.beginPath();
+            ctx.arc(player.x - player.size * 0.35, player.y - player.size * 0.35, player.size * 0.22, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.fill();
+
+            // 분신
+            player.splitlings.forEach(s => {
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+                const splitGrad = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.size);
+                splitGrad.addColorStop(0, `hsla(${player.color.h}, ${player.color.s}%, ${player.color.l + 20}%, ${s.life / 90})`);
+                splitGrad.addColorStop(1, `hsla(${player.color.h}, ${player.color.s}%, ${player.color.l}%, ${s.life / 180})`);
+                ctx.fillStyle = splitGrad;
+                ctx.fill();
+            });
+
+            // 플로팅 텍스트
+            ctx.font = 'bold 16px "Noto Sans KR"';
+            floatingTexts.forEach(t => {
+                ctx.textAlign = 'center';
+                ctx.fillStyle = t.color;
+                ctx.globalAlpha = t.life / 60;
+                ctx.fillText(t.text, t.x, t.y);
+                ctx.globalAlpha = 1;
+            });
+
+            // 공생체 그리기
+            player.companions?.forEach(comp => {
+                const cx = player.x + Math.cos(comp.angle) * comp.dist;
+                const cy = player.y + Math.sin(comp.angle) * comp.dist;
+
+                // 본체
+                ctx.beginPath();
+                ctx.arc(cx, cy, 8, 0, Math.PI * 2);
+                ctx.fillStyle = '#00ffff';
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // 연결선
+                ctx.beginPath();
+                ctx.moveTo(player.x, player.y);
+                ctx.lineTo(cx, cy);
+                ctx.strokeStyle = 'rgba(0, 255, 255, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+
+                // 레이저 발사 효과
+                if (comp.fireFrame > 0 && comp.targetX) {
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy);
+                    ctx.lineTo(comp.targetX, comp.targetY);
+                    ctx.strokeStyle = `rgba(0, 255, 255, ${comp.fireFrame / 5})`;
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                }
+            });
+
+            ctx.restore();
+
+            // 비네트
+            const vignette = ctx.createRadialGradient(
+                canvas.width / 2, canvas.height / 2, canvas.height * 0.3,
+                canvas.width / 2, canvas.height / 2, canvas.height
+            );
+            vignette.addColorStop(0, 'transparent');
+            vignette.addColorStop(1, gameMode === 'challenge' ? 'rgba(50, 0, 0, 0.7)' : 'rgba(0, 0, 0, 0.6)');
+            ctx.fillStyle = vignette;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // 미니맵
+            const mapSize = 140;
+            const mapX = canvas.width - mapSize - 20;
+            const mapY = canvas.height - mapSize - 70;
+
+            ctx.fillStyle = 'rgba(0, 20, 40, 0.9)';
+            ctx.fillRect(mapX - 3, mapY - 3, mapSize + 6, mapSize + 6);
+            ctx.strokeStyle = gameMode === 'challenge' ? 'rgba(255, 50, 50, 0.6)' : 'rgba(0, 200, 255, 0.6)';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(mapX - 3, mapY - 3, mapSize + 6, mapSize + 6);
+
+            const scale = mapSize / game.worldSize;
+
+            // 독성 지역
+            toxicZones.forEach(zone => {
+                ctx.beginPath();
+                ctx.arc(mapX + zone.x * scale, mapY + zone.y * scale, zone.radius * scale, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0, 255, 0, 0.3)';
+                ctx.fill();
+            });
+
+            cells.forEach(cell => {
+                ctx.beginPath();
+                ctx.arc(mapX + cell.x * scale, mapY + cell.y * scale, 2, 0, Math.PI * 2);
+                ctx.fillStyle = `hsl(${cell.color.h}, ${cell.color.s}%, ${cell.color.l}%)`;
+                ctx.fill();
+            });
+
+            missiles.forEach(m => {
+                ctx.beginPath();
+                ctx.arc(mapX + m.x * scale, mapY + m.y * scale, 3, 0, Math.PI * 2);
+                ctx.fillStyle = '#ff8800';
+                ctx.fill();
+            });
+
+            enemies.forEach(enemy => {
+                ctx.beginPath();
+                ctx.arc(mapX + enemy.x * scale, mapY + enemy.y * scale, 4, 0, Math.PI * 2);
+                ctx.fillStyle = '#ff4444';
+                ctx.fill();
+            });
+
+            ctx.beginPath();
+            ctx.arc(mapX + player.x * scale, mapY + player.y * scale, 6, 0, Math.PI * 2);
+            ctx.fillStyle = `hsl(${player.color.h}, 80%, 60%)`;
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        // 게임 오버
+        function gameOver() {
+            game.running = false;
+
+            if (game.quizTimerInterval) clearInterval(game.quizTimerInterval);
+
+            document.getElementById('challengeOverlay').classList.add('hidden');
+            document.getElementById('leftPanel').classList.remove('warning-border');
+            document.getElementById('missionDisplay').classList.add('translate-x-full');
+
+            document.getElementById('finalLevel').textContent = player.level;
+            document.getElementById('finalInfected').textContent = game.infected;
+            document.getElementById('finalKills').textContent = game.enemiesKilled;
+
+            const elapsed = Math.floor((Date.now() - game.startTime) / 1000);
+
+            // 최고 기록 저장 및 갱신
+            let score = game.infected * 10 + game.enemiesKilled * 50 + elapsed * 5;
+            if (score > game.highScore) {
+                game.highScore = score;
+                localStorage.setItem('virusLabHighScore', score);
+                createFloatingText(window.innerWidth / 2, window.innerHeight / 2 - 100, "🏆 최고 기록 갱신! 🏆", "#ffd700");
+            }
+
+            const mins = Math.floor(elapsed / 60).toString().padStart(2, '0');
+            const secs = (elapsed % 60).toString().padStart(2, '0');
+            document.getElementById('finalTime').textContent = `${mins}:${secs}`;
+
+            const learned = document.getElementById('learnedToday');
+            if (game.learnedFacts.length > 0) {
+                learned.innerHTML = game.learnedFacts.slice(0, 3).map(f => `• ${f}`).join('<br>');
+            } else {
+                learned.textContent = '다음에는 더 오래 생존해서 과학 상식을 배워보세요!';
+            }
+
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+        }
+
+        // 게임 루프
+        function gameLoop() {
+            update();
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 게임 모드 선택
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('ring-4', 'ring-white'));
+                btn.classList.add('ring-4', 'ring-white');
+                gameMode = btn.dataset.mode;
+
+                if (gameMode === 'challenge') {
+                    document.getElementById('challengeWarning').classList.remove('hidden');
+                } else {
+                    document.getElementById('challengeWarning').classList.add('hidden');
+                }
+            });
+        });
+
+        // 이벤트
+        document.getElementById('startBtn').addEventListener('click', () => {
+            document.getElementById('startScreen').classList.add('hidden');
+            SoundManager.init();
+            initGame();
+            game.running = true;
+        });
+
+        document.getElementById('soundBtn').addEventListener('click', () => {
+            SoundManager.toggle();
+        });
+
+        document.getElementById('restartBtn').addEventListener('click', () => {
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            initGame();
+            game.running = true;
+        });
+
+        // 시작
+        document.querySelector('.mode-btn[data-mode="learn"]').classList.add('ring-4', 'ring-white');
+        gameLoop();
+    </script>
+    <script>
+        // --- Premium Shop & Capture Integration ---
+        window.buyPremiumItem = function (item, price) {
+            if (window.parent) window.parent.postMessage({ type: 'PURCHASE_REQUEST', item: item, price: price, gameId: 'virus-lab' }, '*');
+        };
+
+        window.addEventListener('message', e => {
+            if (e.data.type === 'CAPTURE_REQUEST') {
+                const canvas = document.getElementById('gameCanvas');
+                if (canvas) window.parent.postMessage({ type: 'CAPTURE_SUCCESS', imageData: canvas.toDataURL() }, '*');
+            } else if (e.data.type === 'PURCHASE_SUCCESS') {
+                // Virus Lab specific logic
+                const rp = document.getElementById('researchPoints');
+                if (rp) {
+                    let current = parseInt(rp.innerText);
+                    rp.innerText = current + 1000;
+                    alert('연구 포인트 1000 획득!');
+                }
+            }
+        });
+
+        window.addEventListener('keydown', e => {
+            if (e.key === 'F2') {
+                e.preventDefault();
+                if (window.parent) window.parent.postMessage({ type: 'F2_PRESSED' }, '*');
+            }
+        });
+    </script>
+</body>
+
+</html>

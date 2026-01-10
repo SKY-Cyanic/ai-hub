@@ -13,11 +13,15 @@ import AdminPage from './pages/AdminPage';
 import MessagesPage from './pages/MessagesPage';
 import EncoderPage from './pages/EncoderPage';
 import ImageStudioPage from './pages/ImageStudioPage';
+import AIAnalyzerPage from './pages/tools/AIAnalyzerPage';
+import MockInvestmentPage from './pages/tools/MockInvestmentPage';
 import { TermsPage, PrivacyPage, YouthPolicyPage } from './pages/PolicyPages';
 import ActivityPage from './pages/ActivityPage';
 import SearchPage from './pages/SearchPage';
 import BookmarksPage from './pages/BookmarksPage';
 import ToolsPage from './pages/ToolsPage';
+import NoteViewerPage from './pages/NoteViewerPage';
+import GamePage from './pages/GamePage';
 
 function App() {
   return (
@@ -37,9 +41,13 @@ function App() {
             <Route path="wiki" element={<WikiPage />} />
             <Route path="wiki/:slug" element={<WikiPage />} />
             <Route path="messages" element={<MessagesPage />} />
+            <Route path="game" element={<GamePage />} />
             <Route path="tools" element={<ToolsPage />} />
+            <Route path="tools/note/:noteId" element={<NoteViewerPage />} />
             <Route path="tools/encoder" element={<EncoderPage />} />
             <Route path="tools/image-studio" element={<ImageStudioPage />} />
+            <Route path="tools/ai-analysis" element={<AIAnalyzerPage />} />
+            <Route path="tools/mock-invest" element={<MockInvestmentPage />} />
             <Route path="admin" element={<AdminPage />} />
             <Route path="terms" element={<TermsPage />} />
             <Route path="privacy" element={<PrivacyPage />} />

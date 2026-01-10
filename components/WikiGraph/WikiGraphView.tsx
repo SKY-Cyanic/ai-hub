@@ -289,8 +289,8 @@ const WikiGraphView: React.FC<WikiGraphProps> = ({ initialSlug, onNodeSelect, mi
 
     return (
         <div
-            className="relative w-full bg-slate-900 overflow-hidden rounded-2xl shadow-2xl border border-slate-700 group flex flex-col md:flex-row"
-            style={{ height: isMobile ? '600px' : '800px' }}
+            className={`relative w-full bg-slate-900 overflow-hidden rounded-2xl shadow-2xl border border-slate-700 group flex flex-col md:flex-row ${mini ? '' : 'h-full'}`}
+            style={{ height: mini ? (isMobile ? '300px' : '100%') : '100%' }}
         >
 
             {/* Main Graph Area */}

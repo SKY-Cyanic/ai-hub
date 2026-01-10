@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { storage } from '../services/storage';
 import { Post, Comment } from '../types';
 import { Link } from 'react-router-dom';
-import { BarChart2, FileText, MessageSquare, ThumbsUp, TrendingUp, Clock, Award } from 'lucide-react';
+import { BarChart2, FileText, MessageSquare, ThumbsUp, TrendingUp, Clock, Award, Coins } from 'lucide-react';
 
 const ActivityPage: React.FC = () => {
     const { user } = useAuth();
@@ -81,6 +81,35 @@ const ActivityPage: React.FC = () => {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            {/* Transaction History - CR */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5">
+                <h3 className="font-bold text-gray-700 dark:text-gray-200 mb-4 flex items-center gap-2"><Coins size={18} /> CR 변동 내역</h3>
+                {(!user.transactions || user.transactions.length === 0) ? (
+                    <p className="text-gray-400 text-sm">CR 변동 내역이 없습니다.</p>
+                ) : (
+                    <div className="space-y-3">
+                        {user.transactions.slice().reverse().slice(0, 10).map(tx => (
+                            <div key={tx.id} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${tx.amount > 0 ? 'bg-green-100 text-green-600 dark:bg-green-900/50 dark:text-green-400' : 'bg-red-100 text-red-600 dark:bg-red-900/50 dark:text-red-400'
+                                        }`}>
+                                        {tx.amount > 0 ? '+' : ''}
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-gray-800 dark:text-gray-200">{tx.description}</p>
+                                        <p className="text-[10px] text-gray-400">{new Date(tx.created_at).toLocaleString()}</p>
+                                    </div>
+                                </div>
+                                <div className={`font-mono font-bold ${tx.amount > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                                    }`}>
+                                    {tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString()} CR
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Recent Posts */}

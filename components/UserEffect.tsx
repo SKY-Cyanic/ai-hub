@@ -10,6 +10,7 @@ interface UserNicknameProps {
 export const UserNickname: React.FC<UserNicknameProps> = ({ profile, className = "" }) => {
     const isRainbow = profile.active_items?.special_effects?.includes('rainbow');
     const isGlitch = profile.active_items?.special_effects?.includes('glitch');
+    const displayName = (profile as any).nickname || profile.username;
 
     return (
         <span className={`inline-flex items-center gap-1 ${className}`}>
@@ -24,9 +25,9 @@ export const UserNickname: React.FC<UserNicknameProps> = ({ profile, className =
             <span
                 className={`font-black ${isRainbow ? 'effect-rainbow' : ''} ${isGlitch ? 'effect-glitch font-mono' : ''}`}
                 style={{ color: !isRainbow ? profile.active_items?.name_color : undefined }}
-                data-text={profile.username}
+                data-text={displayName}
             >
-                {profile.username}
+                {displayName}
             </span>
         </span>
     );
@@ -67,7 +68,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({ profile, size = 'md', cl
                     />
                 ) : (
                     <div className="w-full h-full bg-gradient-to-br from-gray-400 to-gray-600 flex items-center justify-center text-white font-bold">
-                        {profile.username[0].toUpperCase()}
+                        {((profile as any).nickname || profile.username)[0].toUpperCase()}
                     </div>
                 )}
             </div>

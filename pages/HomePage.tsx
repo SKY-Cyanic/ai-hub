@@ -14,6 +14,7 @@ const HomePage: React.FC = () => {
   const [hotPosts, setHotPosts] = useState<Post[]>([]);
   const [newPosts, setNewPosts] = useState<Post[]>([]);
   const [balance, setBalance] = useState<BalanceGame | null>(null);
+  const [previousBalance, setPreviousBalance] = useState<BalanceGame | null>(null);
   const { isAiHubMode } = useTheme();
   const { user } = useAuth();
 
@@ -23,6 +24,7 @@ const HomePage: React.FC = () => {
       setNewPosts(posts.slice(0, 15));
     });
     setBalance(storage.getBalanceGame());
+    setPreviousBalance(storage.getPreviousBalanceGame());
   }, []);
 
   const handleBalanceVote = async (opt: 'a' | 'b') => {
@@ -39,11 +41,15 @@ const HomePage: React.FC = () => {
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Hero Section */}
-      <div className={`relative overflow-hidden rounded-3xl p-6 md:p-10 text-white shadow-2xl transition-all duration-700 ${isAiHubMode
-        ? 'bg-black border border-cyan-500/20'
-        : 'bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-800'
-        }`}>
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl"></div>
+      <div
+        className="relative overflow-hidden rounded-3xl p-6 md:p-10 text-white shadow-2xl transition-all duration-700 border border-white/10"
+        style={{
+          backgroundImage: `url('/ai_hub_hero_banner_1767869792651.png')`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center'
+        }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent"></div>
         <div className="relative z-10">
           <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-4 ${isAiHubMode ? 'bg-cyan-500 text-black' : 'bg-white/20 backdrop-blur-md'
             }`}>
@@ -78,9 +84,37 @@ const HomePage: React.FC = () => {
               <PostList posts={hotPosts} boardSlug="best" />
             </div>
           </section>
+
+          {/* 전체 노드 타임라인 - Moved here right after hot issues */}
+          <section className="space-y-3">
+            <div className="flex justify-between items-center px-1">
+              <h2 className="text-sm font-black flex items-center gap-1.5 dark:text-white uppercase tracking-wider">
+                <TrendingUp className="text-green-500" size={16} />
+                전체 노드 타임라인
+              </h2>
+            </div>
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+              <PostList posts={newPosts} boardSlug="all" />
+            </div>
+          </section>
         </div>
 
         <aside className="space-y-6">
+          {/* Attendance Tracking (Top Priority) */}
+          {user && (
+            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 dark:from-gray-900 dark:to-black p-5 rounded-3xl text-white shadow-xl border border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/20 dark:bg-orange-500/20 rounded-2xl flex items-center justify-center">
+                  <Flame size={20} className="text-yellow-300 dark:text-orange-500" fill="currentColor" />
+                </div>
+                <div>
+                  <div className="text-[10px] text-indigo-100 dark:text-gray-500 uppercase font-black">Current Streak</div>
+                  <div className="text-xl font-black">{user.attendance_streak} DAYS</div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* System Status / Notice */}
           <div className="bg-white dark:bg-gray-800 rounded-3xl p-5 shadow-xl border border-gray-100 dark:border-gray-700">
             <div className="flex items-center justify-between mb-4">
@@ -133,6 +167,32 @@ const HomePage: React.FC = () => {
                 </button>
               </div>
               <p className="text-[9px] text-gray-400 text-center mt-3 uppercase tracking-tighter">참여 시 5P 지급 (1일 1회)</p>
+
+              {/* Yesterday's Results */}
+              {previousBalance && (
+                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+                  <div className="text-[10px] text-gray-400 uppercase font-black mb-2">어제의 결과</div>
+                  <div className="text-xs text-gray-600 dark:text-gray-300 mb-2 font-medium">{previousBalance.question}</div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-indigo-100 dark:bg-indigo-900/30 rounded-full h-3 overflow-hidden">
+                        <div className="bg-indigo-500 h-full rounded-full transition-all" style={{ width: `${previousBalance.votes_a}%` }}></div>
+                      </div>
+                      <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 w-8">{previousBalance.votes_a}%</span>
+                    </div>
+                    <div className="flex justify-between text-[10px] text-gray-500">
+                      <span>{previousBalance.option_a}</span>
+                      <span>{previousBalance.option_b}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-purple-100 dark:bg-purple-900/30 rounded-full h-3 overflow-hidden">
+                        <div className="bg-purple-500 h-full rounded-full transition-all" style={{ width: `${previousBalance.votes_b}%` }}></div>
+                      </div>
+                      <span className="text-[10px] font-bold text-purple-600 dark:text-purple-400 w-8">{previousBalance.votes_b}%</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -140,34 +200,9 @@ const HomePage: React.FC = () => {
           <TrendingWidget />
 
           {/* Attendance Tracking (Quick View) */}
-          {user && (
-            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 dark:from-gray-900 dark:to-black p-5 rounded-3xl text-white shadow-xl">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/20 dark:bg-orange-500/20 rounded-2xl flex items-center justify-center">
-                  <Flame size={20} className="text-yellow-300 dark:text-orange-500" fill="currentColor" />
-                </div>
-                <div>
-                  <div className="text-[10px] text-indigo-100 dark:text-gray-500 uppercase font-black">Current Streak</div>
-                  <div className="text-xl font-black">{user.attendance_streak} DAYS</div>
-                </div>
-              </div>
-            </div>
-          )}
+
         </aside>
       </div>
-
-      {/* Main Feed */}
-      <section className="space-y-3">
-        <div className="flex justify-between items-center px-1">
-          <h2 className="text-sm font-black flex items-center gap-1.5 dark:text-white uppercase tracking-wider">
-            <TrendingUp className="text-green-500" size={16} />
-            전체 노드 타임라인
-          </h2>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-          <PostList posts={newPosts} boardSlug="all" />
-        </div>
-      </section>
     </div>
   );
 };

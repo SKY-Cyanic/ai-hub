@@ -9,6 +9,16 @@ import { Post, Comment, Board, User, WikiPage, ChatMessage, AiLog, ShopItem, Not
 
 export const NODE_GAS_FEE = 10;
 
+const BALANCE_GAMES: BalanceGame[] = [
+  { id: 'bg-1', question: '일주일 동안 스마트폰 0% vs 인터넷 10년 전 속도', option_a: '스마트폰 압수', option_b: '3G 속도', reward_exp: 10, reward_points: 5 },
+  { id: 'bg-2', question: '평생 라면만 먹기 vs 평생 탄산음료 금지', option_a: '라면만 먹기', option_b: '탄산 금지', reward_exp: 10, reward_points: 5 },
+  { id: 'bg-3', question: '10억 받고 10년 늙기 vs 그냥 살기', option_a: '10억 겟', option_b: '젊음 유지', reward_exp: 10, reward_points: 5 },
+  { id: 'bg-4', question: '초능력: 투명인간 vs 순간이동', option_a: '투명인간', option_b: '순간이동', reward_exp: 10, reward_points: 5 },
+  { id: 'bg-5', question: 'AI가 지배하는 세상 vs 원시 시대로 회귀', option_a: 'AI 통치', option_b: '우가우가', reward_exp: 10, reward_points: 5 },
+  { id: 'bg-6', question: '매일 10시간 자고 100만원 벌기 vs 매일 4시간 자고 500만원 벌기', option_a: '꿀잠 소득', option_b: '피곤 고수익', reward_exp: 10, reward_points: 5 },
+  { id: 'bg-7', question: '말 못하는 천재 vs 말 잘하는 바보', option_a: '고독한 천재', option_b: '인싸 바보', reward_exp: 10, reward_points: 5 },
+];
+
 export const SHOP_ITEMS: ShopItem[] = [
   // --- Visual Effects (Phase 7.1) ---
   { id: 'effect-rainbow', name: '🌈 무지개 닉네임', description: '닉네임이 RGB 컬러로 부드럽게 변하는 효과 (30일)', price: 1000, type: 'style', category: 'name', value: 'rainbow', icon: '🌈' },
@@ -68,6 +78,28 @@ export const storage = {
 
   getUserByRawId: (id: string): User | undefined => {
     return storage.getUsers().find(u => u.id === id);
+  },
+
+  // Async version that fetches from Firestore if not in local cache
+  fetchUserById: async (id: string): Promise<User | undefined> => {
+    // Check local cache first
+    const local = storage.getUserByRawId(id);
+    if (local) return local;
+
+    // Query Firestore by ID field
+    try {
+      const q = query(collection(db, "users"), where("id", "==", id), limit(1));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        const userData = snapshot.docs[0].data() as User;
+        // Cache locally for future lookups
+        const users = storage.getUsers();
+        users.push(userData);
+        localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
+        return userData;
+      }
+    } catch (e) { }
+    return undefined;
   },
 
   getUserByReferralCode: (code: string): User | undefined => {
@@ -360,23 +392,6 @@ export const storage = {
         description: '크레딧 충전',
         created_at: new Date().toISOString()
       });
-      await storage.saveUser(user);
-      return true;
-    }
-    return false;
-  },
-
-  getBalanceGame: (): BalanceGame => ({
-    id: 'daily-bal', question: '평생 하나만 먹는다면?', option_a: '치킨 (평생 무료)', option_b: '피자 (평생 무료)',
-    votes_a: 124, votes_b: 98
-  }),
-
-  voteBalance: async (userId: string, option: 'a' | 'b') => {
-    const user = storage.getUserByRawId(userId);
-    if (user && !user.quests.balance_voted) {
-      user.quests.balance_voted = true;
-      user.points += 5;
-      user.exp += 10;
       await storage.saveUser(user);
       return true;
     }
@@ -745,7 +760,225 @@ export const storage = {
   deleteUser: async (userId: string) => {
     const user = storage.getUserByRawId(userId);
     if (user) {
+      // Remove from Firestore
       try { await deleteDoc(doc(db, "users", user.username)); } catch (e) { }
+      // Remove from local storage
+      const users = storage.getUsers().filter(u => u.id !== userId);
+      localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
     }
+  },
+
+  // --- Balance Game (Daily Protocol) ---
+  getBalanceGame: (): BalanceGame => {
+    const today = new Date().toDateString(); // "Thu Jan 08 2026"
+    // Simple hash function for consistent daily index
+    let hash = 0;
+    for (let i = 0; i < today.length; i++) {
+      hash = ((hash << 5) - hash) + today.charCodeAt(i);
+      hash |= 0;
+    }
+    const idx = Math.abs(hash) % BALANCE_GAMES.length;
+    return BALANCE_GAMES[idx];
+  },
+
+  getPreviousBalanceGame: (): BalanceGame => {
+    const yesterday = new Date(Date.now() - 86400000).toDateString();
+    let hash = 0;
+    for (let i = 0; i < yesterday.length; i++) {
+      hash = ((hash << 5) - hash) + yesterday.charCodeAt(i);
+      hash |= 0;
+    }
+    const idx = Math.abs(hash) % BALANCE_GAMES.length;
+    const game = { ...BALANCE_GAMES[idx] };
+
+    // Deterministic random votes for yesterday
+    const seed = Math.abs(hash);
+    game.votes_a = 40 + (seed % 20); // 40-60%
+    game.votes_b = 100 - game.votes_a;
+
+    return game;
+  },
+
+  voteBalance: async (userId: string, option: 'a' | 'b'): Promise<boolean> => {
+    const user = storage.getUserByRawId(userId);
+    if (!user) return false;
+
+    // Check if user already voted TODAY? 
+    // The requirement says "Daily Protocol", so user.quests.balance_voted controls daily reset
+    // This boolean should be reset daily by processAttendance or similar check.
+    // For now, checks the flag.
+    if (user.quests.balance_voted) return false;
+
+    user.quests.balance_voted = true;
+    user.points += 5;
+    user.exp += 10;
+
+    // Add transaction log
+    if (!user.transactions) user.transactions = [];
+    user.transactions.push({
+      id: `tx-bg-${Date.now()}`,
+      type: 'earn',
+      amount: 5,
+      description: '데일리 프로토콜(밸런스 게임) 참여',
+      created_at: new Date().toISOString()
+    });
+
+    await storage.saveUser(user);
+    await storage.checkAchievements(userId);
+    return true;
+  },
+
+  // ========== Firebase 기반 익명 투표 (효율적 사용) ==========
+
+  // 투표 생성 (쓰기 1회)
+  createAnonVote: async (question: string, options: string[]): Promise<string> => {
+    const voteId = `vote-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const voteData = {
+      id: voteId,
+      question,
+      options,
+      votes: options.reduce((acc, _, idx) => ({ ...acc, [idx]: 0 }), {}),
+      created_at: new Date().toISOString(),
+      voters: [] // 중복 투표 방지용
+    };
+    await setDoc(doc(db, "anon_votes", voteId), voteData);
+    return voteId;
+  },
+
+  // 투표 조회 (읽기 1회)
+  getAnonVote: async (voteId: string): Promise<any | null> => {
+    try {
+      const snap = await getDoc(doc(db, "anon_votes", voteId));
+      if (snap.exists()) return snap.data();
+    } catch (e) { }
+    return null;
+  },
+
+  // 투표 실행 (읽기 1회 + 쓰기 1회)
+  castAnonVote: async (voteId: string, optionIdx: number, voterId: string): Promise<{ success: boolean, message: string }> => {
+    try {
+      const voteRef = doc(db, "anon_votes", voteId);
+      const snap = await getDoc(voteRef);
+      if (!snap.exists()) return { success: false, message: '투표를 찾을 수 없습니다.' };
+
+      const data = snap.data();
+      if (data.voters?.includes(voterId)) {
+        return { success: false, message: '이미 투표하셨습니다.' };
+      }
+
+      // 투표 수 증가 및 투표자 추가
+      const newVotes = { ...data.votes };
+      newVotes[optionIdx] = (newVotes[optionIdx] || 0) + 1;
+      const newVoters = [...(data.voters || []), voterId];
+
+      await updateDoc(voteRef, { votes: newVotes, voters: newVoters });
+      return { success: true, message: '투표 완료!' };
+    } catch (e: any) {
+      return { success: false, message: `오류: ${e.message}` };
+    }
+  },
+
+  // ========== Firebase 기반 휘발성 메모 (효율적 사용) ==========
+
+  // 메모 생성 (쓰기 1회)
+  createVolatileNote: async (content: string, expiry: string): Promise<string> => {
+    const noteId = `note-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const expiryMs = {
+      'instant': 0, // 읽는 즉시
+      '5min': 5 * 60 * 1000,
+      '1hour': 60 * 60 * 1000,
+      '24hour': 24 * 60 * 60 * 1000
+    }[expiry] || 0;
+
+    const noteData = {
+      id: noteId,
+      content,
+      expiry,
+      created_at: Date.now(),
+      expires_at: expiry === 'instant' ? null : Date.now() + expiryMs,
+      viewed: false
+    };
+    await setDoc(doc(db, "volatile_notes", noteId), noteData);
+    return noteId;
+  },
+
+  // 메모 조회 (읽기 1회)
+  getVolatileNote: async (noteId: string): Promise<any | null> => {
+    try {
+      const snap = await getDoc(doc(db, "volatile_notes", noteId));
+      if (snap.exists()) {
+        const data = snap.data();
+        // 만료 체크
+        if (data.expires_at && Date.now() > data.expires_at) {
+          // 만료된 메모 삭제 (쓰기 1회 추가)
+          await deleteDoc(doc(db, "volatile_notes", noteId));
+          return null;
+        }
+        return data;
+      }
+    } catch (e) { }
+    return null;
+  },
+
+  // 메모 삭제 (쓰기 1회)
+  deleteVolatileNote: async (noteId: string): Promise<void> => {
+    try {
+      await deleteDoc(doc(db, "volatile_notes", noteId));
+    } catch (e) { }
+  },
+
+  // 메모 열람 처리 (instant인 경우 삭제)
+  markNoteViewed: async (noteId: string, expiry: string): Promise<void> => {
+    if (expiry === 'instant') {
+      await storage.deleteVolatileNote(noteId);
+    }
+  },
+
+  // 크레딧 업데이트 (게임, 모의투자 등) - 실제로는 포인트(CR) 사용
+  updateUserCredits: async (userId: string, amount: number, description: string): Promise<boolean> => {
+    try {
+      const user = storage.getUserByRawId(userId);
+      if (!user) return false;
+
+      const currentPoints = user.points || 0;
+      const newPoints = currentPoints + amount;
+
+      // 크레딧이 0 이하로 떨어지면 실패
+      if (newPoints < 0) return false;
+
+      user.points = newPoints;
+
+      // 트랜잭션 기록
+      if (!user.transactions) user.transactions = [];
+      user.transactions.unshift({
+        id: `tx-${Date.now()}`,
+        type: amount > 0 ? 'charge' : 'spend',
+        amount: Math.abs(amount),
+        description,
+        created_at: new Date().toISOString()
+      });
+
+      // 최근 50개 트랜잭션만 유지
+      if (user.transactions.length > 50) {
+        user.transactions = user.transactions.slice(0, 50);
+      }
+
+      await storage.saveUser(user);
+
+      // 현재 세션 사용자면 세션도 업데이트
+      if (storage.getSession()?.id === userId) {
+        storage.setSession(user);
+      }
+
+      return true;
+    } catch (e) {
+      console.error('Credit update error:', e);
+      return false;
+    }
+  },
+
+  // 크레딧 충전 (결제 연동용)
+  chargeCredits: async (userId: string, amount: number, paymentMethod: string): Promise<boolean> => {
+    return storage.updateUserCredits(userId, amount, `크레딧 충전 (${paymentMethod})`);
   },
 };

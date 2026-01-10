@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📈 실시간 모의투자 시뮬레이션 Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.45.0/dist/apexcharts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+    <!-- Header -->
+    <header class="glass sticky top-0 z-50 border-b border-slate-700">
+        <div class="max-w-[1920px] mx-auto px-4 py-3">
+            <div class="flex flex-wrap justify-between items-center gap-4">
+                <div class="flex items-center gap-4">
+                    <h1
+                        class="text-2xl font-black bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                        📈 모의투자 Pro
+                    </h1>
+                    <div class="flex items-center gap-2 px-3 py-1.5 bg-slate-800 rounded-full">
+                        <span class="live-pulse w-2 h-2 bg-green-500 rounded-full"></span>
+                        <span class="text-sm text-green-400 font-medium" id="connectionStatus">연결중...</span>
+                    </div>
+                    <button onclick="refreshAllData()"
+                        class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-lg text-sm transition flex items-center gap-2">
+                        🔄 <span id="refreshText">새로고침</span>
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-6">
+                    <div class="text-center">
+                        <p class="text-xs text-slate-400">보유 현금</p>
+                        <p class="text-lg font-bold text-emerald-400 number-font" id="cashDisplay">₩100,000,000</p>
+                    </div>
+                    <div class="w-px h-10 bg-slate-600"></div>
+                    <div class="text-center">
+                        <p class="text-xs text-slate-400">총 자산</p>
+                        <p class="text-lg font-bold text-amber-400 number-font" id="totalAssetDisplay">₩100,000,000</p>
+                    </div>
+                    <div class="w-px h-10 bg-slate-600"></div>
+                    <div class="text-center">
+                        <p class="text-xs text-slate-400">수익률</p>
+                        <p class="text-lg font-bold number-font" id="profitRateDisplay">0.00%</p>
+                    </div>
+                    <button onclick="openBotModal()"
+                        class="bg-purple-600/20 hover:bg-purple-600/40 text-purple-400 px-4 py-2 rounded-lg text-sm font-medium transition mr-2">
+                        🤖 봇 설정
+                    </button>
+                    <button onclick="resetGame()"
+                        class="bg-red-600/20 hover:bg-red-600/40 text-red-400 px-4 py-2 rounded-lg text-sm font-medium transition">
+                        🔄 초기화
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Index Ticker -->
+    <div class="bg-slate-800/80 border-b border-slate-700">
+        <div class="max-w-[1920px] mx-auto px-4 py-4">
+            <div class="flex gap-8 overflow-x-auto pb-2 min-w-max custom-scrollbar" id="indexTicker">
+                <span class="text-slate-500">지수 로딩중...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="bg-slate-800/50 border-b border-slate-700 overflow-x-auto">
+        <div class="max-w-[1920px] mx-auto px-4">
+            <div class="flex gap-2 py-3 min-w-max">
+                <button onclick="showTab('market')"
+                    class="main-tab tab-active px-6 py-2.5 rounded-xl font-semibold transition" data-tab="market">📊
+                    시장</button>
+                <button onclick="showTab('indices')"
+                    class="main-tab px-6 py-2.5 rounded-xl font-semibold transition hover:bg-slate-700"
+                    data-tab="indices">📈 지수</button>
+                <button onclick="showTab('chart')"
+                    class="main-tab px-6 py-2.5 rounded-xl font-semibold transition hover:bg-slate-700"
+                    data-tab="chart">📉 차트</button>
+                <button onclick="showTab('heatmap')"
+                    class="main-tab px-6 py-2.5 rounded-xl font-semibold transition hover:bg-slate-700"
+                    data-tab="heatmap">🗺️ 히트맵</button>
+                <button onclick="showTab('portfolio')"
+                    class="main-tab px-6 py-2.5 rounded-xl font-semibold transition hover:bg-slate-700"
+                    data-tab="portfolio">💼 포트폴리오</button>
+                <button onclick="showTab('history')"
+                    class="main-tab px-6 py-2.5 rounded-xl font-semibold transition hover:bg-slate-700"
+                    data-tab="history">📝 거래내역</button>
+                <button onclick="showTab('game')"
+                    class="main-tab px-6 py-2.5 rounded-xl font-semibold transition hover:bg-slate-700 text-yellow-400"
+                    data-tab="game">🎮 챌린지</button>
+                <!-- New Tabs Placeholder -->
+                <button onclick="showTab('backtest')"
+                    class="main-tab px-6 py-2.5 rounded-xl font-semibold transition hover:bg-slate-700"
+                    data-tab="backtest">🧪 백테스팅</button>
+                <button onclick="showTab('analyst')"
+                    class="main-tab px-6 py-2.5 rounded-xl font-semibold transition hover:bg-slate-700 text-cyan-400"
+                    data-tab="analyst">👨‍🔬 분석가</button>
+                <button onclick="showTab('lab')"
+                    class="main-tab px-6 py-2.5 rounded-xl font-semibold transition hover:bg-slate-700 text-purple-400"
+                    data-tab="lab">🧪 실험실</button>
+                <button onclick="showTab('journal')"
+                    class="main-tab px-6 py-2.5 rounded-xl font-semibold transition hover:bg-slate-700 text-emerald-400"
+                    data-tab="journal">📓 매매 일지</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-[1920px] mx-auto p-4">
+        <!-- Market Tab -->
+        <div id="marketTab" class="tab-content">
+            <div class="grid grid-cols-1 xl:grid-cols-4 gap-4">
+                <div class="xl:col-span-3 card overflow-hidden">
+                    <!-- Asset Type -->
+                    <div class="flex border-b border-slate-700">
+                        <button
+                            class="asset-tab flex-1 px-6 py-4 font-semibold bg-gradient-to-r from-blue-600/20 to-transparent border-b-2 border-blue-500"
+                            data-type="stocks" onclick="setAssetType('stocks', this)">📈 주식</button>
+                        <button
+                            class="asset-tab flex-1 px-6 py-4 font-semibold text-slate-400 hover:bg-slate-700/50 transition"
+                            data-type="crypto" onclick="setAssetType('crypto', this)">₿ 암호화폐</button>
+                    </div>
+
+                    <!-- Market Filter -->
+                    <div id="marketTabs" class="flex gap-2 p-4 border-b border-slate-700 bg-slate-800/30 flex-wrap">
+                        <button
+                            class="market-tab px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-yellow-400"
+                            data-market="favorites" onclick="setMarket('favorites', this)">⭐ 관심</button>
+                        <button class="market-tab px-4 py-2 rounded-lg text-sm font-medium bg-blue-600"
+                            data-market="all" onclick="setMarket('all', this)">전체</button>
+                        <button
+                            class="market-tab px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600"
+                            data-market="KOSPI" onclick="setMarket('KOSPI', this)">코스피</button>
+                        <button
+                            class="market-tab px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600"
+                            data-market="KOSDAQ" onclick="setMarket('KOSDAQ', this)">코스닥</button>
+                        <button
+                            class="market-tab px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600"
+                            data-market="NASDAQ" onclick="setMarket('NASDAQ', this)">나스닥</button>
+                        <button
+                            class="market-tab px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600"
+                            data-market="NYSE" onclick="setMarket('NYSE', this)">NYSE</button>
+                    </div>
+
+                    <!-- Search -->
+                    <div class="p-4 border-b border-slate-700">
+                        <input type="text" id="searchInput" placeholder="🔍 종목명, 코드, 섹터 검색..."
+                            class="w-full bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            oninput="filterAssets()">
+                    </div>
+
+                    <!-- Table -->
+                    <div class="overflow-y-auto max-h-[600px]">
+                        <table class="w-full">
+                            <thead class="bg-slate-800 sticky top-0 z-10">
+                                <tr class="text-slate-400 text-sm">
+                                    <th class="px-4 py-3 text-left font-semibold">종목</th>
+                                    <th class="px-4 py-3 text-left font-semibold">섹터</th>
+                                    <th class="px-4 py-3 text-right font-semibold">현재가</th>
+                                    <th class="px-4 py-3 text-right font-semibold">전일대비</th>
+                                    <th class="px-4 py-3 text-right font-semibold">등락률</th>
+                                    <th class="px-4 py-3 text-right font-semibold">거래량</th>
+                                    <th class="px-4 py-3 text-center font-semibold">매매</th>
+                                </tr>
+                            </thead>
+                            <tbody id="assetTableBody" class="divide-y divide-slate-700/50"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Sidebar -->
+                <div class="space-y-4">
+                    <!-- 실시간 뉴스 -->
+                    <div class="card overflow-hidden">
+                        <div class="p-4 border-b border-slate-700 bg-slate-800/50">
+                            <h3 class="font-bold flex items-center gap-2">📰 실시간 뉴스</h3>
+                        </div>
+                        <div class="max-h-[300px] overflow-y-auto custom-scrollbar" id="sidebarNews">
+                            <div class="text-slate-500 text-center py-8 text-sm">뉴스 로딩중...</div>
+                        </div>
+                    </div>
+
+                    <!-- 내 보유종목 -->
+                    <div class="card overflow-hidden">
+                        <div class="p-4 border-b border-slate-700 bg-slate-800/50">
+                            <h3 class="font-bold">💼 내 보유종목</h3>
+                        </div>
+                        <div class="max-h-[300px] overflow-y-auto" id="miniPortfolio">
+                            <div class="text-slate-500 text-center py-8 text-sm">보유 종목이 없습니다</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Indices Tab -->
+        <div id="indicesTab" class="tab-content hidden">
+            <div class="card p-6">
+                <h2 class="text-xl font-bold mb-6">📈 글로벌 주요 지수</h2>
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4" id="indicesGrid"></div>
+            </div>
+            <div class="card p-6 mt-4">
+                <h3 class="text-lg font-bold mb-4">📊 지수 차트</h3>
+                <div class="flex flex-wrap gap-3 mb-4">
+                    <select id="indexChartSelect" class="bg-slate-700 border border-slate-600 rounded-lg px-4 py-2"
+                        onchange="loadIndexChart()">
+                        <option value="">지수 선택...</option>
+                    </select>
+                    <div class="flex rounded-lg overflow-hidden border border-slate-600">
+                        <button onclick="setIndexPeriod('1D')" class="idx-period-btn px-3 py-2 bg-slate-700 text-sm"
+                            data-period="1D">1일</button>
+                        <button onclick="setIndexPeriod('1W')" class="idx-period-btn px-3 py-2 bg-slate-700 text-sm"
+                            data-period="1W">1주</button>
+                        <button onclick="setIndexPeriod('1M')" class="idx-period-btn px-3 py-2 bg-blue-600 text-sm"
+                            data-period="1M">1개월</button>
+                        <button onclick="setIndexPeriod('3M')" class="idx-period-btn px-3 py-2 bg-slate-700 text-sm"
+                            data-period="3M">3개월</button>
+                        <button onclick="setIndexPeriod('1Y')" class="idx-period-btn px-3 py-2 bg-slate-700 text-sm"
+                            data-period="1Y">1년</button>
+                    </div>
+                </div>
+                <div id="indexChartContainer" class="h-[400px] bg-slate-900 rounded-xl"></div>
+            </div>
+        </div>
+
+        <!-- Chart Tab -->
+        <div id="chartTab" class="tab-content hidden">
+            <div class="card p-6">
+                <div class="flex flex-wrap justify-between items-center gap-4 mb-6">
+                    <div class="flex items-center gap-4 flex-wrap">
+                        <select id="chartSymbolSelect"
+                            class="bg-slate-700 border border-slate-600 rounded-xl px-4 py-3 min-w-[200px]"
+                            onchange="loadChart()">
+                            <option value="">종목 선택...</option>
+                        </select>
+                        <div class="flex items-center gap-2 border-l border-slate-600 pl-4">
+                            <select id="compareSymbolSelect"
+                                class="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm max-w-[150px]"
+                                onchange="addComparison(this.value)">
+                                <option value="">🆚 비교 종목...</option>
+                            </select>
+                            <button onclick="clearComparisons()"
+                                class="px-3 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm"
+                                title="비교 초기화">❌</button>
+                        </div>
+                        <div class="flex rounded-xl overflow-hidden border border-slate-600">
+                            <button onclick="setChartType('candle')"
+                                class="chart-type-btn px-5 py-2.5 bg-blue-600 font-medium" data-type="candle">🕯️
+                                캔들</button>
+                            <button onclick="setChartType('line')"
+                                class="chart-type-btn px-5 py-2.5 bg-slate-700 font-medium" data-type="line">📈
+                                선형</button>
+                            <button onclick="setChartType('area')"
+                                class="chart-type-btn px-5 py-2.5 bg-slate-700 font-medium" data-type="area">📊
+                                영역</button>
+                        </div>
+                    </div>
+                    <div class="flex rounded-xl overflow-hidden border border-slate-600 flex-wrap">
+                        <button onclick="setChartPeriod('1D')" class="period-btn px-4 py-2.5 bg-slate-700 font-medium"
+                            data-period="1D">1일</button>
+                        <button onclick="setChartPeriod('1W')" class="period-btn px-4 py-2.5 bg-slate-700 font-medium"
+                            data-period="1W">1주</button>
+                        <button onclick="setChartPeriod('1M')" class="period-btn px-4 py-2.5 bg-blue-600 font-medium"
+                            data-period="1M">1개월</button>
+                        <button onclick="setChartPeriod('3M')" class="period-btn px-4 py-2.5 bg-slate-700 font-medium"
+                            data-period="3M">3개월</button>
+                        <button onclick="setChartPeriod('1Y')" class="period-btn px-4 py-2.5 bg-slate-700 font-medium"
+                            data-period="1Y">1년</button>
+                        <button onclick="setChartPeriod('5Y')" class="period-btn px-4 py-2.5 bg-slate-700 font-medium"
+                            data-period="5Y">5년</button>
+                        <button onclick="setChartPeriod('MAX')"
+                            class="period-btn px-4 py-2.5 bg-slate-700 font-medium text-yellow-400"
+                            data-period="MAX">전체</button>
+                    </div>
+                    <div id="aiPrediction"
+                        class="mt-3 pt-3 border-t border-slate-700/50 flex items-center gap-3 text-sm">
+                        <span class="bg-purple-600/20 text-purple-400 px-2 py-0.5 rounded text-xs font-bold">AI
+                            예측</span>
+                        <span id="predictText" class="text-slate-400">데이터 분석 중...</span>
+                    </div>
+                </div>
+
+                <div id="chartInfo" class="mb-4 p-4 bg-gradient-to-r from-slate-800 to-slate-800/50 rounded-xl hidden">
+                    <div class="flex flex-wrap items-center gap-6">
+                        <div>
+                            <span id="chartTitle" class="text-xl font-bold"></span>
+                            <p id="chartDesc" class="text-sm text-slate-400 mt-1"></p>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <span id="chartPrice" class="text-3xl font-black number-font"></span>
+                            <span id="chartChange" class="text-xl font-bold"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tradingChart" class="w-full h-[500px] bg-slate-900 rounded-xl"></div>
+                <div id="volumeChart" class="w-full h-[120px] bg-slate-900 rounded-xl mt-2"></div>
+
+                <div id="chartPlaceholder" class="flex items-center justify-center h-[500px] text-slate-500">
+                    <div class="text-center">
+                        <p class="text-6xl mb-4">📈</p>
+                        <p class="text-xl">종목을 선택하면 차트가 표시됩니다</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Heatmap Tab -->
+        <div id="heatmapTab" class="tab-content hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                <div class="lg:col-span-3 card p-6">
+                    <div class="flex flex-wrap justify-between items-center gap-4 mb-4">
+                        <div>
+                            <h2 class="text-xl font-bold">🗺️ 시장 히트맵</h2>
+                            <p class="text-sm text-slate-400 mt-1">시가총액 기준 크기 • 등락률 기준 색상</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <select id="heatmapMarket"
+                                class="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm"
+                                onchange="renderHeatmap()">
+                                <option value="all">전체</option>
+                                <option value="KOSPI">코스피</option>
+                                <option value="KOSDAQ">코스닥</option>
+                                <option value="NASDAQ">나스닥</option>
+                                <option value="NYSE">NYSE</option>
+                            </select>
+                            <button onclick="setHeatmapType('stocks')"
+                                class="heatmap-type-btn px-4 py-2 bg-blue-600 rounded-lg font-medium text-sm"
+                                data-type="stocks">📈 주식</button>
+                            <button onclick="setHeatmapType('crypto')"
+                                class="heatmap-type-btn px-4 py-2 bg-slate-700 rounded-lg font-medium text-sm"
+                                data-type="crypto">₿ 암호화폐</button>
+                        </div>
+                    </div>
+                    <div id="heatmapContainer" class="min-h-[600px]"></div>
+                </div>
+
+                <div class="card p-5 h-fit">
+                    <h3 class="font-bold text-lg mb-4 flex items-center gap-2">📰 실시간 뉴스</h3>
+                    <div id="newsList" class="space-y-3 max-h-[700px] overflow-y-auto custom-scrollbar">
+                        <div class="text-slate-500 text-center py-12">뉴스를 불러오는 중...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Portfolio Tab -->
+        <div id="portfolioTab" class="tab-content hidden">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="card p-5 bg-gradient-to-br from-emerald-900/30 to-slate-900">
+                    <p class="text-emerald-400 text-sm font-medium mb-2">💵 보유 현금</p>
+                    <p class="text-2xl font-black number-font" id="portCash">₩100,000,000</p>
+                </div>
+                <div class="card p-5 bg-gradient-to-br from-blue-900/30 to-slate-900">
+                    <p class="text-blue-400 text-sm font-medium mb-2">📊 평가금액</p>
+                    <p class="text-2xl font-black number-font" id="portStock">₩0</p>
+                </div>
+                <div class="card p-5 bg-gradient-to-br from-amber-900/30 to-slate-900">
+                    <p class="text-amber-400 text-sm font-medium mb-2">💰 총 자산</p>
+                    <p class="text-2xl font-black number-font" id="portTotal">₩100,000,000</p>
+                </div>
+                <div class="card p-5 bg-gradient-to-br from-purple-900/30 to-slate-900">
+                    <p class="text-purple-400 text-sm font-medium mb-2">📈 총 수익</p>
+                    <p class="text-2xl font-black number-font" id="portProfit">₩0</p>
+                    <p class="text-lg font-bold mt-1" id="portProfitRate">(0.00%)</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div class="card overflow-hidden">
+                    <div class="p-4 border-b border-slate-700 bg-slate-800/50">
+                        <h3 class="font-bold">📊 자산 구성</h3>
+                    </div>
+                    <div class="p-6"><canvas id="portfolioPieChart" height="300"></canvas></div>
+                </div>
+                <div class="card overflow-hidden">
+                    <div class="p-4 border-b border-slate-700 bg-slate-800/50">
+                        <h3 class="font-bold">💹 보유 종목 상세</h3>
+                    </div>
+                    <div class="max-h-[400px] overflow-y-auto" id="portfolioDetail">
+                        <div class="text-slate-500 text-center py-12">보유 종목이 없습니다</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div id="historyTab" class="tab-content hidden">
+            <div class="card overflow-hidden">
+                <div
+                    class="p-4 border-b border-slate-700 bg-slate-800/50 flex flex-wrap justify-between items-center gap-3">
+                    <h3 class="font-bold text-lg">📝 거래 내역</h3>
+                    <div class="flex gap-2">
+                        <select id="historyFilter" class="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2"
+                            onchange="renderHistory()">
+                            <option value="all">전체</option>
+                            <option value="buy">매수</option>
+                            <option value="sell">매도</option>
+                        </select>
+                        <button onclick="exportHistory()"
+                            class="bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg text-sm font-medium transition">📥
+                            CSV 내보내기</button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-slate-800 text-slate-400 text-sm">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-semibold">시간</th>
+                                <th class="px-4 py-3 text-left font-semibold">유형</th>
+                                <th class="px-4 py-3 text-left font-semibold">종목</th>
+                                <th class="px-4 py-3 text-right font-semibold">가격</th>
+                                <th class="px-4 py-3 text-right font-semibold">수량</th>
+                                <th class="px-4 py-3 text-right font-semibold">총액</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody" class="divide-y divide-slate-700/50">
+                            <tr>
+                                <td colspan="6" class="text-center py-12 text-slate-500">거래 내역이 없습니다</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                <div class="card p-5">
+                    <p class="text-slate-400 text-sm mb-2">총 거래</p>
+                    <p class="text-2xl font-bold number-font" id="statTotalTrades">0회</p>
+                </div>
+                <div class="card p-5">
+                    <p class="text-slate-400 text-sm mb-2">매수 금액</p>
+                    <p class="text-2xl font-bold text-red-400 number-font" id="statTotalBuy">₩0</p>
+                </div>
+                <div class="card p-5">
+                    <p class="text-slate-400 text-sm mb-2">매도 금액</p>
+                    <p class="text-2xl font-bold text-blue-400 number-font" id="statTotalSell">₩0</p>
+                </div>
+                <div class="card p-5">
+                    <p class="text-slate-400 text-sm mb-2">실현 손익</p>
+                    <p class="text-2xl font-bold number-font" id="statRealizedPL">₩0</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Tab -->
+        <div id="gameTab" class="tab-content hidden">
+            <div class="card p-6 min-h-[800px] flex flex-col relative overflow-hidden">
+                <!-- Game Header -->
+                <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-4 z-10">
+                    <div>
+                        <h2 class="text-2xl font-black text-yellow-400 flex items-center gap-2">⏳ 과거 차트 트레이딩 챌린지</h2>
+                        <p class="text-slate-400 text-sm mt-1">역사적 순간으로 돌아가 매매 실력을 증명하세요! (초기자본: 1,000만원)</p>
+                    </div>
+                    <div id="gameControls"
+                        class="hidden flex gap-6 bg-slate-800 px-6 py-2 rounded-xl border border-slate-600">
+                        <div class="text-right">
+                            <p class="text-xs text-slate-400">현재 날짜</p>
+                            <p class="text-lg font-bold text-white number-font" id="gameDate">-</p>
+                        </div>
+                        <div class="w-px bg-slate-600"></div>
+                        <div class="text-right">
+                            <p class="text-xs text-slate-400">수익률</p>
+                            <p class="text-lg font-bold number-font" id="gameReturn">0.00%</p>
+                        </div>
+                        <div class="w-px bg-slate-600"></div>
+                        <div class="text-right">
+                            <p class="text-xs text-slate-400">총 자산</p>
+                            <p class="text-lg font-bold text-yellow-400 number-font" id="gameAsset">₩10,000,000</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Game Select Screen -->
+                <div id="gameSelectScreen" class="flex-1 z-10">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- 종목 선택 -->
+                        <div>
+                            <h3 class="text-lg font-bold mb-4">📈 종목 선택</h3>
+                            <select id="gameSymbolSelect"
+                                class="w-full bg-slate-700 border border-slate-600 rounded-xl px-6 py-4 text-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 cursor-pointer mb-4">
+                                <optgroup label="🇺🇸 미국 주식">
+                                    <option value="AAPL">🍎 Apple (AAPL)</option>
+                                    <option value="TSLA">🚗 Tesla (TSLA)</option>
+                                    <option value="NVDA">🤖 NVIDIA (NVDA)</option>
+                                    <option value="MSFT">💻 Microsoft (MSFT)</option>
+                                    <option value="AMZN">📦 Amazon (AMZN)</option>
+                                    <option value="GME">🎮 GameStop (GME)</option>
+                                </optgroup>
+                                <optgroup label="🇰🇷 한국 주식">
+                                    <option value="005930.KS">📱 삼성전자</option>
+                                    <option value="000660.KS">💾 SK하이닉스</option>
+                                </optgroup>
+                                <optgroup label="₿ 암호화폐">
+                                    <option value="BTC-USD">🪙 Bitcoin (BTC)</option>
+                                    <option value="ETH-USD">💎 Ethereum (ETH)</option>
+                                </optgroup>
+                            </select>
+                        </div>
+
+                        <!-- 시나리오 선택 -->
+                        <div>
+                            <h3 class="text-lg font-bold mb-4">🎯 시나리오 선택</h3>
+                            <div class="space-y-3" id="eventScenarios">
+                                <div class="event-card selected" data-mode="random" onclick="selectScenario(this)">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-2xl">🎲</span>
+                                        <div>
+                                            <h4 class="font-bold">랜덤 시점</h4>
+                                            <p class="text-sm text-slate-400">2015~2023년 사이 무작위 시점에서 시작</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="event-card" data-mode="covid" data-date="2020-01-01"
+                                    onclick="selectScenario(this)">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-2xl">🦠</span>
+                                        <div>
+                                            <h4 class="font-bold">코로나19 팬데믹 (2020.01)</h4>
+                                            <p class="text-sm text-slate-400">세계적 팬데믹 직전, 대폭락과 V자 반등</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="event-card" data-mode="gme" data-date="2021-01-01"
+                                    onclick="selectScenario(this)">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-2xl">🚀</span>
+                                        <div>
+                                            <h4 class="font-bold">GME 숏스퀴즈 (2021.01)</h4>
+                                            <p class="text-sm text-slate-400">밈주식 광풍, 개미 vs 월가 전쟁</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="event-card" data-mode="btc2017" data-date="2017-09-01"
+                                    onclick="selectScenario(this)">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-2xl">📈</span>
+                                        <div>
+                                            <h4 class="font-bold">비트코인 2만불 (2017.09)</h4>
+                                            <p class="text-sm text-slate-400">첫 암호화폐 버블, $1,000→$20,000</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="event-card" data-mode="financial2008" data-date="2008-09-01"
+                                    onclick="selectScenario(this)">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-2xl">💥</span>
+                                        <div>
+                                            <h4 class="font-bold">금융위기 (2008.09)</h4>
+                                            <p class="text-sm text-slate-400">리먼브라더스 파산, 세계 금융위기</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="event-card" data-mode="ai2023" data-date="2023-01-01"
+                                    onclick="selectScenario(this)">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-2xl">🤖</span>
+                                        <div>
+                                            <h4 class="font-bold">AI 붐 (2023.01)</h4>
+                                            <p class="text-sm text-slate-400">ChatGPT 출시 후 NVIDIA 급등</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="event-card border-dashed border-2 border-slate-600" data-mode="timemachine"
+                                    onclick="selectScenario(this)">
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-2xl">🕒</span>
+                                        <div class="flex-1">
+                                            <h4 class="font-bold">타임머신 (직접 지정)</h4>
+                                            <input type="date" id="tmDate"
+                                                class="w-full bg-slate-700 border border-slate-600 rounded mt-1 px-2 py-1 text-xs"
+                                                onclick="event.stopPropagation()">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 text-center">
+                        <button onclick="startGame()"
+                            class="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-bold px-12 py-4 rounded-xl text-xl transition shadow-lg shadow-orange-500/20 transform hover:-translate-y-1">
+                            🚀 게임 시작하기
+                        </button>
+                    </div>
+
+                    <!-- Leaderboard -->
+                    <div class="mt-8 bg-slate-800/50 rounded-xl p-6 border border-slate-700">
+                        <h3 class="font-bold text-lg mb-4 flex items-center gap-2 text-yellow-400">🏆 명예의 전당 (Top 5)
+                        </h3>
+                        <div id="leaderboardList" class="space-y-2 text-sm">
+                            <div class="text-slate-500 text-center py-4">기록이 없습니다. 첫 챌린지에 도전하세요!</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Game Play Screen -->
+                <div id="gamePlayScreen" class="hidden flex-1 flex flex-col h-full min-h-0 z-10">
+                    <div class="flex-1 bg-slate-900 rounded-xl mb-4 relative overflow-hidden border border-slate-700">
+                        <div id="gameChartContainer" class="w-full h-full min-h-[400px]"></div>
+                        <div id="gameEffect"
+                            class="absolute inset-0 pointer-events-none flex items-center justify-center z-20 opacity-0 transform scale-50 transition-all duration-300 font-black text-6xl text-white drop-shadow-lg">
+                        </div>
+                    </div>
+
+                    <div
+                        class="flex flex-wrap gap-4 justify-between items-center bg-slate-800 p-4 rounded-xl border border-slate-700">
+                        <div class="flex gap-3">
+                            <button onclick="gameTrade('buy')"
+                                class="bg-gradient-to-br from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white px-8 py-3 rounded-xl font-bold text-lg flex flex-col items-center min-w-[140px] shadow-lg shadow-red-900/30 active:scale-95 transition">
+                                <span>매수 (Full)</span>
+                                <span class="text-xs font-normal opacity-80 mt-1" id="gamePriceBuy">₩0</span>
+                            </button>
+                            <button onclick="gameTrade('sell')"
+                                class="bg-gradient-to-br from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white px-8 py-3 rounded-xl font-bold text-lg flex flex-col items-center min-w-[140px] shadow-lg shadow-blue-900/30 active:scale-95 transition">
+                                <span>매도 (Full)</span>
+                                <span class="text-xs font-normal opacity-80 mt-1" id="gamePriceSell">₩0</span>
+                            </button>
+                            <div class="flex flex-col justify-center px-4">
+                                <span class="text-xs text-slate-400 mb-1">보유 수량</span>
+                                <span class="font-bold text-xl number-font" id="gameHeldQty">0주</span>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-3 bg-slate-900/50 p-2 rounded-xl border border-slate-700">
+                            <button onclick="gameNext()"
+                                class="w-12 h-12 rounded-lg bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-xl transition"
+                                title="1일 진행">⏭</button>
+                            <button onclick="gameToggleAuto()" id="gameAutoBtn"
+                                class="w-12 h-12 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-white flex items-center justify-center text-xl transition shadow-lg shadow-yellow-900/20"
+                                title="자동 진행">▶</button>
+                            <button onclick="finishGame()"
+                                class="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-medium">게임
+                                종료</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Game Result -->
+                <div id="gameResult"
+                    class="absolute inset-0 bg-slate-900/95 z-50 hidden flex-col items-center justify-center text-center p-8 backdrop-blur-sm">
+                    <div class="text-6xl mb-6" id="gameResultEmoji">🎉</div>
+                    <h2 class="text-4xl font-black mb-2 text-white">챌린지 종료!</h2>
+                    <p class="text-slate-400 mb-8" id="gameResultDate">-</p>
+
+                    <div class="grid grid-cols-2 gap-6 mb-8 w-full max-w-lg">
+                        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700">
+                            <p class="text-sm text-slate-400 mb-2">최종 자산</p>
+                            <p class="text-2xl font-black text-yellow-400 number-font" id="gameResultAsset">₩0</p>
+                        </div>
+                        <div class="bg-slate-800 p-6 rounded-2xl border border-slate-700">
+                            <p class="text-sm text-slate-400 mb-2">수익률</p>
+                            <p class="text-2xl font-black number-font" id="gameResultProfit">0%</p>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4">
+                        <button onclick="resetGameScreen()"
+                            class="bg-slate-700 hover:bg-slate-600 px-8 py-3 rounded-xl font-bold text-lg transition">다시
+                            하기</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Backtest Tab -->
+        <div id="backtestTab" class="tab-content hidden">
+            <div class="card p-6 min-h-[800px]">
+                <h2 class="text-2xl font-black mb-6 flex items-center gap-2">🧪 과거 데이터 백테스팅</h2>
+
+                <!-- Backtest Guide -->
+                <div class="bg-blue-600/10 border border-blue-500/30 rounded-xl p-4 mb-6 flex items-start gap-3">
+                    <span class="text-xl">💡</span>
+                    <div class="text-xs text-blue-200 leading-relaxed">
+                        <p class="font-bold text-sm mb-1">백테스팅 가이드</p>
+                        과거 데이터를 기반으로 특정 매매 전략의 유효성을 검증합니다. 종목과 기간을 선택하고 '백테스트 실행'을 눌러 승률과 수익률을 확인하세요.
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Config -->
+                    <div class="lg:col-span-1 space-y-6">
+                        <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
+                            <h3 class="font-bold mb-4">전략 설정 (이동평균 교차)</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm text-slate-400 mb-2">대상 종목</label>
+                                    <select id="backtestSymbol"
+                                        class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2">
+                                        <!-- Populated by JS -->
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm text-slate-400 mb-2">초기 자본</label>
+                                    <input type="number" id="backtestCapital" value="10000000"
+                                        class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-right">
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-2">단기 MA (일)</label>
+                                        <input type="number" id="maShort" value="5"
+                                            class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-right">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm text-slate-400 mb-2">장기 MA (일)</label>
+                                        <input type="number" id="maLong" value="20"
+                                            class="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-right">
+                                    </div>
+                                </div>
+                                <button onclick="runBacktest()"
+                                    class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-lg font-bold text-lg transition">실행하기</button>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-800 p-5 rounded-xl border border-slate-700">
+                            <h3 class="font-bold mb-4">결과 요약</h3>
+                            <div class="space-y-4">
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">총 수익률</span>
+                                    <span class="font-bold number-font" id="btTotalReturn">-</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">최종 자산</span>
+                                    <span class="font-bold number-font" id="btFinalAsset">-</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">총 거래 횟수</span>
+                                    <span class="font-bold number-font" id="btTradeCount">-</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-400">승률</span>
+                                    <span class="font-bold number-font" id="btWinRate">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Result Chart & Log -->
+                    <div class="lg:col-span-2 flex flex-col gap-6">
+                        <div class="bg-slate-800 p-1 rounded-xl border border-slate-700 h-[400px]">
+                            <div id="backtestChart" class="w-full h-full"></div>
+                        </div>
+
+                        <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 flex-1">
+                            <h3 class="font-bold mb-4">거래 로그</h3>
+                            <div id="backtestLog" class="h-[200px] overflow-y-auto custom-scrollbar text-sm space-y-2">
+                                <div class="text-slate-500 text-center py-8">백테스트를 실행해주세요</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Analyst Tab -->
+        <div id="analystTab" class="tab-content hidden">
+            <!-- Analyst Guide -->
+            <div class="bg-cyan-600/10 border border-cyan-500/30 rounded-xl p-4 mb-6 flex items-start gap-3">
+                <span class="text-xl">👨‍🔬</span>
+                <div class="text-xs text-cyan-100 leading-relaxed">
+                    <p class="font-bold text-sm mb-1">분석가 대시보드 사용법</p>
+                    AI와 통계를 활용한 고급 분석 도구입니다. <b>패턴 매칭</b>은 차트 탭에서 선택한 종목의 현재 흐름과 유사한 과거 사례를 찾습니다. <b>상관관계</b>는 내 포트폴리오의
+                    분산 투자 상태를 보여주며, <b>이상 수급</b>은 실시간으로 거래량이 터진 종목을 포착합니다.
+                </div>
+            </div>
+
+            <!-- AI Master Report Section -->
+            <div
+                class="card p-6 mb-6 bg-gradient-to-br from-slate-800 to-slate-900 border-t-4 border-purple-500 relative overflow-hidden">
+                <div class="absolute top-0 right-0 p-4 opacity-10">
+                    <span class="text-6xl">🤖</span>
+                </div>
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="text-2xl font-black text-white flex items-center gap-2">
+                            AI 시장 마스터 리포트
+                            <span
+                                class="text-xs font-bold px-2 py-1 bg-purple-600 rounded-full animate-pulse">LIVE</span>
+                        </h2>
+                        <p class="text-slate-400 text-sm mt-1">실시간 뉴스와 시장 데이터를 융합하여 오늘의 인사이트를 도출합니다.</p>
+                    </div>
+                    <button onclick="generateAIMasterReport()"
+                        class="bg-purple-600 hover:bg-purple-500 text-white px-5 py-2.5 rounded-xl font-bold transition flex items-center gap-2">
+                        <span>✨ 리포트 새로고침</span>
+                    </button>
+                </div>
+
+                <div id="aiMasterSummary" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-slate-900/50 p-5 rounded-2xl border border-slate-700/50">
+                        <h3 class="font-bold text-purple-400 mb-2 flex items-center gap-2">🌍 시장 요약</h3>
+                        <div id="aiMarketSummary" class="text-sm text-slate-300 leading-relaxed min-h-[100px]">
+                            뉴스를 분석하여 시장의 흐름을 파악하고 있습니다...
+                        </div>
+                    </div>
+                    <div class="bg-slate-900/50 p-5 rounded-2xl border border-slate-700/50">
+                        <h3 class="font-bold text-red-400 mb-2 flex items-center gap-2">🔥 주요 섹터</h3>
+                        <div id="aiSectorFocus" class="text-sm text-slate-300 leading-relaxed min-h-[100px]">
+                            현재 가장 뜨거운 관심사를 추출 중입니다...
+                        </div>
+                    </div>
+                    <div class="bg-slate-900/50 p-5 rounded-2xl border border-slate-700/50">
+                        <h3 class="font-bold text-yellow-400 mb-2 flex items-center gap-2">⚠️ 주의 리스크</h3>
+                        <div id="aiRiskFactor" class="text-sm text-slate-300 leading-relaxed min-h-[100px]">
+                            잠재적 위험 요소를 체크하고 있습니다...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div class="card p-6">
+                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2">🔍 유사 차트 패턴 매칭 (AI)</h2>
+                    <div id="patternMatchingResult"
+                        class="min-h-[300px] flex flex-col justify-center items-center text-slate-500">
+                        <div class="text-4xl mb-2">🧠</div>
+                        <p>현재 차트 패턴과 유사한 과거 사례를 분석합니다.</p>
+                        <button onclick="runPatternMatching()"
+                            class="mt-4 bg-cyan-600 hover:bg-cyan-500 px-6 py-2 rounded-lg font-bold text-white transition">분석
+                            실행</button>
+                    </div>
+                </div>
+                <div class="card p-6">
+                    <h2 class="text-xl font-bold mb-4 flex items-center gap-2">💎 수급 감지기 (Smart Money)</h2>
+                    <div id="smartMoneyList" class="space-y-3 max-h-[400px] overflow-y-auto custom-scrollbar">
+                        <div class="text-slate-500 text-center py-12">이상 수급 발생 시 여기에 표시됩니다.</div>
+                    </div>
+                </div>
+                <div class="card p-6 lg:col-span-2">
+                    <h2 class="text-xl font-bold mb-4">🔗 종목 간 상관관계 매트릭스 (Portfolio)</h2>
+                    <div id="correlationMatrix"
+                        class="overflow-x-auto min-h-[400px] flex items-center justify-center text-slate-500">
+                        보유 종목이 2개 이상일 때 분석이 가능합니다.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lab Tab -->
+        <div id="labTab" class="tab-content hidden">
+            <!-- Lab Guide -->
+            <div class="bg-purple-600/10 border border-purple-500/30 rounded-xl p-4 mb-6 flex items-start gap-3">
+                <span class="text-xl">🧪</span>
+                <div class="text-xs text-purple-100 leading-relaxed">
+                    <p class="font-bold text-sm mb-1">전략 실험실 (노코드 빌더)</p>
+                    나만의 매매 규칙을 만들고 실시간으로 감시할 수 있습니다. 지표(RSI, SMA 등)와 조건을 설정하고 저장하면, 시장이 갱신될 때마다 전체 종목을 스캔하여 조건에 맞는 종목이
+                    나올 때 즉석에서 알림을 띄워줍니다.
+                </div>
+            </div>
+
+            <div class="card p-6">
+                <h2 class="text-2xl font-black mb-6 text-purple-400">🧪 노코드 전략 빌더</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                            <h3 class="font-bold mb-3">내 전략 만들기</h3>
+                            <div id="strategyBuilder" class="space-y-3">
+                                <div class="flex items-center gap-2">
+                                    <select
+                                        class="strategy-indicator bg-slate-700 border-slate-600 rounded p-2 text-sm flex-1">
+                                        <option value="rsi">RSI</option>
+                                        <option value="sma20">SMA 20</option>
+                                        <option value="price">현재가</option>
+                                    </select>
+                                    <select class="strategy-op bg-slate-700 border-slate-600 rounded p-2 text-sm">
+                                        <option value="lt">미만 (<)< /option>
+                                        <option value="gt">초과 (> )</option>
+                                        <option value="cross_up">골든크로스</option>
+                                    </select>
+                                    <input type="number"
+                                        class="strategy-val bg-slate-700 border-slate-600 rounded p-2 text-sm w-20"
+                                        value="30">
+                                </div>
+                                <button onclick="saveCustomStrategy()"
+                                    class="w-full bg-purple-600 hover:bg-purple-500 py-2 rounded font-bold transition">전략
+                                    저장 및 활성화</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                        <h3 class="font-bold mb-3">활성 신호 모니터링</h3>
+                        <div id="strategySignals" class="space-y-2 text-sm text-slate-400">
+                            포착된 신호가 없습니다.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Journal Tab -->
+        <div id="journalTab" class="tab-content hidden">
+            <!-- Journal Guide -->
+            <div class="bg-emerald-600/10 border border-emerald-500/30 rounded-xl p-4 mb-6 flex items-start gap-3">
+                <span class="text-xl">📓</span>
+                <div class="text-xs text-emerald-100 leading-relaxed">
+                    <p class="font-bold text-sm mb-1">매매 일지 (복기)</p>
+                    단순한 거래 기록을 넘어, 매매 버튼을 눌렀던 <b>그 순간의 지표 상태와 시장 분위기</b>를 함께 기록합니다. 과거의 판단을 되짚어보며 승률 높은 습관을 만들어보세요.
+                </div>
+            </div>
+
+            <div class="card p-6">
+                <h2 class="text-xl font-bold mb-4 flex items-center gap-2">📓 무드(Mood) 매매 일지</h2>
+                <div id="journalList" class="space-y-4">
+                    <div class="text-slate-500 text-center py-12">상세 복기를 원하는 거래를 선택하세요.</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Trade Modal -->
+    <div id="tradeModal"
+        class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="card p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="text-xl font-bold" id="modalTitle">거래</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <!-- Alert Modal -->
+    <div id="alertModal"
+        class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="card p-6 w-full max-w-sm">
+            <h3 class="text-xl font-bold mb-4" id="alertModalTitle">알림 설정</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-slate-400 mb-2">목표 가격</label>
+                    <input type="number" id="alertPrice"
+                        class="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-3 text-lg font-bold">
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="saveAlert()"
+                        class="flex-1 bg-blue-600 hover:bg-blue-500 py-3 rounded-xl font-bold">설정하기</button>
+                    <button onclick="closeAlertModal()"
+                        class="flex-1 bg-slate-700 hover:bg-slate-600 py-3 rounded-xl font-bold">취소</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auto Bot Modal -->
+    <div id="botModal"
+        class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="card p-6 w-full max-w-sm">
+            <h3 class="text-xl font-bold mb-4 flex items-center gap-2">🤖 자동매매 봇 설정</h3>
+            <div class="space-y-4">
+                <div class="flex items-center justify-between bg-slate-700/50 p-3 rounded-xl border border-slate-600">
+                    <span class="font-medium">봇 활성화</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="botActive" class="sr-only peer" onchange="toggleBot()">
+                        <div
+                            class="w-11 h-6 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600">
+                        </div>
+                    </label>
+                </div>
+
+                <div>
+                    <label class="block text-sm text-slate-400 mb-2">전략 선택</label>
+                    <select id="botStrategy" class="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-3">
+                        <option value="rsi">RSI (과매도 매수/과매수 매도)</option>
+                        <option value="random">무작위 매매 (테스트용)</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-2">매수 기준 (RSI)</label>
+                        <input type="number" id="botBuyRSI" value="30"
+                            class="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-2 text-center font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-slate-400 mb-2">매도 기준 (RSI)</label>
+                        <input type="number" id="botSellRSI" value="70"
+                            class="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-2 text-center font-bold">
+                    </div>
+                </div>
+
+                <div class="text-xs text-slate-500 text-center pt-2">
+                    * 관심 종목에 등록된 자산만 거래합니다.<br>
+                    * 1분마다 조건을 검사합니다.
+                </div>
+
+                <button onclick="closeBotModal()"
+                    class="w-full bg-slate-700 hover:bg-slate-600 py-3 rounded-xl font-bold mt-2">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Welcome Modal -->
+    <div id="welcomeModal"
+        class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="card w-full max-w-2xl p-8 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500">
+            </div>
+            <h2
+                class="text-3xl font-black mb-6 text-center bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+                🚀 프로 트레이더 시뮬레이션에 오신 것을 환영합니다
+            </h2>
+            <div class="space-y-6 text-slate-300 mb-8">
+                <div class="flex gap-4 items-start">
+                    <div class="bg-blue-600/20 p-3 rounded-xl text-2xl">🤖</div>
+                    <div>
+                        <h3 class="font-bold text-white text-lg">AI 기반 예측 & 자동매매</h3>
+                        <p class="text-sm">최첨단 TensorFlow AI가 시장을 분석하고, 자동화 봇이 24시간 수익을 창출합니다.</p>
+                    </div>
+                </div>
+                <div class="flex gap-4 items-start">
+                    <div class="bg-purple-600/20 p-3 rounded-xl text-2xl">🌍</div>
+                    <div>
+                        <h3 class="font-bold text-white text-lg">글로벌 마켓 리얼타임 데이터</h3>
+                        <p class="text-sm">나스닥, 코스피, 비트코인까지. 실제 시장 데이터를 기반으로 리스크 없이 훈련하세요.</p>
+                    </div>
+                </div>
+                <div class="flex gap-4 items-start">
+                    <div class="bg-green-600/20 p-3 rounded-xl text-2xl">🏆</div>
+                    <div>
+                        <h3 class="font-bold text-white text-lg">챌린지 모드 & 랭킹</h3>
+                        <p class="text-sm">2008 금융위기, 2020 코로나 폭락장 등 역사적 순간을 재현하고 최고 수익률에 도전하세요.</p>
+                    </div>
+                </div>
+            </div>
+            <button onclick="closeWelcome()"
+                class="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-xl font-bold text-lg shadow-lg shadow-blue-500/20 transition transform hover:scale-[1.02]">
+                시뮬레이션 시작하기 (보너스 ₩1,000,000 받기)
+            </button>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col items-end pointer-events-none"></div>
+
+    <div id="stockTooltip" class="tooltip hidden"></div>
+    <script src="script.js"></script>
+    <script type="module" src="js/main.js"></script>
+</body>
+
+</html>

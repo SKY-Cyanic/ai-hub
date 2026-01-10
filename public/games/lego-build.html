@@ -1,0 +1,1617 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>레고 조립 시뮬레이터</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            user-select: none;
+            background-color: #f0f0f0;
+        }
+
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* Custom scrollbar for the UI panel if needed */
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scroll::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 3px;
+        }
+
+        /* Accordion Styles */
+        details>summary {
+            list-style: none;
+            cursor: pointer;
+            background-color: #f3f4f6;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #374151;
+            transition: background-color 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        details>summary:hover {
+            background-color: #e5e7eb;
+        }
+
+        details>summary::after {
+            content: '+';
+            font-weight: bold;
+        }
+
+        details[open]>summary::after {
+            content: '-';
+        }
+
+        details[open]>summary {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Brick Item Styles */
+        .brick-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            width: 100%;
+            padding: 0.25rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .brick-item:hover {
+            background-color: #f9fafb;
+        }
+
+        .brick-item.selected {
+            background-color: #eff6ff;
+            border-color: #3b82f6;
+        }
+
+        .brick-icon {
+            width: 30px;
+            height: 30px;
+            flex-shrink: 0;
+        }
+    </style>
+    <!-- Import map for Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+
+<body>
+
+    <!-- UI Overlay -->
+    <div
+        class="absolute top-4 left-4 bottom-4 w-80 bg-white/95 backdrop-blur-sm rounded-xl shadow-xl flex flex-col z-10 border border-gray-200 overflow-hidden">
+        <!-- Header -->
+        <div class="p-4 border-b border-gray-100 shrink-0">
+            <h1 class="text-xl font-bold text-gray-800 flex justify-between items-center">
+                <span>🧩 레고 빌더</span>
+                <button id="btn-help" class="text-gray-400 hover:text-blue-500 text-sm" title="도움말">❔</button>
+            </h1>
+        </div>
+
+        <!-- Scrollable Content -->
+        <div class="flex-1 overflow-y-auto custom-scroll p-4 space-y-5">
+            <!-- Controls Info (Hidden by default, toggled via ?) -->
+            <div id="controls-info" class="text-xs text-gray-600 bg-blue-50 p-3 rounded-lg hidden">
+                <p class="mb-1">🖱️ <b>좌클릭:</b> 블록 놓기</p>
+                <p class="mb-1">🖱️ <b>우클릭 드래그:</b> 카메라 회전</p>
+                <p class="mb-1">🖱️ <b>휠:</b> 줌 인/아웃</p>
+                <p class="mb-1">⌨️ <b>R 키:</b> 블록 회전</p>
+                <p class="mb-1">⌨️ <b>Shift + 클릭:</b> 블록 삭제</p>
+                <p>💾 <b>저장/로드:</b> 하단 버튼 사용</p>
+            </div>
+
+            <!-- Color Picker -->
+            <div>
+                <label class="block text-sm font-bold text-gray-700 mb-2">색상 선택</label>
+                <div class="flex flex-wrap gap-2 items-center" id="color-palette">
+                    <!-- Colors injected here -->
+                    <!-- Custom Color Picker Input -->
+                    <div
+                        class="relative w-8 h-8 rounded-full overflow-hidden ring-2 ring-gray-200 hover:ring-gray-400 cursor-pointer">
+                        <input type="color" id="custom-color-picker"
+                            class="absolute -top-2 -left-2 w-12 h-12 cursor-pointer p-0 border-0" value="#ffffff">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Custom Block Creator -->
+            <div class="bg-gray-50 p-3 rounded-lg border border-gray-100">
+                <label class="block text-sm font-bold text-gray-700 mb-2">🛠️ 커스텀 블록 생성</label>
+                <div class="grid grid-cols-3 gap-2 mb-2">
+                    <div class="flex flex-col">
+                        <span class="text-[10px] text-gray-500">가로</span>
+                        <input type="number" id="cust-x" value="2" min="1" max="20"
+                            class="text-sm border rounded px-1 py-1">
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-[10px] text-gray-500">세로</span>
+                        <input type="number" id="cust-z" value="2" min="1" max="20"
+                            class="text-sm border rounded px-1 py-1">
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-[10px] text-gray-500">높이</span>
+                        <select id="cust-h" class="text-sm border rounded px-1 py-1 h-[29px]">
+                            <option value="24">벽돌</option>
+                            <option value="8">플레이트</option>
+                            <option value="72">기둥</option>
+                        </select>
+                    </div>
+                </div>
+                <button id="btn-create-custom"
+                    class="w-full bg-indigo-100 hover:bg-indigo-200 text-indigo-800 text-xs font-bold py-2 rounded transition">
+                    + 목록에 추가
+                </button>
+            </div>
+
+            <!-- Brick Type Picker -->
+            <div>
+                <label class="block text-sm font-bold text-gray-700 mb-2">블록 종류</label>
+                <div id="brick-types" class="flex flex-col gap-1">
+                    <!-- Categories and brick types injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer Tools -->
+        <div class="p-4 border-t border-gray-100 bg-gray-50 shrink-0 space-y-2">
+            <div class="flex gap-2">
+                <button id="btn-rotate"
+                    class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium transition shadow-sm">
+                    회전 (R)
+                </button>
+                <button id="btn-delete-mode"
+                    class="flex-1 bg-white border border-gray-300 hover:bg-red-50 hover:border-red-300 text-gray-700 hover:text-red-600 py-2 rounded-lg text-sm font-medium transition shadow-sm">
+                    삭제 모드
+                </button>
+            </div>
+
+            <div class="flex gap-2 pt-2 border-t border-gray-200">
+                <button id="btn-save"
+                    class="flex-1 bg-green-600 hover:bg-green-700 text-white py-1.5 rounded text-xs transition shadow-sm">
+                    💾 저장
+                </button>
+                <button id="btn-load"
+                    class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-1.5 rounded text-xs transition shadow-sm">
+                    📂 불러오기
+                </button>
+                <input type="file" id="file-input" accept=".json" style="display: none;">
+            </div>
+
+            <button id="btn-clear"
+                class="w-full bg-red-50 hover:bg-red-100 text-red-600 py-1.5 rounded text-xs transition border border-red-100">
+                🗑️ 모두 지우기
+            </button>
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+        // Configuration
+        const GRID_SIZE = 500;
+        const GRID_DIVISIONS = 25; // 20 units per grid square
+        const UNIT_SIZE = 20; // Standard LEGO width unit
+        const PLATE_HEIGHT = 8;
+        const BRICK_HEIGHT = 24;
+
+        // State
+        let scene, camera, renderer, controls;
+        let plane; // The baseplate
+        let raycaster, pointer;
+        let rollOverMesh, rollOverMaterial;
+        let objects = []; // Interactable objects (plane + bricks)
+        let isDeleteMode = false;
+
+        // Current settings
+        let brickColor = 0xd92020; // Default Red
+        let currentBrick = { label: '벽돌 2x4', type: 'brick', x: 2, z: 4, height: 24 }; // Default
+        let brickRotation = 0; // 0, 1, 2, 3
+
+        const colors = [
+            { name: 'Red', hex: 0xd92020, class: 'bg-red-600' },
+            { name: 'Blue', hex: 0x2050d9, class: 'bg-blue-600' },
+            { name: 'Yellow', hex: 0xf2d22e, class: 'bg-yellow-400' },
+            { name: 'Green', hex: 0x2ebd2e, class: 'bg-green-600' },
+            { name: 'White', hex: 0xf0f0f0, class: 'bg-gray-100 border border-gray-300' },
+            { name: 'Black', hex: 0x1a1a1a, class: 'bg-gray-900' },
+            { name: 'Orange', hex: 0xff851b, class: 'bg-orange-500' },
+            { name: 'Purple', hex: 0xb10dc9, class: 'bg-purple-600' },
+            { name: 'Pink', hex: 0xff69b4, class: 'bg-pink-400' },
+            { name: 'Brown', hex: 0x8b4513, class: 'bg-yellow-900' },
+            { name: 'Gray', hex: 0x808080, class: 'bg-gray-500' },
+        ];
+
+        const brickCategories = [
+            {
+                name: "🧱 기본 벽돌 (Bricks)",
+                items: [
+                    { label: '벽돌 1x1', type: 'brick', x: 1, z: 1, height: 24 },
+                    { label: '벽돌 1x2', type: 'brick', x: 1, z: 2, height: 24 },
+                    { label: '벽돌 1x3', type: 'brick', x: 1, z: 3, height: 24 },
+                    { label: '벽돌 1x4', type: 'brick', x: 1, z: 4, height: 24 },
+                    { label: '벽돌 1x6', type: 'brick', x: 1, z: 6, height: 24 },
+                    { label: '벽돌 1x8', type: 'brick', x: 1, z: 8, height: 24 },
+                    { label: '벽돌 2x2', type: 'brick', x: 2, z: 2, height: 24 },
+                    { label: '벽돌 2x3', type: 'brick', x: 2, z: 3, height: 24 },
+                    { label: '벽돌 2x4', type: 'brick', x: 2, z: 4, height: 24 },
+                    { label: '벽돌 2x6', type: 'brick', x: 2, z: 6, height: 24 },
+                    { label: '벽돌 2x8', type: 'brick', x: 2, z: 8, height: 24 },
+                    { label: '벽돌 2x10', type: 'brick', x: 2, z: 10, height: 24 },
+                    { label: '벽돌 4x4', type: 'brick', x: 4, z: 4, height: 24 },
+                    { label: '벽돌 4x6', type: 'brick', x: 4, z: 6, height: 24 },
+                ]
+            },
+            {
+                name: "📏 플레이트 (Plates)",
+                items: [
+                    { label: '플레이트 1x1', type: 'plate', x: 1, z: 1, height: 8 },
+                    { label: '플레이트 1x2', type: 'plate', x: 1, z: 2, height: 8 },
+                    { label: '플레이트 1x3', type: 'plate', x: 1, z: 3, height: 8 },
+                    { label: '플레이트 1x4', type: 'plate', x: 1, z: 4, height: 8 },
+                    { label: '플레이트 1x6', type: 'plate', x: 1, z: 6, height: 8 },
+                    { label: '플레이트 1x8', type: 'plate', x: 1, z: 8, height: 8 },
+                    { label: '플레이트 2x2', type: 'plate', x: 2, z: 2, height: 8 },
+                    { label: '플레이트 2x3', type: 'plate', x: 2, z: 3, height: 8 },
+                    { label: '플레이트 2x4', type: 'plate', x: 2, z: 4, height: 8 },
+                    { label: '플레이트 2x6', type: 'plate', x: 2, z: 6, height: 8 },
+                    { label: '플레이트 2x8', type: 'plate', x: 2, z: 8, height: 8 },
+                    { label: '플레이트 4x4', type: 'plate', x: 4, z: 4, height: 8 },
+                    { label: '플레이트 4x6', type: 'plate', x: 4, z: 6, height: 8 },
+                    { label: '플레이트 4x8', type: 'plate', x: 4, z: 8, height: 8 },
+                    { label: '플레이트 6x6', type: 'plate', x: 6, z: 6, height: 8 },
+                    { label: '플레이트 8x8', type: 'plate', x: 8, z: 8, height: 8 },
+                    { label: '코너 플레이트 3x3', type: 'corner_plate', x: 3, z: 3, height: 8 },
+                ]
+            },
+            {
+                name: "📐 슬로프 (Slopes)",
+                items: [
+                    { label: '슬로프 1x1', type: 'slope', x: 1, z: 1, height: 16 },
+                    { label: '슬로프 1x2', type: 'slope', x: 1, z: 2, height: 24 },
+                    { label: '슬로프 1x3', type: 'slope', x: 1, z: 3, height: 24 },
+                    { label: '슬로프 2x2', type: 'slope', x: 2, z: 2, height: 24 },
+                    { label: '슬로프 2x3', type: 'slope', x: 2, z: 3, height: 24 },
+                    { label: '슬로프 2x4', type: 'slope', x: 2, z: 4, height: 24 },
+                    { label: '슬로프 2x2 (곡면)', type: 'slope_curved', x: 2, z: 2, height: 24 },
+                    { label: '역슬로프 1x2', type: 'slope_inv', x: 1, z: 2, height: 24 },
+                    { label: '역슬로프 2x2', type: 'slope_inv', x: 2, z: 2, height: 24 },
+                ]
+            },
+            {
+                name: "🧼 타일 (Tiles)",
+                items: [
+                    { label: '타일 1x1', type: 'tile', x: 1, z: 1, height: 8 },
+                    { label: '타일 1x2', type: 'tile', x: 1, z: 2, height: 8 },
+                    { label: '타일 1x3', type: 'tile', x: 1, z: 3, height: 8 },
+                    { label: '타일 1x4', type: 'tile', x: 1, z: 4, height: 8 },
+                    { label: '타일 2x2', type: 'tile', x: 2, z: 2, height: 8 },
+                    { label: '타일 2x2 (원형)', type: 'tile_round', x: 2, z: 2, height: 8 },
+                    { label: '타일 2x4', type: 'tile', x: 2, z: 4, height: 8 },
+                    { label: '타일 그릴 1x2', type: 'tile_grill', x: 1, z: 2, height: 8 },
+                ]
+            },
+            {
+                name: "🔵 원통형 (Round)",
+                items: [
+                    { label: '원통 1x1', type: 'round', x: 1, z: 1, height: 24 },
+                    { label: '원통 2x2', type: 'round', x: 2, z: 2, height: 24 },
+                    { label: '원통 2x2 (줄무늬)', type: 'round_grooved', x: 2, z: 2, height: 24 },
+                    { label: '원통플레이트 1x1', type: 'round_plate', x: 1, z: 1, height: 8 },
+                    { label: '원통플레이트 2x2', type: 'round_plate', x: 2, z: 2, height: 8 },
+                    { label: '원뿔 1x1', type: 'cone', x: 1, z: 1, height: 24 },
+                    { label: '돔 2x2', type: 'dome', x: 2, z: 2, height: 24 },
+                ]
+            },
+            {
+                name: "🚗 차량/특수 (Vehicle)",
+                items: [
+                    { label: '타이어/휠 2x2', type: 'wheel', x: 2, z: 2, height: 24 }, // New
+                    { label: '윈드실드 2x4', type: 'windshield', x: 2, z: 4, height: 24 }, // New
+                    { label: '운전대 (핸들)', type: 'steering', x: 2, z: 1, height: 24 }, // New
+                    { label: '좌석 (시트) 2x2', type: 'seat', x: 2, z: 2, height: 24 }, // New
+                    { label: '펜더(바퀴덮개) 4x2', type: 'mudguard', x: 4, z: 2, height: 32 }, // New
+                ]
+            },
+            {
+                name: "🏗️ 구조물 (Structure)",
+                items: [
+                    { label: '아치 1x3', type: 'arch', x: 1, z: 3, height: 24 },
+                    { label: '아치 1x4', type: 'arch', x: 1, z: 4, height: 24 },
+                    { label: '아치 1x6', type: 'arch', x: 1, z: 6, height: 24 },
+                    { label: '기둥 1x1x2', type: 'pillar', x: 1, z: 1, height: 48 },
+                    { label: '기둥 1x1x3', type: 'pillar', x: 1, z: 1, height: 72 },
+                    { label: '기둥 2x2x2', type: 'pillar', x: 2, z: 2, height: 48 },
+                    { label: '코너 벽돌 2x2', type: 'corner', x: 2, z: 2, height: 24 }, // New
+                    { label: '계단 2x3', type: 'stairs', x: 2, z: 3, height: 24 },
+                    { label: '계단 2x4', type: 'stairs', x: 2, z: 4, height: 32 },
+                    { label: '울타리 1x4', type: 'fence', x: 1, z: 4, height: 24 },
+                ]
+            },
+            {
+                name: "🏠 창문/지붕 (House)",
+                items: [
+                    { label: '창문프레임 1x2x2', type: 'window', x: 1, z: 2, height: 48 },
+                    { label: '창문프레임 1x4x3', type: 'window', x: 1, z: 4, height: 72 },
+                    { label: '문프레임 1x4x6', type: 'door', x: 1, z: 4, height: 144 },
+                    { label: '지붕타일 2x2', type: 'roof', x: 2, z: 2, height: 16 }, // New
+                    { label: '지붕타일 2x3', type: 'roof', x: 2, z: 3, height: 16 },
+                    { label: '지붕타일 2x4', type: 'roof', x: 2, z: 4, height: 16 },
+                    { label: '지붕꼭대기 2x4', type: 'roof_ridge', x: 2, z: 4, height: 16 },
+                ]
+            },
+            {
+                name: "🌿 자연/장식 (Nature)",
+                items: [
+                    { label: '꽃 (1x1)', type: 'flower', x: 1, z: 1, height: 8 }, // New
+                    { label: '안테나 (1x1)', type: 'antenna', x: 1, z: 1, height: 24 }, // New
+                    { label: '수도꼭지 (1x1)', type: 'tap', x: 1, z: 1, height: 16 }, // New
+                ]
+            },
+            {
+                name: "🔧 테크닉/기타 (Technic)",
+                items: [
+                    { label: '테크닉 빔 1x2', type: 'technic_beam', x: 1, z: 2, height: 8 }, // New
+                    { label: '테크닉 빔 1x4', type: 'technic_beam', x: 1, z: 4, height: 8 }, // New
+                    { label: '테크닉 빔 1x6', type: 'technic_beam', x: 1, z: 6, height: 8 }, // New
+                    { label: '앵글 1x2', type: 'angle', x: 1, z: 2, height: 24 },
+                    { label: '웨지 2x4', type: 'wedge', x: 2, z: 4, height: 24 },
+                    { label: '웨지 3x6', type: 'wedge', x: 3, z: 6, height: 24 },
+                ]
+            }
+        ];
+
+        init();
+        animate();
+
+        function init() {
+            // Scene Setup
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf0f5f9);
+            scene.fog = new THREE.Fog(0xf0f5f9, 500, 1500);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
+            camera.position.set(300, 400, 300);
+            camera.lookAt(0, 0, 0);
+
+            // Geometry for UI helpers
+            raycaster = new THREE.Raycaster();
+            pointer = new THREE.Vector2();
+
+            // Base Grid (The "Plate")
+            const geometry = new THREE.PlaneGeometry(GRID_SIZE, GRID_SIZE);
+            geometry.rotateX(-Math.PI / 2);
+            plane = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ visible: false }));
+            scene.add(plane);
+            objects.push(plane);
+
+            // Visual Grid
+            const gridHelper = new THREE.GridHelper(GRID_SIZE, GRID_DIVISIONS, 0xbbbbbb, 0xeeeeee);
+            scene.add(gridHelper);
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0x606060, 1.5);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 2.5);
+            directionalLight.position.set(500, 800, 500);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 3000;
+            const d = 1000;
+            directionalLight.shadow.camera.left = -d;
+            directionalLight.shadow.camera.right = d;
+            directionalLight.shadow.camera.top = d;
+            directionalLight.shadow.camera.bottom = -d;
+            directionalLight.shadow.bias = -0.0001;
+            scene.add(directionalLight);
+
+            // Roll-over helper (Ghost Brick)
+            rollOverMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, opacity: 0.5, transparent: true });
+            updateRollOverMesh();
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            // Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 - 0.05; // Prevent going below ground
+
+            // Event Listeners
+            document.addEventListener('pointermove', onPointerMove);
+            document.addEventListener('pointerdown', onPointerDown);
+            document.addEventListener('keydown', onKeyDown);
+            window.addEventListener('resize', onWindowResize);
+
+            initUI();
+        }
+
+        // Variables for click vs drag detection
+        let lastPointerDown = { x: 0, y: 0 };
+        let isDragging = false;
+
+        function createLegoGeometry(widthUnits, depthUnits, type, height) {
+            const w = widthUnits * UNIT_SIZE;
+            const d = depthUnits * UNIT_SIZE;
+            const h = height;
+            const gap = 0.5;
+
+            let geometries = [];
+            let mainGeo;
+            let addStuds = true;
+
+            switch (type) {
+                case 'round':
+                case 'round_plate':
+                case 'round_grooved': {
+                    const radius = (Math.min(w, d) / 2) - gap;
+                    mainGeo = new THREE.CylinderGeometry(radius, radius, h, 32);
+                    mainGeo.translate(0, h / 2, 0);
+                    break;
+                }
+
+                case 'cone': {
+                    const radius = (Math.min(w, d) / 2) - gap;
+                    mainGeo = new THREE.ConeGeometry(radius, h, 32);
+                    mainGeo.translate(0, h / 2, 0);
+                    addStuds = false;
+                    break;
+                }
+
+                case 'dome': {
+                    const radius = (Math.min(w, d) / 2) - gap;
+                    mainGeo = new THREE.SphereGeometry(radius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+                    mainGeo.translate(0, 0, 0);
+                    addStuds = false;
+                    break;
+                }
+
+                case 'slope': {
+                    mainGeo = new THREE.BoxGeometry(w - gap, h, d - gap);
+                    mainGeo.translate(0, h / 2, 0);
+                    const pos = mainGeo.attributes.position;
+                    for (let i = 0; i < pos.count; i++) {
+                        if (pos.getY(i) > h / 2) {
+                            if (pos.getZ(i) > 0) {
+                                pos.setY(i, 8);
+                            }
+                        }
+                    }
+                    mainGeo.computeVertexNormals();
+                    addStuds = false;
+                    break;
+                }
+
+                case 'slope_curved': {
+                    // Simplified curved slope (using Cylinder segment)
+                    const radius = h;
+                    const shape = new THREE.Shape();
+                    shape.moveTo(0, 0);
+                    shape.lineTo(0, h);
+                    shape.lineTo(d - gap, 8); // Stud height at front
+                    shape.lineTo(d - gap, 0);
+                    shape.lineTo(0, 0);
+
+                    // This is a simple wedge, for true curve we need more vertices, 
+                    // but for this demo, we stick to basic shapes. Let's make a wedge for now.
+                    mainGeo = new THREE.BoxGeometry(w - gap, h, d - gap);
+                    mainGeo.translate(0, h / 2, 0);
+                    const pos = mainGeo.attributes.position;
+                    for (let i = 0; i < pos.count; i++) {
+                        if (pos.getY(i) > h / 2 && pos.getZ(i) > 0) {
+                            pos.setY(i, 8); // Drop front
+                        }
+                    }
+                    mainGeo.computeVertexNormals();
+                    addStuds = false;
+                    break;
+                }
+
+                case 'slope_inv': {
+                    mainGeo = new THREE.BoxGeometry(w - gap, h, d - gap);
+                    mainGeo.translate(0, h / 2, 0);
+                    const pos = mainGeo.attributes.position;
+                    for (let i = 0; i < pos.count; i++) {
+                        if (pos.getY(i) < h / 2) {
+                            if (pos.getZ(i) > 0) {
+                                pos.setY(i, h - 8);
+                            }
+                        }
+                    }
+                    mainGeo.computeVertexNormals();
+                    break;
+                }
+
+                case 'arch': {
+                    const archShape = new THREE.Shape();
+                    const archWidth = d - gap;
+                    const archHeight = h;
+                    const archDepth = w - gap;
+                    const holeRadius = (archWidth / 2) * 0.7;
+
+                    archShape.moveTo(-archWidth / 2, 0);
+                    archShape.lineTo(-archWidth / 2, archHeight);
+                    archShape.lineTo(archWidth / 2, archHeight);
+                    archShape.lineTo(archWidth / 2, 0);
+                    archShape.absarc(0, 0, holeRadius, 0, Math.PI, false);
+
+                    const extrudeSettings = { depth: archDepth, bevelEnabled: false };
+                    mainGeo = new THREE.ExtrudeGeometry(archShape, extrudeSettings);
+                    mainGeo.rotateX(-Math.PI / 2);
+                    mainGeo.rotateY(Math.PI / 2);
+                    mainGeo.translate(0, 0, 0);
+                    addStuds = false;
+                    break;
+                }
+
+                case 'pillar':
+                case 'beam': {
+                    mainGeo = new THREE.BoxGeometry(w - gap, h, d - gap);
+                    mainGeo.translate(0, h / 2, 0);
+                    break;
+                }
+
+                case 'stairs': {
+                    const stepCount = depthUnits;
+                    const stepHeight = h / stepCount;
+                    const stepDepth = d / stepCount;
+
+                    for (let i = 0; i < stepCount; i++) {
+                        const stepGeo = new THREE.BoxGeometry(w - gap, stepHeight * (i + 1), stepDepth - gap);
+                        stepGeo.translate(0, (stepHeight * (i + 1)) / 2, -d / 2 + stepDepth / 2 + i * stepDepth);
+                        geometries.push(stepGeo);
+                    }
+                    addStuds = false;
+                    break;
+                }
+
+                case 'fence': {
+                    const baseGeo = new THREE.BoxGeometry(w - gap, 4, d - gap);
+                    baseGeo.translate(0, 2, 0);
+                    geometries.push(baseGeo);
+
+                    const barCount = depthUnits * 2;
+                    const barSpacing = d / barCount;
+                    for (let i = 0; i < barCount; i++) {
+                        const barGeo = new THREE.BoxGeometry(2, h - 4, 2);
+                        barGeo.translate(0, h / 2 + 2, -d / 2 + barSpacing / 2 + i * barSpacing);
+                        geometries.push(barGeo);
+                    }
+
+                    const topGeo = new THREE.BoxGeometry(w - gap, 4, d - gap);
+                    topGeo.translate(0, h - 2, 0);
+                    geometries.push(topGeo);
+
+                    addStuds = false;
+                    break;
+                }
+
+                case 'window': {
+                    const frameThickness = 4;
+                    const outerGeo = new THREE.BoxGeometry(w - gap, h, d - gap);
+                    outerGeo.translate(0, h / 2, 0);
+                    geometries.push(outerGeo);
+
+                    const innerGeo = new THREE.BoxGeometry(w + 2, h - frameThickness * 2, d - frameThickness * 2);
+                    innerGeo.translate(0, h / 2, 0);
+
+                    const hBarGeo = new THREE.BoxGeometry(w - gap, frameThickness, d - gap);
+                    hBarGeo.translate(0, h / 2, 0);
+                    geometries.push(hBarGeo);
+
+                    const vBarGeo = new THREE.BoxGeometry(w - gap, h, frameThickness);
+                    vBarGeo.translate(0, h / 2, 0);
+                    geometries.push(vBarGeo);
+
+                    addStuds = false;
+                    break;
+                }
+
+                case 'door': {
+                    const frameThickness = 4;
+                    const leftGeo = new THREE.BoxGeometry(w - gap, h, frameThickness);
+                    leftGeo.translate(0, h / 2, -d / 2 + frameThickness / 2);
+                    geometries.push(leftGeo);
+
+                    const rightGeo = new THREE.BoxGeometry(w - gap, h, frameThickness);
+                    rightGeo.translate(0, h / 2, d / 2 - frameThickness / 2);
+                    geometries.push(rightGeo);
+
+                    const topGeo = new THREE.BoxGeometry(w - gap, frameThickness, d - gap);
+                    topGeo.translate(0, h - frameThickness / 2, 0);
+                    geometries.push(topGeo);
+
+                    addStuds = false;
+                    break;
+                }
+
+                case 'roof': {
+                    mainGeo = new THREE.BoxGeometry(w - gap, h, d - gap);
+                    mainGeo.translate(0, h / 2, 0);
+                    const pos = mainGeo.attributes.position;
+                    for (let i = 0; i < pos.count; i++) {
+                        const y = pos.getY(i);
+                        const x = pos.getX(i);
+                        if (y > h / 2) {
+                            if (x > 0) {
+                                pos.setY(i, y + 8);
+                            }
+                        }
+                    }
+                    mainGeo.computeVertexNormals();
+                    addStuds = false;
+                    break;
+                }
+
+                case 'roof_ridge': {
+                    const shape = new THREE.Shape();
+                    shape.moveTo(-w / 2 + gap, 0);
+                    shape.lineTo(0, h);
+                    shape.lineTo(w / 2 - gap, 0);
+                    shape.lineTo(-w / 2 + gap, 0);
+
+                    const extrudeSettings = { depth: d - gap, bevelEnabled: false };
+                    mainGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+                    mainGeo.rotateY(Math.PI);
+                    mainGeo.translate(0, 0, d / 2 - gap / 2);
+                    addStuds = false;
+                    break;
+                }
+
+                case 'wedge': {
+                    mainGeo = new THREE.BoxGeometry(w - gap, h, d - gap);
+                    mainGeo.translate(0, h / 2, 0);
+                    const pos = mainGeo.attributes.position;
+                    for (let i = 0; i < pos.count; i++) {
+                        const z = pos.getZ(i);
+                        const y = pos.getY(i);
+                        if (y > h / 2 && z > 0) {
+                            const factor = 1 - (z / (d / 2)) * 0.7;
+                            pos.setY(i, h / 2 + (y - h / 2) * factor);
+                        }
+                    }
+                    mainGeo.computeVertexNormals();
+                    addStuds = false;
+                    break;
+                }
+
+                case 'angle': {
+                    const box1 = new THREE.BoxGeometry(w - gap, h, d / 2 - gap);
+                    box1.translate(0, h / 2, -d / 4);
+                    geometries.push(box1);
+
+                    const box2 = new THREE.BoxGeometry(w - gap, h / 2, d - gap);
+                    box2.translate(0, h / 4, 0);
+                    geometries.push(box2);
+
+                    addStuds = false;
+                    break;
+                }
+
+                case 'tile':
+                case 'tile_grill': {
+                    mainGeo = new THREE.BoxGeometry(w - gap, h, d - gap);
+                    mainGeo.translate(0, h / 2, 0);
+                    addStuds = false;
+                    break;
+                }
+
+                case 'tile_round': {
+                    const radius = (Math.min(w, d) / 2) - gap;
+                    mainGeo = new THREE.CylinderGeometry(radius, radius, h, 32);
+                    mainGeo.translate(0, h / 2, 0);
+                    addStuds = false;
+                    break;
+                }
+
+                case 'wheel': {
+                    // Vertical cylinder (tire) + Hub
+                    const radius = (Math.min(w, d) / 2);
+                    const tireGeo = new THREE.CylinderGeometry(radius, radius, h * 0.6, 32);
+                    tireGeo.rotateX(Math.PI / 2); // Make wheel upright
+                    tireGeo.translate(0, h / 2, 0);
+                    geometries.push(tireGeo);
+
+                    // Add a base plate for connection
+                    const baseGeo = new THREE.BoxGeometry(w * 0.8, 4, d * 0.4);
+                    baseGeo.translate(0, 2, 0);
+                    geometries.push(baseGeo);
+
+                    addStuds = false;
+                    break;
+                }
+
+                case 'windshield': {
+                    // Translucent slope
+                    mainGeo = new THREE.BoxGeometry(w - gap, h, d - gap);
+                    mainGeo.translate(0, h / 2, 0);
+                    const pos = mainGeo.attributes.position;
+                    for (let i = 0; i < pos.count; i++) {
+                        if (pos.getY(i) > h / 2) {
+                            if (pos.getZ(i) > 0) {
+                                pos.setY(i, 8);
+                            }
+                        }
+                    }
+                    mainGeo.computeVertexNormals();
+                    addStuds = false;
+                    break;
+                }
+
+                case 'seat': {
+                    // Chair L-shape
+                    const seatHeight = 8;
+                    const backHeight = h;
+                    const backThick = 4;
+
+                    const seatBase = new THREE.BoxGeometry(w - gap, seatHeight, d - gap);
+                    seatBase.translate(0, seatHeight / 2, 0);
+                    geometries.push(seatBase);
+
+                    const seatBack = new THREE.BoxGeometry(w - gap, backHeight, backThick);
+                    seatBack.translate(0, backHeight / 2, -d / 2 + backThick / 2);
+                    geometries.push(seatBack);
+
+                    addStuds = true; // Studs on top of back or base? Usually base studs are covered. Let's add studs on floor (auto handled) but not on seat.
+                    // Actually addStuds logic adds to Top. Let's disable default addStuds and add custom if needed.
+                    addStuds = false;
+                    break;
+                }
+
+                case 'steering': {
+                    // Steering column
+                    const base = new THREE.BoxGeometry(w - gap, h / 2, d - gap);
+                    base.translate(0, h / 4, 0);
+                    geometries.push(base);
+
+                    // Column
+                    const col = new THREE.CylinderGeometry(2, 2, h / 2, 8);
+                    col.rotateX(Math.PI / 4);
+                    col.translate(0, h * 0.75, -2);
+                    geometries.push(col);
+
+                    // Wheel
+                    const wheel = new THREE.TorusGeometry(6, 1, 8, 16);
+                    wheel.rotateX(Math.PI / 4); // Match column
+                    wheel.translate(0, h * 0.9, -4);
+                    geometries.push(wheel);
+
+                    addStuds = false;
+                    break;
+                }
+
+                case 'flower': {
+                    // Stem
+                    const stem = new THREE.CylinderGeometry(2, 2, h, 8);
+                    stem.translate(0, h / 2, 0);
+                    geometries.push(stem);
+
+                    // Petals
+                    const petal = new THREE.CylinderGeometry(6, 1, 4, 5);
+                    petal.translate(0, h, 0);
+                    geometries.push(petal);
+
+                    addStuds = false;
+                    break;
+                }
+
+                case 'antenna': {
+                    const base = new THREE.CylinderGeometry(4, 4, 8, 16);
+                    base.translate(0, 4, 0);
+                    geometries.push(base);
+
+                    const pole = new THREE.CylinderGeometry(1, 1, h - 8, 8);
+                    pole.translate(0, 4 + (h - 8) / 2, 0);
+                    geometries.push(pole);
+
+                    addStuds = false;
+                    break;
+                }
+
+                case 'corner': {
+                    // L-shaped Brick
+                    // 2x2 corner implies removing 1x1 corner
+                    // Create full 2x2 then subtract 1x1? Or build from 3 boxes.
+                    // Let's build from 2 boxes.
+                    // Box 1: 1x2
+                    const b1 = new THREE.BoxGeometry(UNIT_SIZE - gap, h, UNIT_SIZE * 2 - gap);
+                    b1.translate(-UNIT_SIZE / 2, h / 2, 0);
+                    geometries.push(b1);
+
+                    // Box 2: 1x1 (the other leg)
+                    const b2 = new THREE.BoxGeometry(UNIT_SIZE - gap, h, UNIT_SIZE - gap);
+                    b2.translate(UNIT_SIZE / 2, h / 2, -UNIT_SIZE / 2);
+                    geometries.push(b2);
+
+                    // Add studs manually for L shape
+                    const studGeo = new THREE.CylinderGeometry(3, 3, 4, 16);
+                    const studPositions = [
+                        [-UNIT_SIZE / 2, -UNIT_SIZE / 2],
+                        [-UNIT_SIZE / 2, UNIT_SIZE / 2],
+                        [UNIT_SIZE / 2, -UNIT_SIZE / 2]
+                    ];
+
+                    studPositions.forEach(pos => {
+                        const s = studGeo.clone();
+                        s.translate(pos[0], h + 2, pos[1]);
+                        geometries.push(s);
+                    });
+
+                    addStuds = false;
+                    break;
+                }
+
+                case 'corner_plate': {
+                    // L-shaped Plate
+                    const b1 = new THREE.BoxGeometry(UNIT_SIZE - gap, h, UNIT_SIZE * 3 - gap);
+                    b1.translate(-UNIT_SIZE, h / 2, 0);
+                    geometries.push(b1);
+
+                    const b2 = new THREE.BoxGeometry(UNIT_SIZE * 2 - gap, h, UNIT_SIZE - gap);
+                    b2.translate(UNIT_SIZE * 0.5, h / 2, -UNIT_SIZE);
+                    geometries.push(b2);
+
+                    addStuds = false;
+                    // Add studs later if needed, simple approximation for now
+                    const studGeo = new THREE.CylinderGeometry(3, 3, 4, 16);
+                    // Studs on b1 (1x3)
+                    for (let z = 0; z < 3; z++) {
+                        const s = studGeo.clone();
+                        s.translate(-UNIT_SIZE, h + 2, (z - 1) * UNIT_SIZE);
+                        geometries.push(s);
+                    }
+                    // Studs on b2 (2x1 extra part)
+                    for (let x = 0; x < 2; x++) {
+                        const s = studGeo.clone();
+                        s.translate(x * UNIT_SIZE, h + 2, -UNIT_SIZE);
+                        geometries.push(s);
+                    }
+
+                    break;
+                }
+
+                case 'technic_beam': {
+                    // Beam with holes
+                    mainGeo = new THREE.BoxGeometry(w - gap, h, d - gap);
+                    mainGeo.translate(0, h / 2, 0);
+                    // No studs on top usually, holes on side
+                    // Just render the box for now, technic is complex
+                    addStuds = false;
+                    break;
+                }
+
+                default: {
+                    // brick, plate, pillar
+                    mainGeo = new THREE.BoxGeometry(w - gap, h, d - gap);
+                    mainGeo.translate(0, h / 2, 0);
+                    break;
+                }
+            }
+
+            if (mainGeo) {
+                geometries.push(mainGeo);
+            }
+
+            // Add studs for applicable types
+            if (addStuds) {
+                const studGeo = new THREE.CylinderGeometry(3, 3, 4, 16);
+
+                if (type === 'round' || type === 'round_plate' || type === 'round_grooved') {
+                    const stud = studGeo.clone();
+                    stud.translate(0, h + 2, 0);
+                    geometries.push(stud);
+                } else {
+                    for (let i = 0; i < widthUnits; i++) {
+                        for (let j = 0; j < depthUnits; j++) {
+                            const stud = studGeo.clone();
+                            const x = (i * UNIT_SIZE) - (w / 2) + (UNIT_SIZE / 2);
+                            const z = (j * UNIT_SIZE) - (d / 2) + (UNIT_SIZE / 2);
+                            const y = h + 2;
+                            stud.translate(x, y, z);
+                            geometries.push(stud);
+                        }
+                    }
+                }
+            }
+
+            return mergeGeometries(geometries);
+        }
+
+        function updateRollOverMesh() {
+            if (rollOverMesh) scene.remove(rollOverMesh);
+
+            const geometry = createLegoGeometry(currentBrick.x, currentBrick.z, currentBrick.type, currentBrick.height);
+            rollOverMesh = new THREE.Mesh(geometry, rollOverMaterial);
+            rollOverMesh.rotation.y = (brickRotation * Math.PI) / 2;
+            scene.add(rollOverMesh);
+        }
+
+        function onPointerMove(event) {
+            pointer.set((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1);
+
+            raycaster.setFromCamera(pointer, camera);
+
+            const intersects = raycaster.intersectObjects(objects, false);
+
+            if (intersects.length > 0) {
+                const intersect = intersects[0];
+
+                if (isDeleteMode) {
+                    rollOverMesh.visible = false;
+                    document.body.style.cursor = 'no-drop';
+                    return;
+                }
+
+                rollOverMesh.visible = true;
+                document.body.style.cursor = 'crosshair';
+
+                const normal = intersect.face.normal;
+                const point = intersect.point;
+
+                const voxPos = new THREE.Vector3();
+
+                // Determine world dimensions based on rotation
+                const worldXUnits = (brickRotation % 2 === 0) ? currentBrick.x : currentBrick.z;
+                const worldZUnits = (brickRotation % 2 === 0) ? currentBrick.z : currentBrick.x;
+
+                // Snap X
+                if (worldXUnits % 2 === 0) {
+                    voxPos.x = Math.round(point.x / UNIT_SIZE) * UNIT_SIZE;
+                } else {
+                    voxPos.x = Math.floor(point.x / UNIT_SIZE) * UNIT_SIZE + UNIT_SIZE / 2;
+                }
+
+                // Snap Z
+                if (worldZUnits % 2 === 0) {
+                    voxPos.z = Math.round(point.z / UNIT_SIZE) * UNIT_SIZE;
+                } else {
+                    voxPos.z = Math.floor(point.z / UNIT_SIZE) * UNIT_SIZE + UNIT_SIZE / 2;
+                }
+
+                // Snap Y
+                if (intersect.object === plane) {
+                    voxPos.y = 0;
+                } else {
+                    if (Math.abs(normal.y) > 0.9) {
+                        // Top or bottom (stacking)
+                        // Snap to nearest Plate Height (8 units)
+                        voxPos.y = Math.round(point.y / PLATE_HEIGHT) * PLATE_HEIGHT;
+                    } else {
+                        // Side placement
+                        voxPos.y = intersect.object.position.y;
+                    }
+                }
+
+                rollOverMesh.position.copy(voxPos);
+            } else {
+                rollOverMesh.visible = false;
+            }
+        }
+
+        function onPointerDown(event) {
+            // Store start position to detect drag
+            lastPointerDown.x = event.clientX;
+            lastPointerDown.y = event.clientY;
+            isDragging = false;
+        }
+
+        // Add pointer up listener to handle click
+        document.addEventListener('pointerup', onPointerUp);
+
+        function onPointerUp(event) {
+            // Calculate distance moved
+            const dx = event.clientX - lastPointerDown.x;
+            const dy = event.clientY - lastPointerDown.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            // If moved more than 5 pixels, it's a drag (camera move), ignore click
+            if (dist > 5) {
+                isDragging = true;
+                return;
+            }
+
+            // Only left click (0) for placing
+            if (event.button !== 0) return;
+
+            // Ignore if clicking on UI
+            if (event.target.closest('.absolute')) return;
+
+            pointer.set((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1);
+            raycaster.setFromCamera(pointer, camera);
+            const intersects = raycaster.intersectObjects(objects, false);
+
+            if (intersects.length > 0) {
+                const intersect = intersects[0];
+
+                // Delete Mode logic
+                if (isDeleteMode || event.shiftKey) {
+                    if (intersect.object !== plane) {
+                        scene.remove(intersect.object);
+                        objects.splice(objects.indexOf(intersect.object), 1);
+                    }
+                    return;
+                }
+
+                // Build Mode Logic
+                if (rollOverMesh.visible) {
+                    // Handle transparent bricks
+                    let materialParams = {
+                        color: brickColor,
+                        roughness: 0.1,
+                        metalness: 0.05
+                    };
+
+                    if (currentBrick.type === 'windshield') {
+                        materialParams.transparent = true;
+                        materialParams.opacity = 0.6;
+                    }
+
+                    const material = new THREE.MeshStandardMaterial(materialParams);
+
+                    const geometry = createLegoGeometry(currentBrick.x, currentBrick.z, currentBrick.type, currentBrick.height);
+                    const brick = new THREE.Mesh(geometry, material);
+
+                    brick.position.copy(rollOverMesh.position);
+                    brick.rotation.y = rollOverMesh.rotation.y;
+
+                    // 저장을 위한 블록 정보 저장
+                    brick.userData.brick = {
+                        label: currentBrick.label,
+                        type: currentBrick.type,
+                        x: currentBrick.x,
+                        z: currentBrick.z,
+                        height: currentBrick.height
+                    };
+
+                    // Shadows
+                    brick.castShadow = true;
+                    brick.receiveShadow = true;
+
+                    scene.add(brick);
+                    objects.push(brick);
+                }
+            }
+        }
+
+        function onKeyDown(event) {
+            switch (event.code) {
+                case 'KeyR':
+                    rotateBrick();
+                    break;
+                case 'Escape':
+                    setDeleteMode(false);
+                    break;
+            }
+        }
+
+        function rotateBrick() {
+            brickRotation++;
+            updateRollOverMesh();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // UI Initialization
+        function initUI() {
+            // Color Palette
+            const palette = document.getElementById('color-palette');
+            colors.forEach(c => {
+                const btn = document.createElement('button');
+                btn.className = `${c.class} w-8 h-8 rounded-full shadow-sm hover:scale-110 transition ring-2 ring-offset-1 ring-transparent focus:outline-none`;
+                if (c.hex === brickColor) btn.classList.add('ring-blue-500');
+
+                btn.onclick = () => {
+                    brickColor = c.hex;
+                    rollOverMaterial.color.setHex(brickColor);
+                    // Reset rings
+                    Array.from(palette.children).forEach(child => child.classList.remove('ring-blue-500'));
+                    btn.classList.add('ring-blue-500');
+                };
+                palette.appendChild(btn);
+            });
+
+            // Brick Types with Accordion
+            const typeContainer = document.getElementById('brick-types');
+            let firstItem = null;
+
+            brickCategories.forEach((category, catIndex) => {
+                const details = document.createElement('details');
+                details.open = catIndex === 0; // Open first category by default
+
+                const summary = document.createElement('summary');
+                summary.innerText = category.name;
+                details.appendChild(summary);
+
+                const list = document.createElement('div');
+                list.className = 'flex flex-col gap-1';
+
+                category.items.forEach(t => {
+                    const item = document.createElement('div');
+                    item.className = 'brick-item';
+
+                    // Canvas Icon
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 60;
+                    canvas.height = 60;
+                    canvas.className = 'brick-icon';
+                    drawBrickIcon(canvas, t);
+
+                    const label = document.createElement('span');
+                    label.innerText = t.label;
+                    label.className = 'text-xs text-gray-700 font-medium';
+
+                    item.appendChild(canvas);
+                    item.appendChild(label);
+
+                    item.onclick = () => {
+                        currentBrick = t;
+                        updateRollOverMesh();
+                        // Visual selection feedback
+                        document.querySelectorAll('.brick-item').forEach(el => el.classList.remove('selected'));
+                        item.classList.add('selected');
+                    };
+
+                    if (!firstItem) firstItem = item;
+                    list.appendChild(item);
+                });
+
+                details.appendChild(list);
+                typeContainer.appendChild(details);
+            });
+
+            // Select default
+            if (firstItem) firstItem.click();
+
+            // Initialize default color ring
+            if (palette.children.length > 0) palette.children[0].classList.add('ring-blue-500');
+
+            // Buttons
+            document.getElementById('btn-rotate').onclick = rotateBrick;
+
+            const delBtn = document.getElementById('btn-delete-mode');
+            delBtn.onclick = () => {
+                setDeleteMode(!isDeleteMode);
+            };
+
+            document.getElementById('btn-clear').onclick = () => {
+                if (confirm('정말 모든 블록을 지우시겠습니까?')) {
+                    // Keep plane (index 0)
+                    for (let i = objects.length - 1; i > 0; i--) {
+                        scene.remove(objects[i]);
+                    }
+                    objects = [plane];
+                }
+            };
+
+            // 새로운 기능 초기화
+            initCustomColorPicker();
+            initCustomBlockCreator();
+            initSaveLoad();
+            initHelpToggle();
+        }
+
+        function drawBrickIcon(canvas, brick) {
+            const ctx = canvas.getContext('2d');
+            const w = canvas.width;
+            const h = canvas.height;
+            const padding = 10;
+
+            // Clear
+            ctx.clearRect(0, 0, w, h);
+
+            // Calculate scale
+            const maxUnits = Math.max(brick.x, brick.z);
+            const unitSize = (w - padding * 2) / (maxUnits + 0.5);
+
+            const brickW = brick.x * unitSize;
+            const brickH = brick.z * unitSize;
+
+            // Center
+            const startX = (w - brickW) / 2;
+            const startY = (h - brickH) / 2;
+
+            // Draw body
+            ctx.fillStyle = '#ddd';
+            ctx.strokeStyle = '#888';
+            ctx.lineWidth = 2;
+
+            if (brick.type.includes('round') || brick.type === 'cone' || brick.type === 'dome') {
+                // Circle
+                ctx.beginPath();
+                ctx.ellipse(w / 2, h / 2, brickW / 2, brickH / 2, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            } else {
+                // Rect
+                ctx.beginPath();
+                ctx.rect(startX, startY, brickW, brickH);
+                ctx.fill();
+                ctx.stroke();
+            }
+
+            // Draw studs
+            const studRadius = unitSize * 0.3;
+            ctx.fillStyle = '#bbb';
+            ctx.strokeStyle = '#666';
+            ctx.lineWidth = 1;
+
+            if (brick.type.includes('tile') || brick.type.includes('slope') || brick.type === 'roof') {
+                // No studs or limited studs (simplified: draw simple cross or gradient line)
+                if (brick.type.includes('slope')) {
+                    ctx.beginPath();
+                    ctx.moveTo(startX, startY + brickH);
+                    ctx.lineTo(startX + brickW, startY + brickH);
+                    ctx.lineTo(startX + brickW, startY + brickH * 0.3);
+                    ctx.stroke();
+                }
+            } else if (brick.type === 'wheel') {
+                ctx.fillStyle = '#333';
+                ctx.beginPath();
+                ctx.arc(w / 2, h / 2, brickW / 2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#bbb';
+                ctx.beginPath();
+                ctx.arc(w / 2, h / 2, brickW / 4, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                // Standard studs grid
+                for (let i = 0; i < brick.x; i++) {
+                    for (let j = 0; j < brick.z; j++) {
+                        const cx = startX + i * unitSize + unitSize / 2;
+                        const cy = startY + j * unitSize + unitSize / 2;
+
+                        ctx.beginPath();
+                        ctx.arc(cx, cy, studRadius, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+
+        function setDeleteMode(active) {
+            isDeleteMode = active;
+            const btn = document.getElementById('btn-delete-mode');
+            if (isDeleteMode) {
+                btn.classList.remove('bg-gray-200', 'text-gray-800');
+                btn.classList.add('bg-red-600', 'text-white', 'ring-2', 'ring-red-400', 'ring-offset-1');
+                btn.innerText = '삭제 중...';
+                rollOverMesh.visible = false;
+            } else {
+                btn.classList.add('bg-gray-200', 'text-gray-800');
+                btn.classList.remove('bg-red-600', 'text-white', 'ring-2', 'ring-red-400', 'ring-offset-1');
+                btn.innerText = '삭제 모드';
+                updateRollOverMesh();
+            }
+        }
+
+        // ===== 사용자 지정 색상 기능 =====
+        function initCustomColorPicker() {
+            const customColorPicker = document.getElementById('custom-color-picker');
+            const palette = document.getElementById('color-palette');
+
+            customColorPicker.addEventListener('input', (e) => {
+                const hexColor = e.target.value;
+                // Convert hex string to number
+                brickColor = parseInt(hexColor.replace('#', ''), 16);
+                rollOverMaterial.color.setHex(brickColor);
+
+                // Remove ring from all color buttons
+                Array.from(palette.querySelectorAll('button')).forEach(child => {
+                    child.classList.remove('ring-blue-500');
+                });
+
+                // Add ring to custom color picker container
+                customColorPicker.parentElement.classList.add('ring-blue-500');
+                customColorPicker.parentElement.classList.remove('ring-gray-200');
+            });
+
+            customColorPicker.addEventListener('change', (e) => {
+                const hexColor = e.target.value;
+                brickColor = parseInt(hexColor.replace('#', ''), 16);
+                rollOverMaterial.color.setHex(brickColor);
+            });
+        }
+
+        // ===== 커스텀 블록 생성 기능 =====
+        let customBrickCounter = 0;
+
+        function initCustomBlockCreator() {
+            const btnCreate = document.getElementById('btn-create-custom');
+
+            btnCreate.addEventListener('click', () => {
+                const xInput = document.getElementById('cust-x');
+                const zInput = document.getElementById('cust-z');
+                const hSelect = document.getElementById('cust-h');
+
+                const x = parseInt(xInput.value) || 2;
+                const z = parseInt(zInput.value) || 2;
+                const height = parseInt(hSelect.value) || 24;
+
+                // Clamp values
+                const clampedX = Math.max(1, Math.min(20, x));
+                const clampedZ = Math.max(1, Math.min(20, z));
+
+                // Determine type based on height
+                let type = 'brick';
+                let typeName = '벽돌';
+                if (height === 8) {
+                    type = 'plate';
+                    typeName = '플레이트';
+                } else if (height >= 48) {
+                    type = 'pillar';
+                    typeName = '기둥';
+                }
+
+                customBrickCounter++;
+                const newBrick = {
+                    label: `커스텀 ${typeName} ${clampedX}x${clampedZ} #${customBrickCounter}`,
+                    type: type,
+                    x: clampedX,
+                    z: clampedZ,
+                    height: height
+                };
+
+                // Add to the first category or create a custom category
+                addCustomBrickToUI(newBrick);
+
+                // Select the new brick
+                currentBrick = newBrick;
+                updateRollOverMesh();
+
+                // Show confirmation
+                btnCreate.innerText = '✓ 추가됨!';
+                btnCreate.classList.add('bg-green-200', 'text-green-800');
+                btnCreate.classList.remove('bg-indigo-100', 'text-indigo-800');
+
+                setTimeout(() => {
+                    btnCreate.innerText = '+ 목록에 추가';
+                    btnCreate.classList.remove('bg-green-200', 'text-green-800');
+                    btnCreate.classList.add('bg-indigo-100', 'text-indigo-800');
+                }, 1500);
+            });
+        }
+
+        function addCustomBrickToUI(brick) {
+            const typeContainer = document.getElementById('brick-types');
+
+            // Find or create custom category
+            let customDetails = document.getElementById('custom-bricks-category');
+
+            if (!customDetails) {
+                customDetails = document.createElement('details');
+                customDetails.id = 'custom-bricks-category';
+                customDetails.open = true;
+
+                const summary = document.createElement('summary');
+                summary.innerText = '⭐ 내 커스텀 블록';
+                customDetails.appendChild(summary);
+
+                const list = document.createElement('div');
+                list.className = 'flex flex-col gap-1';
+                list.id = 'custom-bricks-list';
+                customDetails.appendChild(list);
+
+                // Insert at the top
+                typeContainer.insertBefore(customDetails, typeContainer.firstChild);
+            }
+
+            const list = document.getElementById('custom-bricks-list');
+
+            const item = document.createElement('div');
+            item.className = 'brick-item';
+
+            // Canvas Icon
+            const canvas = document.createElement('canvas');
+            canvas.width = 60;
+            canvas.height = 60;
+            canvas.className = 'brick-icon';
+            drawBrickIcon(canvas, brick);
+
+            const label = document.createElement('span');
+            label.innerText = brick.label;
+            label.className = 'text-xs text-gray-700 font-medium';
+
+            item.appendChild(canvas);
+            item.appendChild(label);
+
+            item.onclick = () => {
+                currentBrick = brick;
+                updateRollOverMesh();
+                document.querySelectorAll('.brick-item').forEach(el => el.classList.remove('selected'));
+                item.classList.add('selected');
+            };
+
+            list.appendChild(item);
+
+            // Auto-select the new item
+            document.querySelectorAll('.brick-item').forEach(el => el.classList.remove('selected'));
+            item.classList.add('selected');
+        }
+
+        // ===== 저장/불러오기 기능 =====
+        function initSaveLoad() {
+            const btnSave = document.getElementById('btn-save');
+            const btnLoad = document.getElementById('btn-load');
+            const fileInput = document.getElementById('file-input');
+
+            // 저장 기능
+            btnSave.addEventListener('click', () => {
+                const saveData = {
+                    version: '1.0',
+                    timestamp: new Date().toISOString(),
+                    bricks: []
+                };
+
+                // Collect all bricks (skip plane at index 0)
+                for (let i = 1; i < objects.length; i++) {
+                    const obj = objects[i];
+                    const brickData = {
+                        position: {
+                            x: obj.position.x,
+                            y: obj.position.y,
+                            z: obj.position.z
+                        },
+                        rotation: obj.rotation.y,
+                        color: obj.material.color.getHex(),
+                        brick: obj.userData.brick || currentBrick
+                    };
+                    saveData.bricks.push(brickData);
+                }
+
+                // Download as JSON
+                const json = JSON.stringify(saveData, null, 2);
+                const blob = new Blob([json], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `lego-build-${Date.now()}.json`;
+                a.click();
+
+                URL.revokeObjectURL(url);
+
+                // Feedback
+                btnSave.innerText = '✓ 저장됨!';
+                setTimeout(() => {
+                    btnSave.innerText = '💾 저장';
+                }, 1500);
+            });
+
+            // 불러오기 버튼 클릭
+            btnLoad.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            // 파일 선택 시
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        loadBuildFromData(data);
+
+                        btnLoad.innerText = '✓ 불러옴!';
+                        setTimeout(() => {
+                            btnLoad.innerText = '📂 불러오기';
+                        }, 1500);
+                    } catch (err) {
+                        alert('파일을 읽는 중 오류가 발생했습니다: ' + err.message);
+                    }
+                };
+                reader.readAsText(file);
+
+                // Reset file input
+                fileInput.value = '';
+            });
+        }
+
+        function loadBuildFromData(data) {
+            // Clear existing bricks
+            for (let i = objects.length - 1; i > 0; i--) {
+                scene.remove(objects[i]);
+            }
+            objects = [plane];
+
+            // Rebuild from data
+            if (data.bricks && Array.isArray(data.bricks)) {
+                data.bricks.forEach(brickData => {
+                    const brick = brickData.brick;
+
+                    let materialParams = {
+                        color: brickData.color,
+                        roughness: 0.1,
+                        metalness: 0.05
+                    };
+
+                    if (brick.type === 'windshield') {
+                        materialParams.transparent = true;
+                        materialParams.opacity = 0.6;
+                    }
+
+                    const material = new THREE.MeshStandardMaterial(materialParams);
+                    const geometry = createLegoGeometry(brick.x, brick.z, brick.type, brick.height);
+                    const mesh = new THREE.Mesh(geometry, material);
+
+                    mesh.position.set(brickData.position.x, brickData.position.y, brickData.position.z);
+                    mesh.rotation.y = brickData.rotation;
+                    mesh.userData.brick = brick;
+
+                    mesh.castShadow = true;
+                    mesh.receiveShadow = true;
+
+                    scene.add(mesh);
+                    objects.push(mesh);
+                });
+            }
+        }
+
+        // ===== 도움말 토글 =====
+        function initHelpToggle() {
+            const btnHelp = document.getElementById('btn-help');
+            const controlsInfo = document.getElementById('controls-info');
+
+            btnHelp.addEventListener('click', () => {
+                controlsInfo.classList.toggle('hidden');
+            });
+        }
+
+    </script>
+</body>
+
+</html>

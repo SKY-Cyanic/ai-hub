@@ -9,16 +9,21 @@ export interface Transaction {
 
 export interface User {
   id: string;
-  username: string;
+  username: string;       // 로그인용 ID
+  nickname: string;       // 표시용 닉네임
   password?: string;
   second_password?: string;
   is_admin?: boolean;
   is_bot?: boolean;
+  is_guest?: boolean;
+  guest_expires_at?: number;
+  google_uid?: string;    // Google 계정 연동 시 UID
   avatar_url?: string;
   email?: string;
   level: number;
   exp: number;
   points: number;
+  credits: number;        // 크레딧 (실제 화폐 연동)
   inventory: string[];
   active_items: {
     name_color?: string;
@@ -179,8 +184,10 @@ export interface BalanceGame {
   question: string;
   option_a: string;
   option_b: string;
-  votes_a: number;
-  votes_b: number;
+  votes_a?: number;
+  votes_b?: number;
+  reward_exp?: number;
+  reward_points?: number;
 }
 
 export interface ShopItem {
