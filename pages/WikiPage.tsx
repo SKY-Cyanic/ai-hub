@@ -196,18 +196,32 @@ const WikiPage: React.FC = () => {
 
     if (!slug) {
         return (
-            <div className="space-y-6 w-full animate-fade-in">
-                {/* Header */}
-                <div className="bg-gradient-to-br from-indigo-900 via-indigo-800 to-purple-900 rounded-3xl p-6 md:p-8 text-white shadow-2xl relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-10 opacity-10"><Globe size={200} /></div>
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
-                        <div>
-                            <h1 className="text-3xl md:text-4xl font-black mb-2 flex items-center gap-3"><Book size={36} /> NEXUS WIKI</h1>
-                            <p className="text-indigo-200 text-sm md:text-base max-w-xl">AI-Hub의 집단지성 데이터베이스. 지식을 공유하고 탐험하세요.</p>
+            <div className="space-y-4 md:space-y-6 w-full animate-fade-in">
+                {/* Header - 나무위키 스타일 */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl md:rounded-3xl p-4 md:p-8 shadow-lg border border-gray-100 dark:border-gray-700">
+                    <div className="flex flex-col gap-4">
+                        <div className="flex items-center justify-between">
+                            <h1 className="text-xl md:text-3xl font-black text-gray-900 dark:text-white flex items-center gap-2">
+                                <Book size={24} className="text-indigo-600" /> NEXUS WIKI
+                            </h1>
+                            <button onClick={() => navigate(`/wiki/new-${Date.now()}`)} className="px-3 py-2 md:px-5 md:py-2.5 bg-indigo-600 text-white rounded-lg md:rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg flex items-center gap-2 text-xs md:text-sm">
+                                <Edit3 size={14} /> 새 문서
+                            </button>
                         </div>
-                        <button onClick={() => navigate(`/wiki/new-${Date.now()}`)} className="px-5 py-2.5 bg-white text-indigo-900 rounded-xl font-bold hover:bg-gray-100 transition-all shadow-lg flex items-center gap-2 text-sm">
-                            <Edit3 size={16} /> 새 문서
-                        </button>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm">지식을 공유하고 탐험하세요.</p>
+                        {/* 검색창 - 나무위키 스타일 */}
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="문서 검색..."
+                                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && (e.target as HTMLInputElement).value) {
+                                        navigate(`/wiki/${(e.target as HTMLInputElement).value}`);
+                                    }
+                                }}
+                            />
+                        </div>
                     </div>
                 </div>
 
@@ -239,8 +253,8 @@ const WikiPage: React.FC = () => {
                         </div>
                     </main>
 
-                    {/* Right: Sidebar (Graph + Status) */}
-                    <aside className="w-full lg:w-1/4 space-y-6 order-1 lg:order-2">
+                    {/* Right: Sidebar (Graph + Status) - 모바일에서 숨김 */}
+                    <aside className="hidden lg:block w-full lg:w-1/4 space-y-6">
                         <SystemStatus />
                         <div className="bg-slate-900 rounded-2xl p-1 shadow-xl overflow-hidden aspect-square border border-gray-700 relative group">
                             <div className="absolute top-2 left-2 z-10 bg-slate-800/80 text-white text-[10px] font-bold px-2 py-1 rounded backdrop-blur">KNOWLEDGE GRAPH</div>

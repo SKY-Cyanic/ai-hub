@@ -179,6 +179,40 @@ export interface AuctionItem {
   is_finished: boolean;
 }
 
+export interface Game {
+  id: string;
+  name: string;
+  subtitle: string;
+  description: string;
+  image: string;
+  tags: string[];
+  bgGradient: string;
+  accentColor: string;
+  iframeSrc: string;
+  price: number;
+  originalPrice?: number;
+  isFree?: boolean;
+  isFeatured?: boolean;
+  rating: number;
+  players: string;
+  author_id?: string; // 추가됨
+  created_at?: string; // 추가됨
+}
+
+export interface GameSubmission {
+  id: string;
+  submitter_id: string;
+  submitter_name: string;
+  type: 'idea' | 'game';
+  title: string;
+  description: string;
+  html_content?: string; // HTML 형식 게임 소스
+  status: 'pending' | 'approved' | 'rejected';
+  admin_feedback?: string;
+  created_at: string;
+}
+
+
 export interface BalanceGame {
   id: string;
   question: string;

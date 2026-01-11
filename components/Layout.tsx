@@ -12,6 +12,7 @@ import { storage } from '../services/storage';
 import LiveChat from './LiveChat';
 import VoiceNeuralLink from './VoiceNeuralLink';
 import { UserNickname, UserAvatar } from './UserEffect';
+import AdBanner from './AdBanner';
 
 // 모바일 사이드바 컴포넌트
 const MobileSidebar: React.FC<{
@@ -370,6 +371,7 @@ const Layout: React.FC = () => {
   const [isMobileUserOpen, setIsMobileUserOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isBoardExpanded, setIsBoardExpanded] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [megaphone, setMegaphone] = useState<{ text: string; author: string } | null>(null);
   const location = useLocation();
@@ -401,8 +403,8 @@ const Layout: React.FC = () => {
   const navItems = [
     { label: '홈', icon: <Home size={22} />, path: '/' },
     { label: '게시판', icon: <Menu size={22} />, path: '/board/free' },
+    { label: '게임', icon: <Gamepad2 size={22} />, path: '/game' },
     { label: '위키', icon: <BookOpen size={22} />, path: '/wiki' },
-    { label: '상점', icon: <ShoppingBag size={22} />, path: '/shop' },
     { label: '내 정보', icon: <UserIcon size={22} />, path: isMobileUserOpen ? '#' : null, onClick: () => setIsMobileUserOpen(true) },
   ];
 
@@ -438,9 +440,25 @@ const Layout: React.FC = () => {
               <Link to="/wiki" className={`flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-lg transition-all ${location.pathname.startsWith('/wiki') ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                 <BookOpen size={18} /> 위키
               </Link>
-              <Link to="/board/free" className={`flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-lg transition-all ${location.pathname.startsWith('/board') ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
-                <Menu size={18} /> 게시판
-              </Link>
+              {/* 게시판 아코디언 */}
+              <div>
+                <button
+                  onClick={() => setIsBoardExpanded(!isBoardExpanded)}
+                  className={`w-full flex items-center justify-between px-3 py-2 text-sm font-bold rounded-lg transition-all ${location.pathname.startsWith('/board') ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                >
+                  <span className="flex items-center gap-3"><Menu size={18} /> 게시판</span>
+                  <ChevronRight size={16} className={`transition-transform ${isBoardExpanded ? 'rotate-90' : ''}`} />
+                </button>
+                {isBoardExpanded && (
+                  <nav className="ml-4 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-3">
+                    {boards.map(board => (
+                      <Link key={board.id} to={`/board/${board.id}`} className={`flex items-center gap-2 px-2 py-1.5 text-xs font-medium rounded-md transition-all ${location.pathname === `/board/${board.id}` ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+                        <span>{board.emoji || '📝'}</span> {board.name}
+                      </Link>
+                    ))}
+                  </nav>
+                )}
+              </div>
               <Link to="/game" className={`flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-lg transition-all ${location.pathname === '/game' ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                 <Gamepad2 size={18} /> 게임
               </Link>
@@ -484,6 +502,15 @@ const Layout: React.FC = () => {
             <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden text-gray-500">
               <Menu size={24} />
             </button>
+            {/* 모바일 로고 */}
+            <Link to="/" className="md:hidden flex items-center gap-2 whitespace-nowrap">
+              <div className={`p-1.5 rounded-lg flex-shrink-0 ${isAiHubMode ? 'bg-cyan-500' : 'bg-indigo-600'}`}>
+                <Cpu className="text-white" size={16} />
+              </div>
+              <span className={`text-sm font-black tracking-tight ${isAiHubMode ? 'text-cyan-400' : 'text-gray-900 dark:text-white'}`}>
+                AI-HUB
+              </span>
+            </Link>
             <h1 className="text-lg font-bold dark:text-white hidden md:block">
               {location.pathname === '/' ? '대시보드' :
                 location.pathname.startsWith('/board') ? '커뮤니티' :
@@ -557,6 +584,11 @@ const Layout: React.FC = () => {
           )}
 
           <Outlet />
+
+          {/* 콘텐츠 하단 푸터 광고 */}
+          <div className="mt-8 mb-4">
+            <AdBanner slot="footer" />
+          </div>
         </main>
       </div>
 

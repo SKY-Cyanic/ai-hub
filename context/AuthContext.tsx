@@ -139,6 +139,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             avatar_url: avatarUrl || '',
             exp: 0,
             points: isAdmin ? 999999999 : points,
+            credits: 0,
             inventory: [],
             active_items: isAdmin ? { name_color: '#FF0000', name_style: 'bold', badge: '👑' } : { theme: 'standard' },
             blocked_users: [],
@@ -179,19 +180,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
 
             // 신규 사용자 생성
+            const isAdmin = googleUser.email === 'lech.skynic@gmail.com';
             const newUser: User = {
                 id: `user-${Date.now()}`,
                 username: `google_${googleUser.uid.slice(0, 8)}`,
                 nickname: googleUser.displayName || '구글 사용자',
                 google_uid: googleUser.uid,
-                is_admin: false,
-                level: 1,
+                is_admin: isAdmin,
+                level: isAdmin ? 999 : 1,
                 email: googleUser.email || '',
                 avatar_url: googleUser.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${googleUser.uid}`,
                 exp: 0,
-                points: 500,
+                points: isAdmin ? 1000000 : 500,
+                credits: 0,
                 inventory: [],
-                active_items: { theme: 'standard' },
+                active_items: isAdmin ? { name_color: '#FF0000', name_style: 'bold', badge: '👑' } : { theme: 'standard' },
                 blocked_users: [],
                 scrapped_posts: [],
                 achievements: [],
@@ -233,6 +236,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             level: 1,
             exp: 0,
             points: 100,
+            credits: 0,
             avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${Date.now()}`,
             inventory: [],
             active_items: { theme: 'standard' },

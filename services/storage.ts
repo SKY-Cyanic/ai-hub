@@ -5,7 +5,7 @@ import {
   query, where, orderBy, limit, addDoc, deleteDoc,
   onSnapshot, serverTimestamp, Timestamp, writeBatch
 } from "firebase/firestore";
-import { Post, Comment, Board, User, WikiPage, ChatMessage, AiLog, ShopItem, Notification, Conversation, PrivateMessage, Achievement, AuctionItem, BalanceGame, FactCheckReport } from '../types';
+import { Post, Comment, Board, User, WikiPage, ChatMessage, AiLog, ShopItem, Notification, Conversation, PrivateMessage, Achievement, AuctionItem, BalanceGame, FactCheckReport, GameSubmission } from '../types';
 
 export const NODE_GAS_FEE = 10;
 
@@ -980,5 +980,65 @@ export const storage = {
   // 크레딧 충전 (결제 연동용)
   chargeCredits: async (userId: string, amount: number, paymentMethod: string): Promise<boolean> => {
     return storage.updateUserCredits(userId, amount, `크레딧 충전 (${paymentMethod})`);
+  },
+
+  // ========== 게임 심사 시스템 (Phase 8) ==========
+
+  // 게임 제출 (아이디어 또는 HTML 게임)
+  submitGameSubmission: async (submission: Omit<GameSubmission, 'id' | 'status' | 'created_at'>): Promise<string | null> => {
+    try {
+      const id = `sub-${Date.now()}`;
+      const fullSubmission: GameSubmission = {
+        ...submission,
+        id,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      };
+      await setDoc(doc(db, "game_submissions", id), sanitize(fullSubmission));
+
+      // 관리자에게 알림 (옵션)
+      // await storage.sendNotification({ ... });
+
+      return id;
+    } catch (e) {
+      console.error('Submission error:', e);
+      return null;
+    }
+  },
+
+  // 심사 대기열 구독 (관리자용)
+  subscribeGameSubmissions: (callback: (submissions: GameSubmission[]) => void) => {
+    const q = query(collection(db, "game_submissions"), orderBy("created_at", "desc"));
+    return onSnapshot(q, (snapshot) => {
+      const submissions = snapshot.docs.map(doc => doc.data() as GameSubmission);
+      callback(submissions);
+    });
+  },
+
+  // 심사 상태 업데이트 (승인/거절)
+  updateGameSubmissionStatus: async (submissionId: string, status: 'approved' | 'rejected', feedback?: string): Promise<boolean> => {
+    try {
+      const subRef = doc(db, "game_submissions", submissionId);
+      const snap = await getDoc(subRef);
+      if (!snap.exists()) return false;
+
+      const submission = snap.data() as GameSubmission;
+      await updateDoc(subRef, { status, admin_feedback: feedback || '' });
+
+      // 승인 시 실제 게임 리스트에 추가 로직 (여기서는 목업 데이터만 사용하므로 알림만 전송)
+      // 실제로는 별도의 games 컬렉션에 추가해야 함.
+
+      await storage.sendNotification({
+        user_id: submission.submitter_id,
+        type: 'system',
+        message: `제출하신 게임 [${submission.title}]이(가) ${status === 'approved' ? '승인' : '거절'}되었습니다.`,
+        link: '/game'
+      });
+
+      return true;
+    } catch (e) {
+      console.error('Update submission status error:', e);
+      return false;
+    }
   },
 };
