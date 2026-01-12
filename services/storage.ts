@@ -5,7 +5,7 @@ import {
   query, where, orderBy, limit, addDoc, deleteDoc,
   onSnapshot, serverTimestamp, Timestamp, writeBatch
 } from "firebase/firestore";
-import { Post, Comment, Board, User, WikiPage, ChatMessage, AiLog, ShopItem, Notification, Conversation, PrivateMessage, Achievement, AuctionItem, BalanceGame, FactCheckReport, GameSubmission } from '../types';
+import { Post, Comment, Board, User, WikiPage, ChatMessage, AiLog, ShopItem, Notification, Conversation, PrivateMessage, Achievement, AuctionItem, BalanceGame, FactCheckReport, GameSubmission, Transaction, WikiHistoryItem } from '../types';
 
 export const NODE_GAS_FEE = 10;
 
@@ -20,23 +20,29 @@ const BALANCE_GAMES: BalanceGame[] = [
 ];
 
 export const SHOP_ITEMS: ShopItem[] = [
-  // --- Visual Effects (Phase 7.1) ---
-  { id: 'effect-rainbow', name: '🌈 무지개 닉네임', description: '닉네임이 RGB 컬러로 부드럽게 변하는 효과 (30일)', price: 1000, type: 'style', category: 'name', value: 'rainbow', icon: '🌈' },
-  { id: 'effect-glitch', name: '⚡ 글리치 효과', description: '닉네임과 아바타에 해커 감성 지직거림 부여', price: 2000, type: 'style', category: 'name', value: 'glitch', icon: '⚡' },
+  // --- Visual Effects & Branding ---
+  { id: 'effect-rainbow', name: '🌈 무지개 닉네임', description: '닉네임이 RGB 컬러로 변하는 효과 (7일)', price: 1000, type: 'style', category: 'name', value: 'rainbow', icon: '🌈', duration_days: 7 },
+  { id: 'effect-glitch', name: '⚡ 글리치 효과', description: '닉네임과 아바타에 지직거림 효과 부여', price: 2000, type: 'style', category: 'name', value: 'glitch', icon: '⚡' },
+  { id: 'item-title-pro', name: '🎓 전문가 칭호', description: '원하는 분야의 전문가 타이틀을 부여', price: 5000, type: 'custom_title', category: 'name', value: 'expert', icon: '🎓' },
 
   // --- Avatar Frames (Seasonal) ---
-  { id: 'frame-shell', name: '[시즌] 뉴비의 알껍질', description: '뉴비들을 위한 귀여운 알껍질 테두리', price: 500, type: 'frame', category: 'avatar', value: 'border-yellow-200 border-2 rounded-full border-dashed', icon: '🥚' },
-  { id: 'frame-laurel', name: '[시즌] 황금 월계관', description: '승리자의 상징인 황금 월계관 테두리', price: 5000, type: 'frame', category: 'avatar', value: 'border-yellow-500 border-4 shadow-[0_0_10px_gold] rounded-lg', icon: '🌿' },
-  { id: 'frame-cyber', name: '[시즌] 사이버펑크 네온', description: '강렬한 핑크-시안 네온 테두리', price: 3000, type: 'frame', category: 'avatar', value: 'border-pink-500 border-2 shadow-[0_0_15px_#ff00ff,#00ffff_inset]', icon: '🏙️' },
+  { id: 'frame-shell', name: '🥚 뉴비의 알껍질', description: '귀여운 알껍질 테두리', price: 500, type: 'frame', category: 'avatar', value: 'border-yellow-200 border-2 rounded-full border-dashed', icon: '🥚' },
+  { id: 'frame-laurel', name: '🌿 황금 월계관', description: '승리자의 상징인 황금 테두리', price: 5000, type: 'frame', category: 'avatar', value: 'border-yellow-500 border-4 shadow-[0_0_10px_gold] rounded-lg', icon: '🌿' },
+  { id: 'frame-cyber', name: '🏙️ 사이버펑크 네온', description: '핑크-시안 네온 테두리', price: 3000, type: 'frame', category: 'avatar', value: 'border-pink-500 border-2 shadow-[0_0_15px_#ff00ff,#00ffff_inset]', icon: '🏙️' },
 
-  // --- Utility Items ---
-  { id: 'item-megaphone', name: '📌 확성기', description: '전 서버 상단에 내 메시지를 공지 (2,000 CR)', price: 2000, type: 'badge', category: 'system', value: 'megaphone', icon: '📢' },
-  { id: 'item-shield', name: '🛡️ 1일 방어권', description: '신고로부터 경고 카운트를 1회 방어합니다.', price: 300, type: 'badge', category: 'system', value: 'shield', icon: '🛡️' },
-  { id: 'item-title', name: '📝 내 맘대로 타이틀', description: '닉네임 옆에 원하는 칭호를 직접 설정', price: 5000, type: 'badge', category: 'system', value: 'custom_title', icon: '🏷️' },
+  // --- Functional / Utility Items ---
+  { id: 'item-nick-change', name: '🆔 닉네임 변경권', description: '닉네임을 1회 변경할 수 있습니다.', price: 3000, type: 'utility', category: 'name', effect_type: 'nick_change', is_consumable: true, icon: '🆔' },
+  { id: 'item-ad-remove', name: '🚫 광고 제거 패스', description: '30일 동안 사이트 내 광고를 제거합니다.', price: 5000, type: 'utility', category: 'system', effect_type: 'ad_remove', duration_days: 30, icon: '🚫' },
+  { id: 'item-exp-boost', name: '🚀 경험치 부스트', description: '24시간 동안 획득 경험치가 2배가 됩니다.', price: 1500, type: 'utility', category: 'system', effect_type: 'exp_boost', is_consumable: true, duration_days: 1, icon: '🚀' },
+  { id: 'item-post-highlight', name: '✨ 게시글 강조권', description: '내 게시글 하나를 화려하게 강조합니다.', price: 1000, type: 'utility', category: 'system', effect_type: 'post_highlight', is_consumable: true, icon: '✨' },
+  { id: 'item-megaphone', name: '📢 전 서버 확성기', description: '상단 공지에 내 메시지를 노출합니다.', price: 2000, type: 'utility', category: 'system', icon: '📢', is_consumable: true, effect_type: 'megaphone' },
+  { id: 'item-shield', name: '🛡️ 경고 보호막', description: '신고로부터 경고 1회를 자동 방어합니다.', price: 500, type: 'utility', category: 'system', icon: '🛡️', is_consumable: true, effect_type: 'shield' },
+  { id: 'item-coupon', name: '🎫 상점 할인 쿠폰', description: '다음 아이템 구매 시 20% 할인 (1회용)', price: 300, type: 'utility', category: 'system', icon: '🎫', is_consumable: true, effect_type: 'coupon' },
 
-  // --- Mystery Box / Lottery (Phase 7.2) ---
-  { id: 'item-box', name: '📦 미스테리 박스', description: '랜덤한 보상이 들어있는 상자 (꽝도 있음!)', price: 100, type: 'badge', category: 'system', value: 'mystery_box', icon: '🎁' },
-  { id: 'item-lottery', name: '🎟️ 주간 복권', description: '매주 금요일 밤 10시 추첨! 팟 시스템 상금 독식', price: 50, type: 'badge', category: 'system', value: 'lottery_ticket', icon: '🎰' },
+  // --- Gamble & Misc ---
+  { id: 'item-box', name: '🎁 미스테리 박스', description: '랜덤한 보상이 들어있는 상자', price: 100, type: 'gamble', category: 'system', icon: '🎁', is_consumable: true, effect_type: 'mystery_box' },
+  { id: 'item-lottery', name: '🎰 주간 복권', description: '매주 금요일 밤 10시 추첨!', price: 50, type: 'gamble', category: 'system', icon: '🎰', is_consumable: true, effect_type: 'lottery' },
+  { id: 'item-reset', name: '🧹 기억 소거제', description: '위키 기여 기록을 초기화합니다.', price: 10000, type: 'utility', category: 'system', icon: '🧹', is_consumable: true, effect_type: 'wiki_reset' },
 ];
 
 export const ACHIEVEMENTS: Achievement[] = [
@@ -52,6 +58,10 @@ const LOCAL_POSTS_KEY = 'ai_hub_posts_v4';
 const LOCAL_COMMENTS_KEY = 'ai_hub_comments_v4';
 
 const sanitize = (data: any) => JSON.parse(JSON.stringify(data));
+const isEffectActive = (user: User, effectId: string): boolean => {
+  if (!user.expires_at || !user.expires_at[effectId]) return false;
+  return new Date(user.expires_at[effectId]) > new Date();
+};
 
 export const storage = {
   channel: new BroadcastChannel('ai_hub_sync'),
@@ -325,7 +335,16 @@ export const storage = {
     user.attendance_streak = streak;
     user.last_attendance_date = today;
     user.points += 10 + (Math.min(streak, 10) * 5); // 연속 출석 보너스
-    user.quests.daily_login = true;
+
+    // Reset Daily Quests (Phase 2.5)
+    user.quests = {
+      last_updated: today,
+      daily_login: true,
+      post_count: 0,
+      comment_count: 0,
+      balance_voted: false,
+      lucky_draw_today: false
+    };
 
     // 알림 전송
     await storage.sendNotification({
@@ -481,56 +500,41 @@ export const storage = {
     if (!item) return { success: false, message: '아이템을 찾을 수 없습니다.' };
 
     if (user.points < item.price) return { success: false, message: 'CR이 부족합니다.' };
-    if (user.inventory?.includes(itemId)) return { success: false, message: '이미 보유 중인 아이템입니다.' };
 
-    // Special logic for functional items
-    if (itemId === 'item-megaphone') {
-      const text = prompt('전 서버에 전달할 메시지를 입력하세요 (2,000 CR 차감):');
-      if (!text) return { success: false, message: '전송이 취소되었습니다.' };
-      return await storage.setMegaphoneMessage(userId, text);
+    // 중복 소유 체크 (소모품이 아닌 경우만)
+    if (!item.is_consumable && user.inventory?.includes(itemId)) {
+      return { success: false, message: '이미 보유 중인 아이템입니다.' };
     }
 
-    if (itemId === 'item-lottery') {
-      return await storage.buyLotteryTicket(userId);
-    }
-
-    if (itemId === 'item-title') {
-      const title = prompt('사용할 닉네임 칭호를 입력하세요:');
-      if (!title) return { success: false, message: '칭호를 입력해야 합니다.' };
-      user.active_items.custom_title = title;
-    }
-
-    // Deduct points and add to inventory
+    // 포인트 차감
     user.points -= item.price;
     if (!user.inventory) user.inventory = [];
     user.inventory.push(itemId);
 
-    // Apply immediate effects for visual items
-    if (item.type === 'color') user.active_items.name_color = item.value;
-    if (item.type === 'frame') user.active_items.frame = item.value;
-    if (item.type === 'badge') user.active_items.badge = item.value;
-    if (item.type === 'theme') user.active_items.theme = item.value;
+    // 즉시 적용 효과 (시각적 아이템들 중 기간제가 아닌 것들)
+    if (!item.is_consumable && !item.duration_days) {
+      if (item.type === 'color') user.active_items.name_color = item.value;
+      if (item.type === 'frame') user.active_items.frame = item.value;
+      if (item.type === 'badge') user.active_items.badge = item.value;
+      if (item.type === 'theme') user.active_items.theme = item.value;
+      if (item.type === 'custom_title') user.active_items.custom_title = item.value;
+    }
 
-    if (item.category === 'name' && (item.id.includes('effect'))) {
-      if (!user.active_items.special_effects) user.active_items.special_effects = [];
-      if (!user.active_items.special_effects.includes(item.value!)) {
-        user.active_items.special_effects.push(item.value!);
-      }
+    // 기간제 효과 설정
+    if (item.duration_days) {
+      if (!user.expires_at) user.expires_at = {};
+      const expiry = new Date();
+      expiry.setDate(expiry.getDate() + item.duration_days);
+      user.expires_at[itemId] = expiry.toISOString();
 
-      // Handle Expiration
-      if (itemId === 'effect-rainbow') {
-        if (!user.expires_at) user.expires_at = {};
-        const expiry = new Date();
-        expiry.setDate(expiry.getDate() + 7); // 7 day trial
-        user.expires_at[itemId] = expiry.toISOString();
+      // 시각적 효과 즉시 활성화
+      if (item.type === 'style' && item.value === 'rainbow') {
+        if (!user.active_items.special_effects) user.active_items.special_effects = [];
+        if (!user.active_items.special_effects.includes('rainbow')) user.active_items.special_effects.push('rainbow');
       }
     }
 
-    if (itemId === 'item-shield') {
-      user.shields = (user.shields || 0) + 1;
-    }
-
-    // Record Transaction
+    // 트랜잭션 기록
     if (!user.transactions) user.transactions = [];
     user.transactions.push({
       id: `tx-${Date.now()}`,
@@ -541,22 +545,156 @@ export const storage = {
     });
 
     await storage.saveUser(user);
-    return { success: true, message: '구매가 완료되었습니다.' };
+    return { success: true, message: `${item.name} 구매 완료! 인벤토리를 확인하세요.` };
   },
 
-  openMysteryBox: async (userId: string): Promise<{ success: boolean; message: string; type?: string }> => {
+  useItem: async (userId: string, itemId: string, payload?: any): Promise<{ success: boolean; message: string }> => {
     const user = storage.getUserByRawId(userId);
-    if (!user || user.points < 100) return { success: false, message: 'CR이 부족합니다.' };
+    const item = SHOP_ITEMS.find(i => i.id === itemId);
 
-    user.points -= 100;
-    if (!user.transactions) user.transactions = [];
-    user.transactions.push({
-      id: `tx-box-${Date.now()}`,
-      type: 'spend',
-      amount: 100,
-      description: '미스테리 박스 개봉',
-      created_at: new Date().toISOString()
-    });
+    if (!user || !user.inventory.includes(itemId)) {
+      return { success: false, message: '보유하지 않은 아이템입니다.' };
+    }
+    if (!item) return { success: false, message: '존재하지 않는 아이템입니다.' };
+
+    try {
+      // 아이템 효과별 처리
+      switch (item.effect_type) {
+        case 'nick_change':
+          if (!payload?.newNickname) return { success: false, message: '새 닉네임을 입력해주세요.' };
+
+          // 중복 체크 및 닉네임 변경 (Firestore)
+          const userRef = doc(db, "users", user.username);
+          await updateDoc(userRef, { nickname: payload.newNickname });
+
+          user.nickname = payload.newNickname;
+          // 세션 업데이트
+          if (storage.getSession()?.id === userId) {
+            const session = storage.getSession()!;
+            session.nickname = payload.newNickname;
+            storage.setSession(session);
+          }
+          break;
+
+        case 'exp_boost':
+          if (!user.expires_at) user.expires_at = {};
+          const expExpiry = new Date();
+          expExpiry.setHours(expExpiry.getHours() + 24);
+          user.expires_at['exp_boost'] = expExpiry.toISOString();
+          // 아이템 ID로도 저장 (isEffectActive 호환성)
+          user.expires_at[itemId] = expExpiry.toISOString();
+          break;
+
+        case 'mystery_box':
+          const boxRes = await storage.openMysteryBox(userId, false);
+          if (boxRes.success && item.is_consumable) {
+            const idx = user.inventory.indexOf(itemId);
+            if (idx > -1) user.inventory.splice(idx, 1);
+          }
+          await storage.saveUser(user);
+          return boxRes;
+
+        case 'ad_remove':
+          if (!user.expires_at) user.expires_at = {};
+          const adExpiry = new Date();
+          adExpiry.setDate(adExpiry.getDate() + 30);
+          user.expires_at['ad_remove'] = adExpiry.toISOString();
+          user.expires_at[itemId] = adExpiry.toISOString();
+          break;
+
+        case 'post_highlight':
+          if (!payload?.postId) return { success: false, message: '강조할 게시글을 선택해주세요.' };
+          const postRef = doc(db, "posts", payload.postId);
+          await updateDoc(postRef, { is_hot: true, style_effect: 'glow' });
+          break;
+
+        case 'megaphone':
+          // 확성기: 사이트 공지에 메시지 노출 (24시간)
+          if (!payload?.message) return { success: false, message: '공지할 메시지를 입력해주세요.' };
+          // TODO: 실제 공지 시스템 연동 필요
+          await storage.sendNotification({
+            user_id: 'system',
+            type: 'system',
+            message: `📢 [${user.nickname || user.username}] ${payload.message}`,
+            link: '/'
+          });
+          break;
+
+        case 'shield':
+          // 보호막: 사용자 shields +1
+          user.shields = (user.shields || 0) + 1;
+          break;
+
+        case 'coupon':
+          // 할인 쿠폰: 다음 구매 시 20% 할인 플래그 설정
+          if (!user.expires_at) user.expires_at = {};
+          const couponExpiry = new Date();
+          couponExpiry.setDate(couponExpiry.getDate() + 7); // 7일 내 사용
+          user.expires_at['discount_coupon'] = couponExpiry.toISOString();
+          break;
+
+        case 'lottery':
+          // 복권: 구매만 해도 인벤토리에 들어가는 것으로 충분 (추첨은 별도)
+          // 이미 구매 시점에 인벤토리에 추가됨
+          return { success: true, message: '복권 구매 완료! 금요일 밤 10시 추첨을 기다려주세요.' };
+
+        case 'wiki_reset':
+          // 위키 기여 초기화
+          user.wiki_contributions = 0;
+          break;
+
+        default:
+          // 시각적 아이템 장착 (인벤토리에서 장착/교체용 - 소모되지 않음)
+          if (item.type === 'color') user.active_items.name_color = item.value;
+          if (item.type === 'frame') user.active_items.frame = item.value;
+          if (item.type === 'badge') user.active_items.badge = item.value;
+          if (item.type === 'theme') user.active_items.theme = item.value;
+          if (item.type === 'custom_title') user.active_items.custom_title = item.value;
+          if (item.type === 'style' || item.type === 'special_effects') {
+            if (!user.active_items.special_effects) user.active_items.special_effects = [];
+            if (item.value && !user.active_items.special_effects.includes(item.value)) {
+              user.active_items.special_effects.push(item.value);
+            }
+          }
+
+          // 장착형 아이템은 저장 후 반환 (인벤토리에서 제거하지 않음)
+          await storage.saveUser(user);
+          return { success: true, message: `${item.name} 장착 완료!` };
+      }
+
+      // 소모성인 경우 인벤토리에서 제거
+      if (item.is_consumable) {
+        const idx = user.inventory.indexOf(itemId);
+        if (idx > -1) user.inventory.splice(idx, 1);
+      }
+
+      await storage.saveUser(user);
+      return { success: true, message: `${item.name} 사용 완료!` };
+    } catch (e) {
+      console.error('Use item error:', e);
+      return { success: false, message: '아이템 사용 중 오류가 발생했습니다.' };
+    }
+  },
+
+  openMysteryBox: async (userId: string, deductPoints: boolean = true): Promise<{ success: boolean; message: string; type?: string }> => {
+    const user = storage.getUserByRawId(userId);
+    if (!user) return { success: false, message: '사용자를 찾을 수 없습니다.' };
+
+    if (deductPoints) {
+      if (user.points < 100) return { success: false, message: 'CR이 부족합니다.' };
+      user.points -= 100;
+      if (!user.transactions) user.transactions = [];
+      user.transactions.push({
+        id: `tx-box-${Date.now()}`,
+        type: 'spend',
+        amount: 100,
+        description: '미스테리 박스 개봉',
+        created_at: new Date().toISOString()
+      });
+    }
+
+    // 아이템 효과 활성화 시 알림용
+    const isBoosting = isEffectActive(user, 'exp_boost');
 
     const rand = Math.random() * 100;
     let result = { success: true, message: '', type: 'fail' };
@@ -565,8 +703,9 @@ export const storage = {
       user.points += 10;
       result = { success: true, message: '꽝! (10 CR 보전됨)', type: 'fail' };
     } else if (rand < 90) {
-      user.points += 200;
-      result = { success: true, message: '대박! 200 CR 당첨!', type: 'jackpot' };
+      const winPoints = 200 + (Math.floor(Math.random() * 800)); // 200~1000 CR
+      user.points += winPoints;
+      result = { success: true, message: `대박! ${winPoints.toLocaleString()} CR 당첨!`, type: 'jackpot' };
     } else if (rand < 99) {
       const rareBadge = '💎';
       user.active_items.badge = rareBadge;
@@ -657,7 +796,62 @@ export const storage = {
     return [];
   },
 
-  saveWikiPage: async (page: WikiPage) => { try { await setDoc(doc(db, "wiki", page.slug), sanitize(page)); } catch (e) { } },
+  saveWikiPage: async (page: WikiPage): Promise<boolean> => {
+    try {
+      const docRef = doc(db, "wiki", page.slug);
+      const snap = await getDoc(docRef);
+
+      let existingPage: WikiPage | null = null;
+      if (snap.exists()) {
+        existingPage = snap.data() as WikiPage;
+      }
+
+      // 1. History Management (Keep last 20)
+      const historyItem: WikiHistoryItem = {
+        id: `hist-${Date.now()}`,
+        timestamp: page.last_updated,
+        editor_id: page.last_editor_id || 'unknown',
+        editor_name: page.last_editor,
+        content_preview: page.content.substring(0, 100).replace(/\n/g, ' ') + '...'
+      };
+
+      const newHistory = [historyItem, ...(existingPage?.history || [])].slice(0, 20);
+
+      // 2. Contributor Tracking
+      const contributors = existingPage?.contributors || {};
+      if (page.last_editor_id) {
+        contributors[page.last_editor_id] = (contributors[page.last_editor_id] || 0) + 1;
+      }
+
+      const finalPage = {
+        ...page,
+        history: newHistory,
+        contributors
+      };
+
+      await setDoc(docRef, sanitize(finalPage));
+
+      // 3. Reward System (50 CR for contributing + contribution count)
+      if (page.last_editor_id) {
+        await storage.givePoints(page.last_editor_id, 50, `위키 문서 편집 공헌: ${page.title}`);
+
+        // Update user's total wiki contribution count
+        const userRef = doc(db, "users", page.last_editor_id);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          await setDoc(userRef, {
+            wiki_contributions: (userData.wiki_contributions || 0) + 1
+          }, { merge: true });
+        }
+      }
+
+      return true;
+    } catch (e) {
+      console.error('Save wiki error:', e);
+      return false;
+    }
+  },
 
   getChatMessages: (): ChatMessage[] => { const m = localStorage.getItem('ai_hub_chat_messages'); return m ? JSON.parse(m) : []; },
 
@@ -810,8 +1004,13 @@ export const storage = {
     if (user.quests.balance_voted) return false;
 
     user.quests.balance_voted = true;
+
+    // 경험치 부스트 체크
+    const hasExpBoost = isEffectActive(user, 'exp_boost') || isEffectActive(user, 'item-exp-boost');
+    const expGain = hasExpBoost ? 20 : 10;
+
     user.points += 5;
-    user.exp += 10;
+    user.exp += expGain;
 
     // Add transaction log
     if (!user.transactions) user.transactions = [];
@@ -1041,4 +1240,176 @@ export const storage = {
       return false;
     }
   },
+
+  // 통합 검색 (Phase 8.1)
+  integratedSearch: async (keyword: string): Promise<{
+    posts: Post[],
+    wiki: WikiPage[],
+    shop: ShopItem[]
+  }> => {
+    const term = keyword.toLowerCase().trim();
+    if (!term) return { posts: [], wiki: [], shop: [] };
+
+    // 1. 게시판 검색 (Firestore)
+    const postsQuery = query(
+      collection(db, "posts"),
+      orderBy("created_at", "desc"),
+      limit(20)
+    );
+    const postsSnap = await getDocs(postsQuery);
+    const allPosts = postsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Post));
+    const filteredPosts = allPosts.filter(p =>
+      p.title.toLowerCase().includes(term) ||
+      p.content.toLowerCase().includes(term)
+    );
+
+    // 2. 위키 검색 (Firestore)
+    const wikiQuery = collection(db, "wiki_pages");
+    const wikiSnap = await getDocs(wikiQuery);
+    const allWiki = wikiSnap.docs.map(doc => doc.data() as WikiPage);
+    const filteredWiki = allWiki.filter(w =>
+      w.title.toLowerCase().includes(term) ||
+      w.content.toLowerCase().includes(term)
+    );
+
+    // 3. 상점 검색 (Local Constant)
+    const filteredShop = SHOP_ITEMS.filter(item =>
+      item.name.toLowerCase().includes(term) ||
+      item.description.toLowerCase().includes(term)
+    );
+
+    return {
+      posts: filteredPosts,
+      wiki: filteredWiki,
+      shop: filteredShop
+    };
+  },
+
+  givePoints: async (userId: string, amount: number, description: string): Promise<boolean> => {
+    try {
+      // Find user by ID first to get their username (doc ID)
+      const user = storage.getUserByRawId(userId);
+      if (!user) return false;
+
+      const userRef = doc(db, "users", user.username);
+      const userSnap = await getDoc(userRef);
+      if (!userSnap.exists()) return false;
+
+      const userData = userSnap.data() as User;
+      const newPoints = (userData.points || 0) + amount;
+
+      const transaction: Transaction = {
+        id: `tr-${Date.now()}`,
+        type: amount > 0 ? 'earn' : 'spend',
+        amount: Math.abs(amount),
+        description,
+        created_at: new Date().toISOString()
+      };
+
+      const updatedQuests = {
+        ...(userData.quests || {
+          last_updated: '',
+          daily_login: false,
+          post_count: 0,
+          comment_count: 0,
+          balance_voted: false
+        }),
+        lucky_draw_today: true,
+        last_updated: new Date().toISOString()
+      };
+
+      await updateDoc(userRef, {
+        points: newPoints,
+        transactions: [transaction, ...(userData.transactions || [])].slice(0, 50),
+        quests: updatedQuests
+      });
+
+      // 1. Update Current Session (Important for UI reactive updates)
+      const currentSession = storage.getSession();
+      if (currentSession && currentSession.id === userId) {
+        currentSession.points = newPoints;
+        if (!currentSession.quests) currentSession.quests = { last_updated: '', daily_login: false, post_count: 0, comment_count: 0, balance_voted: false };
+        currentSession.quests.lucky_draw_today = true;
+        storage.setSession(currentSession);
+      }
+
+      // 2. Update Local Users Cache
+      const users = storage.getUsers();
+      const idx = users.findIndex(u => u.id === userId);
+      if (idx !== -1) {
+        users[idx].points = newPoints;
+        if (!users[idx].quests) users[idx].quests = { last_updated: '', daily_login: false, post_count: 0, comment_count: 0, balance_voted: false };
+        users[idx].quests.lucky_draw_today = true;
+        localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
+      }
+
+      return true;
+    } catch (e) {
+      console.error('Give points error:', e);
+      return false;
+    }
+  },
+
+  // 사이트 타임라인 (Phase 8.2)
+  logActivity: async (activity: {
+    type: 'post' | 'comment' | 'wiki' | 'shop' | 'system',
+    user_id: string,
+    user_name: string,
+    content: string,
+    link: string
+  }) => {
+    try {
+      const id = `act-${Date.now()}`;
+      await setDoc(doc(db, "site_activities", id), sanitize({
+        ...activity,
+        id,
+        created_at: new Date().toISOString()
+      }));
+    } catch (e) {
+      console.error('Log activity error:', e);
+    }
+  },
+
+  subscribeTimeline: (callback: (activities: any[]) => void) => {
+    const q = query(
+      collection(db, "site_activities"),
+      orderBy("created_at", "desc"),
+      limit(30)
+    );
+    return onSnapshot(q, (snapshot) => {
+      callback(snapshot.docs.map(doc => doc.data()));
+    });
+  },
+
+  getWikiTopContributors: async (limitCount: number = 5): Promise<User[]> => {
+    try {
+      const q = query(
+        collection(db, "users"),
+        where("wiki_contributions", ">", 0),
+        orderBy("wiki_contributions", "desc"),
+        limit(limitCount)
+      );
+      const snap = await getDocs(q);
+      return snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
+    } catch (e) {
+      console.error('Get top contributors error:', e);
+      return [];
+    }
+  },
+
+  getWikiStubs: async (limitCount: number = 5): Promise<WikiPage[]> => {
+    try {
+      const q = query(
+        collection(db, "wiki"),
+        orderBy("last_updated", "desc"),
+        limit(20)
+      );
+      const snap = await getDocs(q);
+      const pages = snap.docs.map(doc => doc.data() as WikiPage);
+      return pages.filter(p => (p.content || '').length < 300).slice(0, limitCount);
+    } catch (e) {
+      console.error('Get stubs error:', e);
+      return [];
+    }
+  }
 };

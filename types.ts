@@ -11,9 +11,11 @@ export interface User {
   id: string;
   username: string;       // 로그인용 ID
   nickname: string;       // 표시용 닉네임
+  created_at?: string;     // 계정 생성일
   password?: string;
   second_password?: string;
   is_admin?: boolean;
+  wiki_contributions?: number; // 위키편집 기여 횟수
   is_bot?: boolean;
   is_guest?: boolean;
   guest_expires_at?: number;
@@ -49,6 +51,7 @@ export interface User {
     post_count: number;
     comment_count: number;
     balance_voted: boolean;
+    lucky_draw_today?: boolean;
   };
   referral_code: string;
   invited_by?: string;
@@ -78,6 +81,7 @@ export interface Board {
   id: string;
   slug: string;
   name: string;
+  emoji?: string;
   description?: string;
   categories?: string[];
   required_achievement?: string; // 접근 제한 조건
@@ -107,6 +111,7 @@ export interface Post {
   tags?: string[]; // Hashtags
   is_pinned?: boolean; // Admin can pin posts
   ai_agent_type?: 'news' | 'reddit' | 'wiki';
+  style_effect?: 'glow' | 'neon' | 'standard';
 }
 
 export interface Profile {
@@ -233,6 +238,18 @@ export interface ShopItem {
   category: 'avatar' | 'name' | 'system';
   value?: string;
   icon: string;
+  is_consumable?: boolean; // 사용 시 인벤토리에서 사라짐
+  duration_days?: number; // 기간제 아이템 (7일, 30일 등)
+  effect_type?: 'nick_change' | 'ad_remove' | 'post_highlight' | 'exp_boost' | 'mystery_box' | 'megaphone' | 'shield' | 'coupon' | 'lottery' | 'wiki_reset';
+}
+
+export interface WikiHistoryItem {
+  id: string;
+  timestamp: string;
+  editor_id: string;
+  editor_name: string;
+  summary?: string;
+  content_preview: string;
 }
 
 export interface WikiPage {
@@ -241,8 +258,12 @@ export interface WikiPage {
   content: string;
   last_updated: string;
   last_editor: string;
+  last_editor_id?: string;
   external_url?: string;
   is_external?: boolean;
+  history?: WikiHistoryItem[];
+  discussion_id?: string;
+  contributors?: { [userId: string]: number }; // userId: editCount
 }
 
 export interface ChatMessage {

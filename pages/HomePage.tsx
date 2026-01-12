@@ -9,14 +9,51 @@ import { Link } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import TrendingWidget from '../components/TrendingWidget';
+import LeaderboardWidget from '../components/LeaderboardWidget';
+import LuckyDrawWidget from '../components/LuckyDrawWidget';
 
 const HomePage: React.FC = () => {
   const [hotPosts, setHotPosts] = useState<Post[]>([]);
   const [newPosts, setNewPosts] = useState<Post[]>([]);
   const [balance, setBalance] = useState<BalanceGame | null>(null);
   const [previousBalance, setPreviousBalance] = useState<BalanceGame | null>(null);
+  const [currentSlide, setCurrentSlide] = useState(0);
   const { isAiHubMode } = useTheme();
   const { user } = useAuth();
+
+  const slides = [
+    {
+      title: "차세대 지식 공유 노드\nAI-HUB에 접속 중입니다",
+      subtitle: "Neural Core Active",
+      image: "/ai_hub_hero_banner_1767869792651.png",
+      badge: "SYSTEM ONLINE",
+      link: "/board/free",
+      btnText: "메인 광장 입장"
+    },
+    {
+      title: "지식의 한계를 넘어서는\nNEXUS WIKI v2.0",
+      subtitle: "Knowledge Synthesis",
+      image: "/nexus_wiki_v2_banner.png",
+      badge: "NEW UPDATE",
+      link: "/wiki",
+      btnText: "위키 지식베이스"
+    },
+    {
+      title: "활동 포인트를 모아\n유니크 레어 템을 획득하세요",
+      subtitle: "Credit Economy",
+      image: "/ai_hub_shop_banner.png",
+      badge: "AWARD SYSTEM",
+      link: "/shop",
+      btnText: "아이템 마켓"
+    }
+  ];
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide(prev => (prev + 1) % slides.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [slides.length]);
 
   useEffect(() => {
     api.getPosts(undefined, 1).then(posts => {
@@ -40,34 +77,52 @@ const HomePage: React.FC = () => {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Hero Section */}
-      <div
-        className="relative overflow-hidden rounded-3xl p-6 md:p-10 text-white shadow-2xl transition-all duration-700 border border-white/10"
-        style={{
-          backgroundImage: `url('/ai_hub_hero_banner_1767869792651.png')`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center'
-        }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent"></div>
-        <div className="relative z-10">
-          <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider mb-4 ${isAiHubMode ? 'bg-cyan-500 text-black' : 'bg-white/20 backdrop-blur-md'
-            }`}>
-            <Zap size={10} fill="currentColor" /> Neural Core Active
+      {/* Hero Slider Section (Phase 2.4) */}
+      <div className="relative overflow-hidden rounded-3xl h-[280px] md:h-[350px] shadow-2xl border border-white/10 group">
+        {slides.map((slide, idx) => (
+          <div
+            key={idx}
+            className={`absolute inset-0 transition-all duration-1000 ease-in-out ${idx === currentSlide ? 'opacity-100 scale-100' : 'opacity-0 scale-105 pointer-events-none'
+              }`}
+            style={{
+              backgroundImage: `url('${slide.image}')`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center'
+            }}
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent"></div>
+            <div className="relative z-10 p-6 md:p-12 h-full flex flex-col justify-center">
+              <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.2em] mb-4 ${isAiHubMode ? 'bg-cyan-500 text-black' : 'bg-white/20 backdrop-blur-md text-white'
+                }`}>
+                <Zap size={10} fill="currentColor" /> {slide.badge}
+              </div>
+              <h1 className="text-2xl md:text-5xl font-black mb-4 leading-tight tracking-tighter text-white whitespace-pre-line">
+                {slide.title}
+              </h1>
+              <p className="text-gray-300 text-sm font-medium mb-8 opacity-80">{slide.subtitle}</p>
+              <div className="flex flex-wrap gap-2">
+                <Link to={slide.link} className={`px-6 py-3 rounded-2xl text-xs font-black transition-all active:scale-95 shadow-xl ${isAiHubMode ? 'bg-cyan-500 text-black' : 'bg-white text-indigo-700 hover:bg-indigo-50'
+                  }`}>
+                  {slide.btnText}
+                </Link>
+                <Link to="/tools" className="bg-black/40 backdrop-blur-md border border-white/10 px-6 py-3 rounded-2xl text-xs font-black text-white hover:bg-black/50 transition-all active:scale-95">
+                  SYSTEM TOOLS
+                </Link>
+              </div>
+            </div>
           </div>
-          <h1 className="text-2xl md:text-4xl font-black mb-3 leading-tight tracking-tight">
-            차세대 지식 공유 노드<br />
-            AI-HUB에 접속 중입니다
-          </h1>
-          <div className="flex flex-wrap gap-2 mt-6">
-            <Link to="/board/free" className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 shadow-lg ${isAiHubMode ? 'bg-cyan-500 text-black' : 'bg-white text-indigo-700 hover:bg-indigo-50'
-              }`}>
-              메인 광장 입장
-            </Link>
-            <Link to="/shop" className="bg-black/20 backdrop-blur-md border border-white/10 px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-black/30 transition-all active:scale-95">
-              아이템 마켓
-            </Link>
-          </div>
+        ))}
+
+        {/* Slider Indicators */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+          {slides.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => setCurrentSlide(idx)}
+              className={`h-1 rounded-full transition-all ${idx === currentSlide ? 'w-8 bg-white' : 'w-2 bg-white/30'
+                }`}
+            />
+          ))}
         </div>
       </div>
 
@@ -100,20 +155,9 @@ const HomePage: React.FC = () => {
         </div>
 
         <aside className="space-y-6">
-          {/* Attendance Tracking (Top Priority) */}
-          {user && (
-            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 dark:from-gray-900 dark:to-black p-5 rounded-3xl text-white shadow-xl border border-white/10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/20 dark:bg-orange-500/20 rounded-2xl flex items-center justify-center">
-                  <Flame size={20} className="text-yellow-300 dark:text-orange-500" fill="currentColor" />
-                </div>
-                <div>
-                  <div className="text-[10px] text-indigo-100 dark:text-gray-500 uppercase font-black">Current Streak</div>
-                  <div className="text-xl font-black">{user.attendance_streak} DAYS</div>
-                </div>
-              </div>
-            </div>
-          )}
+          {/* Daily Features (Phase 2.2, 2.3) */}
+          <LuckyDrawWidget />
+          <LeaderboardWidget />
 
           {/* System Status / Notice */}
           <div className="bg-white dark:bg-gray-800 rounded-3xl p-5 shadow-xl border border-gray-100 dark:border-gray-700">

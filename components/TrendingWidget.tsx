@@ -27,8 +27,26 @@ const TrendingWidget: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 p-5 shadow-sm">
             <h3 className="font-bold text-gray-700 dark:text-gray-200 mb-4 flex items-center gap-2 text-sm">
                 <Flame className={isAiHubMode ? 'text-cyan-400' : 'text-orange-500'} size={18} />
-                실시간 인기글
+                Neural Trends
             </h3>
+
+            {/* Trending Keywords (Phase 2.1) */}
+            <div className="flex flex-wrap gap-1.5 mb-6">
+                {['#GPT-4o', '#AI영상', '#코딩비서', '#특이점', '#신형모델'].map((tag, idx) => (
+                    <Link
+                        key={tag}
+                        to={`/search?q=${tag.replace('#', '')}`}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${idx === 0
+                                ? (isAiHubMode ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-400/30' : 'bg-indigo-100 text-indigo-700')
+                                : 'bg-gray-50 dark:bg-gray-800 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 border border-transparent'
+                            }`}
+                    >
+                        {tag}
+                    </Link>
+                ))}
+            </div>
+
+            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 px-1">Top Access Nodes</h4>
             <div className="space-y-2">
                 {hotPosts.length === 0 ? (
                     <p className="text-gray-400 text-xs">아직 인기글이 없습니다.</p>

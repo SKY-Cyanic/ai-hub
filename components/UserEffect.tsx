@@ -1,19 +1,21 @@
 import React from 'react';
 import { Profile } from '../types';
 import { BadgeCheck, Shield } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface UserNicknameProps {
     profile: Profile;
     className?: string;
+    linkToProfile?: boolean;
 }
 
-export const UserNickname: React.FC<UserNicknameProps> = ({ profile, className = "" }) => {
+export const UserNickname: React.FC<UserNicknameProps> = ({ profile, className = "", linkToProfile = true }) => {
     const isRainbow = profile.active_items?.special_effects?.includes('rainbow');
     const isGlitch = profile.active_items?.special_effects?.includes('glitch');
     const displayName = (profile as any).nickname || profile.username;
 
-    return (
-        <span className={`inline-flex items-center gap-1 ${className}`}>
+    const content = (
+        <span className={`inline-flex items-center gap-1 ${className} ${linkToProfile ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}>
             {profile.active_items?.custom_title && (
                 <span className="text-[10px] font-black text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded uppercase tracking-tighter mr-1">
                     {profile.active_items.custom_title}
@@ -31,15 +33,21 @@ export const UserNickname: React.FC<UserNicknameProps> = ({ profile, className =
             </span>
         </span>
     );
+
+    if (linkToProfile && profile.username) {
+        return <Link to={`/profile/${profile.username}`} className="no-underline">{content}</Link>;
+    }
+    return content;
 };
 
 interface UserAvatarProps {
     profile: Profile;
     size?: 'sm' | 'md' | 'lg' | 'xl';
     className?: string;
+    linkToProfile?: boolean;
 }
 
-export const UserAvatar: React.FC<UserAvatarProps> = ({ profile, size = 'md', className = "" }) => {
+export const UserAvatar: React.FC<UserAvatarProps> = ({ profile, size = 'md', className = "", linkToProfile = true }) => {
     const isGlitch = profile.active_items?.special_effects?.includes('glitch');
     const frameClass = profile.active_items?.frame || "";
 
@@ -50,8 +58,8 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({ profile, size = 'md', cl
         xl: 'w-24 h-24'
     };
 
-    return (
-        <div className={`relative inline-block ${className}`}>
+    const content = (
+        <div className={`relative inline-block ${className} ${linkToProfile ? 'cursor-pointer' : ''}`}>
             <div className={`
                 ${sizeMap[size]} 
                 relative overflow-hidden
@@ -73,7 +81,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({ profile, size = 'md', cl
                 )}
             </div>
 
-            {/* Online Status or Shield */}
+            {/* Shield Badge */}
             {profile.shields && profile.shields > 0 && (
                 <div className="absolute -top-1 -right-1 bg-blue-500 text-white p-1 rounded-full border-2 border-white dark:border-gray-900 shadow-lg animate-bounce-subtle">
                     <Shield size={size === 'sm' ? 8 : 12} fill="currentColor" />
@@ -87,4 +95,9 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({ profile, size = 'md', cl
             )}
         </div>
     );
+
+    if (linkToProfile && profile.username) {
+        return <Link to={`/profile/${profile.username}`}>{content}</Link>;
+    }
+    return content;
 };

@@ -198,6 +198,17 @@ const WritePage: React.FC = () => {
       }
 
       if (success) {
+        // 활동 기록 (Phase 8.2)
+        if (!isEditMode) {
+          storage.logActivity({
+            type: 'post',
+            user_id: user.id,
+            user_name: user.nickname,
+            content: `새 게시글 [${title}]을(를) 작성했습니다.`,
+            link: `/board/${boardId}`
+          });
+        }
+
         localStorage.removeItem(DRAFT_KEY); // Clear draft
         if (!isEditMode) refreshUser();
         navigate(`/board/${boardId}`);

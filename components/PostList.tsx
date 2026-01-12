@@ -75,7 +75,15 @@ const PostList: React.FC<PostListProps> = ({ posts: initialPosts, boardSlug }) =
           <div className="py-20 text-center text-gray-400 text-xs uppercase tracking-widest font-mono">No data found in this node</div>
         ) : (
           paginatedPosts.map((post) => (
-            <div key={post.id} className="border-b border-gray-50 dark:border-gray-700/50 hover:bg-gray-50/50 dark:hover:bg-gray-700/20 transition-all active:bg-gray-100">
+            <div
+              key={post.id}
+              className={`
+                border-b border-gray-50 dark:border-gray-700/50 
+                hover:bg-gray-50/50 dark:hover:bg-gray-700/20 
+                transition-all active:bg-gray-100 
+                ${post.style_effect === 'glow' ? 'post-glow' : ''}
+              `}
+            >
               <Link to={`/board/${boardSlug}/${post.id}`} className="block p-3.5">
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-start justify-between gap-3">

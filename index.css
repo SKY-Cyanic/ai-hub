@@ -140,3 +140,31 @@ body {
   text-shadow: -2px 0 #00fff9, 2px 2px #ff00c1;
   animation: glitch 10s infinite linear alternate-reverse;
 }
+
+/* UI/UX 개선: 텍스트 유연성 및 넘침 방지 */
+.text-flexible-container {
+  container-type: inline-size;
+  width: 100%;
+}
+
+@container (max-width: 200px) {
+  .text-auto-resize {
+    font-size: clamp(0.7rem, 4cqw, 1rem);
+  }
+}
+
+.text-truncate-px {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hover-slide {
+  transition: transform 0.3s ease;
+}
+
+.hover-slide:hover {
+  transform: translateX(4px);
+}

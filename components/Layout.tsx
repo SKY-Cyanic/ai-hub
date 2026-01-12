@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Board, User, Notification } from '../types';
+import { Board, User, Notification, Post, WikiPage, ShopItem } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import {
   Menu, User as UserIcon, LogOut, PenTool, Moon, Sun,
   BookOpen, Cpu, Sparkles, Home, ShoppingBag, Gamepad2,
-  ChevronRight, Bell, Zap, Lock, Search, BarChart2, RefreshCw
+  ChevronRight, Bell, Zap, Lock, Search, BarChart2, RefreshCw, X
 } from 'lucide-react';
 import { storage } from '../services/storage';
 import LiveChat from './LiveChat';
@@ -202,11 +202,13 @@ const UserSection: React.FC<any> = ({
         <div className="space-y-4">
           <div className="flex items-center gap-4">
             <UserAvatar profile={user as any} size="lg" />
-            <div className="flex-1 overflow-hidden">
-              <UserNickname profile={user as any} className="text-lg" />
+            <div className="flex-1 overflow-hidden text-flexible-container">
+              <div className="text-auto-resize">
+                <UserNickname profile={user as any} className="text-lg" />
+              </div>
               <div className="flex items-center gap-2 text-[10px] font-bold text-gray-500 uppercase tracking-tighter">
-                <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">LV. {user.level}</span>
-                <span className={`${isAiHubMode ? 'text-cyan-400' : 'text-indigo-500'}`}>{user.points.toLocaleString()} CR</span>
+                <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded flex-shrink-0">LV. {user.level}</span>
+                <span className={`${isAiHubMode ? 'text-cyan-400' : 'text-indigo-500'} truncate`}>{user.points.toLocaleString()} CR</span>
               </div>
               <div className="text-[10px] text-gray-400 mt-1">
                 코드: <span className="font-mono select-all bg-gray-100 dark:bg-gray-900 px-1 rounded">{user.referral_code}</span>
@@ -364,6 +366,133 @@ const UserSection: React.FC<any> = ({
   );
 };
 
+const SearchModal: React.FC<{ isOpen: boolean, onClose: () => void }> = ({ isOpen, onClose }) => {
+  const [keyword, setKeyword] = useState('');
+  const [results, setResults] = useState<{ posts: Post[], wiki: WikiPage[], shop: ShopItem[] } | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isOpen) {
+      setKeyword('');
+      setResults(null);
+      return;
+    }
+  }, [isOpen]);
+
+  const handleSearch = async (val: string) => {
+    setKeyword(val);
+    if (val.trim().length < 2) {
+      setResults(null);
+      return;
+    }
+    setIsSearching(true);
+    const res = await storage.integratedSearch(val);
+    setResults(res);
+    setIsSearching(false);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-md flex items-start justify-center p-4 sm:p-20 overflow-y-auto animate-fade-in" onClick={onClose}>
+      <div className="w-full max-w-2xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl overflow-hidden animate-zoom-in" onClick={e => e.stopPropagation()}>
+        <div className="p-4 border-b border-gray-100 dark:border-gray-800 flex items-center gap-3">
+          <Search className="text-gray-400" size={20} />
+          <input
+            autoFocus
+            type="text"
+            placeholder="검색어를 입력하세요 (게시판, 위키, 상점 통합)"
+            className="flex-1 bg-transparent outline-none text-lg text-gray-900 dark:text-gray-100 font-medium"
+            value={keyword}
+            onChange={(e) => handleSearch(e.target.value)}
+          />
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+            <X size={20} className="text-gray-400" />
+          </button>
+        </div>
+
+        <div className="max-h-[60vh] overflow-y-auto p-4 space-y-6">
+          {isSearching && (
+            <div className="py-20 text-center animate-pulse text-gray-400 text-sm font-bold uppercase tracking-widest">
+              Searching Nexus...
+            </div>
+          )}
+
+          {!isSearching && results && (
+            <>
+              {results.posts.length > 0 && (
+                <div>
+                  <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 px-2">Board Results ({results.posts.length})</h4>
+                  <div className="space-y-1">
+                    {results.posts.map(post => (
+                      <Link key={post.id} to={`/post/${post.id}`} onClick={onClose} className="block p-3 rounded-xl hover:bg-indigo-50 dark:hover:bg-indigo-900/20 group transition-all">
+                        <p className="text-sm font-bold text-gray-800 dark:text-gray-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 line-clamp-1">{post.title}</p>
+                        <p className="text-[10px] text-gray-400 mt-1 line-clamp-1">{post.content}</p>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {results.wiki.length > 0 && (
+                <div>
+                  <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 px-2">Wiki Results ({results.wiki.length})</h4>
+                  <div className="space-y-1">
+                    {results.wiki.map(wiki => (
+                      <Link key={wiki.slug} to={`/wiki/${wiki.slug}`} onClick={onClose} className="block p-3 rounded-xl hover:bg-cyan-50 dark:hover:bg-cyan-900/20 group transition-all">
+                        <p className="text-sm font-bold text-gray-800 dark:text-gray-200 group-hover:text-cyan-600 dark:group-hover:text-cyan-400 line-clamp-1">{wiki.title}</p>
+                        <p className="text-[10px] text-gray-400 mt-1 line-clamp-1">{wiki.content}</p>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {results.shop.length > 0 && (
+                <div>
+                  <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 px-2">Shop Results ({results.shop.length})</h4>
+                  <div className="space-y-1">
+                    {results.shop.map(item => (
+                      <Link key={item.id} to="/shop" onClick={onClose} className="flex items-center gap-3 p-3 rounded-xl hover:bg-pink-50 dark:hover:bg-pink-900/20 group transition-all">
+                        <span className="text-xl">{item.icon}</span>
+                        <div>
+                          <p className="text-sm font-bold text-gray-800 dark:text-gray-200 group-hover:text-pink-600 dark:group-hover:text-pink-400">{item.name}</p>
+                          <p className="text-[10px] text-gray-400">{item.description}</p>
+                        </div>
+                        <span className="ml-auto text-[10px] font-bold text-pink-500">{item.price} CR</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {results.posts.length === 0 && results.wiki.length === 0 && results.shop.length === 0 && (
+                <div className="py-20 text-center text-gray-400 text-sm">
+                  검색 결과가 없습니다.
+                </div>
+              )}
+            </>
+          )}
+
+          {!isSearching && !results && keyword.length < 2 && (
+            <div className="py-10 text-center">
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mb-4">Trending Tags</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {['#AI', '#GPT-4o', '#넥서스', '#위키', '#모의투자', '#나침반'].map(tag => (
+                  <button key={tag} onClick={() => handleSearch(tag.replace('#', ''))} className="px-3 py-1.5 rounded-full bg-gray-100 dark:bg-gray-800 text-[10px] font-bold text-gray-500 hover:bg-indigo-600 hover:text-white transition-all">
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const Layout: React.FC = () => {
   const { user, login, register, loginAsGuest, loginWithGoogle, logout, isLoading } = useAuth();
   const { isDarkMode, isAiHubMode, toggleTheme, toggleAiHubMode } = useTheme();
@@ -371,6 +500,7 @@ const Layout: React.FC = () => {
   const [isMobileUserOpen, setIsMobileUserOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isBoardExpanded, setIsBoardExpanded] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [megaphone, setMegaphone] = useState<{ text: string; author: string } | null>(null);
@@ -452,8 +582,9 @@ const Layout: React.FC = () => {
                 {isBoardExpanded && (
                   <nav className="ml-4 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-700 pl-3">
                     {boards.map(board => (
-                      <Link key={board.id} to={`/board/${board.id}`} className={`flex items-center gap-2 px-2 py-1.5 text-xs font-medium rounded-md transition-all ${location.pathname === `/board/${board.id}` ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300'}`}>
-                        <span>{board.emoji || '📝'}</span> {board.name}
+                      <Link key={board.id} to={`/board/${board.id}`} className={`flex items-center gap-2 px-2 py-1.5 text-xs font-medium rounded-md transition-all hover-slide ${location.pathname === `/board/${board.id}` ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300'}`}>
+                        <span className="flex-shrink-0">{board.emoji || '📝'}</span>
+                        <span className="truncate">{board.name}</span>
                       </Link>
                     ))}
                   </nav>
@@ -533,16 +664,11 @@ const Layout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2 relative">
-            {user && (
-              <div className="md:hidden flex items-center gap-1 bg-indigo-50 dark:bg-gray-800/50 border border-indigo-100 dark:border-gray-700 px-2 py-1 rounded-full">
-                <span className={`text-[10px] font-bold ${isAiHubMode ? 'text-cyan-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
-                  {user.points.toLocaleString()} CR
-                </span>
-              </div>
-            )}
-            <Link to="/search" className="p-2 rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
+            {/* CR 표시 제거 (UI 깨짐 방지) */}
+
+            <button onClick={() => setIsSearchOpen(true)} className="p-2 rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
               <Search size={20} />
-            </Link>
+            </button>
             <button onClick={toggleAiHubMode} className={`p-2 rounded-full transition-all ${isAiHubMode ? 'text-cyan-400 bg-cyan-400/10' : 'text-gray-400 hover:bg-gray-100'}`}>
               <Sparkles size={20} />
             </button>
@@ -631,6 +757,8 @@ const Layout: React.FC = () => {
         boards={boards}
         user={user}
       />
+
+      <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
 
       <LiveChat />
       <VoiceNeuralLink />

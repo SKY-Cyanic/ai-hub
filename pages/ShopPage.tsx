@@ -23,30 +23,72 @@ const ShopPage: React.FC = () => {
     const [boxResult, setBoxResult] = useState<{ message: string, type?: string } | null>(null);
     const [previewItem, setPreviewItem] = useState<any | null>(null);
 
+    // 구매 확인 모달 상태
+    const [confirmModal, setConfirmModal] = useState<{
+        isOpen: boolean;
+        itemId: string;
+        itemValue?: string;
+        type: string;
+        message: string;
+    } | null>(null);
+
     useEffect(() => {
         setAuctions(storage.getAuctionItems());
     }, []);
 
-    const handleBuy = async (itemId: string, itemValue: string, type: string) => {
+    // 구매 버튼 클릭 시 모달 열기
+    const handleBuyClick = (itemId: string, itemValue: string | undefined, type: string) => {
+        console.log('[ShopPage] handleBuyClick:', { itemId, itemValue, type });
         if (!user) return alert('로그인이 필요합니다.');
+
+        const item = SHOP_ITEMS.find(i => i.id === itemId);
+        if (!item) return;
 
         if (itemId === 'item-box') {
             if (user.points < 100) return alert('포인트가 부족합니다.');
-            if (confirm('미스테리 박스를 개봉하시겠습니까? (100 CR)')) {
-                setIsBuying(itemId);
-                const res = await storage.openMysteryBox(user.id);
-                if (res.success) {
-                    setBoxResult({ message: res.message, type: res.type });
-                    refreshUser();
-                }
-                setIsBuying(null);
+            setConfirmModal({
+                isOpen: true,
+                itemId,
+                itemValue,
+                type,
+                message: `미스테리 박스를 개봉하시겠습니까? (100 CR)`
+            });
+        } else {
+            if (user.points < item.price) return alert('CR이 부족합니다.');
+            setConfirmModal({
+                isOpen: true,
+                itemId,
+                itemValue,
+                type,
+                message: `${item.name}을(를) ${item.price.toLocaleString()} CR에 구매하시겠습니까?`
+            });
+        }
+    };
+
+    // 구매 확정 처리
+    const handleConfirmPurchase = async () => {
+        if (!confirmModal || !user) return;
+
+        const { itemId, itemValue, type } = confirmModal;
+        setConfirmModal(null);
+
+        if (itemId === 'item-box') {
+            setIsBuying(itemId);
+            const res = await storage.openMysteryBox(user.id);
+            console.log('[ShopPage] openMysteryBox result:', res);
+            if (res.success) {
+                setBoxResult({ message: res.message, type: res.type });
+                refreshUser();
             }
+            setIsBuying(null);
             return;
         }
 
-        if (confirm('구매하시겠습니까?')) {
-            setIsBuying(itemId);
+        console.log('[ShopPage] Purchase confirmed, calling buyItem...');
+        setIsBuying(itemId);
+        try {
             const res = await storage.buyItem(user.id, itemId);
+            console.log('[ShopPage] buyItem result:', res);
             if (res.success) {
                 alert(res.message);
                 if (type === 'theme') {
@@ -56,8 +98,11 @@ const ShopPage: React.FC = () => {
             } else {
                 alert(res.message);
             }
-            setIsBuying(null);
+        } catch (error) {
+            console.error('[ShopPage] buyItem error:', error);
+            alert('구매 중 오류가 발생했습니다.');
         }
+        setIsBuying(null);
     };
 
     const handleBid = async (aucId: string) => {
@@ -210,7 +255,7 @@ const ShopPage: React.FC = () => {
                                         </button>
                                     )}
                                     <button
-                                        onClick={() => handleBuy(item.id, item.value, item.type)}
+                                        onClick={() => handleBuyClick(item.id, item.value, item.type)}
                                         disabled={isOwned || (isBuying === item.id)}
                                         className={`flex-1 py-3 rounded-2xl font-black text-sm transition-all active:scale-95 shadow-lg ${isOwned ? 'bg-gray-100 dark:bg-gray-700 text-gray-400' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
                                     >
@@ -335,6 +380,31 @@ const ShopPage: React.FC = () => {
                         )}
                         <div className="bg-gray-100 dark:bg-gray-800 p-4 text-center">
                             <p className="text-[9px] text-gray-400 font-medium">결제 시 이용약관 및 취소 규정에 동의하는 것으로 간주됩니다.</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Purchase Confirmation Modal */}
+            {confirmModal && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 animate-fade-in" onClick={() => setConfirmModal(null)}>
+                    <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-sm p-8 text-center" onClick={e => e.stopPropagation()}>
+                        <div className="text-5xl mb-4">🛒</div>
+                        <h3 className="text-xl font-black text-gray-800 dark:text-white mb-2">구매 확인</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">{confirmModal.message}</p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setConfirmModal(null)}
+                                className="flex-1 py-3 rounded-2xl bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={handleConfirmPurchase}
+                                className="flex-1 py-3 rounded-2xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-all active:scale-95"
+                            >
+                                구매하기
+                            </button>
                         </div>
                     </div>
                 </div>

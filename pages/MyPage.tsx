@@ -1,13 +1,22 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { storage, ACHIEVEMENTS } from '../services/storage';
-import { Calendar, Award, Edit3, Bookmark, CheckCircle, Circle, Flame, Sparkles } from 'lucide-react';
+import { storage, ACHIEVEMENTS, SHOP_ITEMS } from '../services/storage';
+import { Calendar, Award, Edit3, Bookmark, CheckCircle, Circle, Flame, Sparkles, ShoppingBag, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { ShopItem } from '../types';
 
 const MyPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
+  // 아이템 사용 모달 상태
+  const [itemModal, setItemModal] = useState<{
+    isOpen: boolean;
+    item: ShopItem | null;
+    inputValue: string;
+    selectOptions?: { id: string; label: string }[];
+  }>({ isOpen: false, item: null, inputValue: '', selectOptions: undefined });
 
   if (!user) return <div className="p-8 text-center">로그인이 필요합니다.</div>;
 
@@ -17,6 +26,89 @@ const MyPage: React.FC = () => {
   const currentExp = user.exp % 100;
   const progress = Math.min(100, (currentExp / 100) * 100);
 
+  // 아이템 사용 버튼 클릭 핸들러
+  const handleItemClick = (item: ShopItem) => {
+    // 입력이 필요 없는 아이템들은 바로 처리
+    if (!item.effect_type || ['shield', 'coupon', 'exp_boost', 'ad_remove', 'lottery'].includes(item.effect_type)) {
+      executeItem(item, {});
+      return;
+    }
+
+    // 확인이 필요한 아이템
+    if (item.effect_type === 'wiki_reset') {
+      setItemModal({ isOpen: true, item, inputValue: '', selectOptions: undefined });
+      return;
+    }
+
+    // 입력이 필요한 아이템들
+    if (item.effect_type === 'nick_change') {
+      setItemModal({ isOpen: true, item, inputValue: '', selectOptions: undefined });
+    } else if (item.effect_type === 'megaphone') {
+      setItemModal({ isOpen: true, item, inputValue: '', selectOptions: undefined });
+    } else if (item.effect_type === 'post_highlight') {
+      const myPosts = posts.slice(0, 10);
+      if (myPosts.length === 0) {
+        alert('강조할 게시글이 없습니다.');
+        return;
+      }
+      setItemModal({
+        isOpen: true,
+        item,
+        inputValue: myPosts[0]?.id || '',
+        selectOptions: myPosts.map(p => ({ id: p.id, label: p.title }))
+      });
+    } else if (item.effect_type === 'mystery_box') {
+      executeItem(item, {});
+    } else {
+      // 장착형 아이템
+      executeItem(item, {});
+    }
+  };
+
+  // 아이템 실행
+  const executeItem = async (item: ShopItem, payload: any) => {
+    const res = await storage.useItem(user.id, item.id, payload);
+    if (res.success) {
+      if (item.effect_type === 'mystery_box') {
+        alert(`🎁 미스테리 박스 개봉 결과: ${res.message}`);
+      } else {
+        alert(res.message);
+      }
+      refreshUser();
+    } else {
+      alert(res.message);
+    }
+  };
+
+  // 모달 확인 버튼
+  const handleModalConfirm = async () => {
+    if (!itemModal.item) return;
+
+    let payload: any = {};
+
+    if (itemModal.item.effect_type === 'nick_change') {
+      if (!itemModal.inputValue.trim()) {
+        alert('닉네임을 입력해주세요.');
+        return;
+      }
+      payload = { newNickname: itemModal.inputValue.trim() };
+    } else if (itemModal.item.effect_type === 'megaphone') {
+      if (!itemModal.inputValue.trim()) {
+        alert('메시지를 입력해주세요.');
+        return;
+      }
+      payload = { message: itemModal.inputValue.slice(0, 50) };
+    } else if (itemModal.item.effect_type === 'post_highlight') {
+      if (!itemModal.inputValue) {
+        alert('게시글을 선택해주세요.');
+        return;
+      }
+      payload = { postId: itemModal.inputValue };
+    }
+
+    setItemModal({ isOpen: false, item: null, inputValue: '', selectOptions: undefined });
+    await executeItem(itemModal.item, payload);
+  };
   return (
     <div className="space-y-6 animate-fade-in pb-10">
       {/* Profile Header */}
@@ -114,6 +206,64 @@ const MyPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Inventory Section */}
+      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-3xl p-6 shadow-lg">
+        <h3 className="font-black text-sm text-gray-800 dark:text-white mb-6 flex items-center gap-2 uppercase tracking-wider">
+          <ShoppingBag size={18} className="text-indigo-500" /> Neural Inventory
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {user.inventory && user.inventory.length > 0 ? (
+            // 중복 제거된 고유 아이템 목록
+            [...new Set(user.inventory)].map((itemId, idx) => {
+              const item = SHOP_ITEMS.find(i => i.id === itemId);
+              if (!item) return null;
+
+              // 현재 장착 여부 확인
+              const isEquipped =
+                (item.type === 'frame' && user.active_items?.frame === item.value) ||
+                (item.type === 'color' && user.active_items?.name_color === item.value) ||
+                (item.type === 'badge' && user.active_items?.badge === item.value) ||
+                (item.type === 'theme' && user.active_items?.theme === item.value) ||
+                (item.type === 'custom_title' && user.active_items?.custom_title === item.value) ||
+                ((item.type === 'style' || item.type === 'special_effects') && user.active_items?.special_effects?.includes(item.value || ''));
+
+              // 소모품의 경우 남은 개수 표시
+              const consumableCount = item.is_consumable
+                ? user.inventory.filter(id => id === itemId).length
+                : null;
+
+              return (
+                <div key={`${itemId}-${idx}`} className={`p-4 rounded-2xl border flex items-center justify-between group transition-all ${isEquipped ? 'bg-indigo-50 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-700' : 'bg-gray-50 dark:bg-gray-900/50 border-gray-100 dark:border-gray-700'}`}>
+                  <div className="flex items-center gap-3">
+                    <div className="text-2xl">{item.icon}</div>
+                    <div>
+                      <div className="text-xs font-black text-gray-800 dark:text-gray-100 flex items-center gap-1">
+                        {item.name}
+                        {consumableCount && consumableCount > 1 && <span className="text-indigo-500">x{consumableCount}</span>}
+                        {isEquipped && <span className="text-[9px] bg-indigo-500 text-white px-1.5 py-0.5 rounded-full ml-1">장착중</span>}
+                      </div>
+                      <div className="text-[10px] text-gray-500">{item.is_consumable ? '소모성' : '영구/장착형'}</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleItemClick(item)}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-[10px] font-black transition-all shadow-md group-hover:scale-105 active:scale-95"
+                  >
+                    {item.is_consumable ? '사용하기' : '장착하기'}
+                  </button>
+                </div>
+              );
+            })
+          ) : (
+            <div className="col-span-full py-10 text-center">
+              <div className="text-4xl mb-2 opacity-20">🛒</div>
+              <div className="text-gray-400 text-xs font-mono">INVENTORY IS EMPTY</div>
+              <Link to="/shop" className="text-indigo-500 text-[10px] font-bold mt-2 inline-block hover:underline">상점 구경 가기 →</Link>
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Scrapped Posts */}
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-3xl shadow-lg p-5">
@@ -183,6 +333,97 @@ const MyPage: React.FC = () => {
           </div>
         )
       }
+
+      {/* Item Use Modal */}
+      {itemModal.isOpen && itemModal.item && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 animate-fade-in" onClick={() => setItemModal({ isOpen: false, item: null, inputValue: '', selectOptions: undefined })}>
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">{itemModal.item.icon}</span>
+                <h3 className="font-black text-lg text-gray-800 dark:text-white">{itemModal.item.name}</h3>
+              </div>
+              <button onClick={() => setItemModal({ isOpen: false, item: null, inputValue: '', selectOptions: undefined })} className="text-gray-400 hover:text-gray-600">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* 닉네임 변경 */}
+              {itemModal.item.effect_type === 'nick_change' && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-2">새 닉네임</label>
+                  <input
+                    type="text"
+                    value={itemModal.inputValue}
+                    onChange={e => setItemModal(prev => ({ ...prev, inputValue: e.target.value }))}
+                    placeholder="닉네임을 입력하세요"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              {/* 확성기 메시지 */}
+              {itemModal.item.effect_type === 'megaphone' && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-2">공지 메시지 (최대 50자)</label>
+                  <input
+                    type="text"
+                    maxLength={50}
+                    value={itemModal.inputValue}
+                    onChange={e => setItemModal(prev => ({ ...prev, inputValue: e.target.value }))}
+                    placeholder="전체 공지할 메시지를 입력하세요"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    autoFocus
+                  />
+                  <div className="text-right text-[10px] text-gray-400 mt-1">{itemModal.inputValue.length}/50</div>
+                </div>
+              )}
+
+              {/* 게시글 선택 */}
+              {itemModal.item.effect_type === 'post_highlight' && itemModal.selectOptions && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-2">강조할 게시글 선택</label>
+                  <select
+                    value={itemModal.inputValue}
+                    onChange={e => setItemModal(prev => ({ ...prev, inputValue: e.target.value }))}
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {itemModal.selectOptions.map(opt => (
+                      <option key={opt.id} value={opt.id}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* 위키 초기화 확인 */}
+              {itemModal.item.effect_type === 'wiki_reset' && (
+                <div className="text-center">
+                  <div className="text-4xl mb-4">⚠️</div>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    정말로 위키 기여 기록을 초기화하시겠습니까?<br />
+                    <span className="text-red-500 font-bold">이 작업은 되돌릴 수 없습니다.</span>
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="p-6 pt-0 flex gap-3">
+              <button
+                onClick={() => setItemModal({ isOpen: false, item: null, inputValue: '', selectOptions: undefined })}
+                className="flex-1 py-3 rounded-2xl bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleModalConfirm}
+                className="flex-1 py-3 rounded-2xl bg-indigo-600 text-white font-bold hover:bg-indigo-700 transition-all active:scale-95"
+              >
+                {itemModal.item.effect_type === 'wiki_reset' ? '초기화' : '확인'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div >
   );
 };

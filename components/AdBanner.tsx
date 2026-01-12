@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 declare global {
     interface Window {
@@ -22,11 +23,16 @@ const AdBanner: React.FC<AdBannerProps> = ({ slot, className = '' }) => {
     const adRef = useRef<HTMLDivElement>(null);
     const isLoaded = useRef(false);
 
+    const { user } = useAuth();
+
     useEffect(() => {
         // 개발 환경에서는 광고 로드 스킵
         const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-        if (!isDev && !isLoaded.current && adRef.current) {
+        // 광고 제거 패스 체크
+        const hasAdRemove = user?.expires_at?.['ad_remove'] && new Date(user.expires_at['ad_remove']) > new Date();
+
+        if (!isDev && !isLoaded.current && adRef.current && !hasAdRemove) {
             try {
                 (window.adsbygoogle = window.adsbygoogle || []).push({});
                 isLoaded.current = true;
@@ -34,7 +40,11 @@ const AdBanner: React.FC<AdBannerProps> = ({ slot, className = '' }) => {
                 console.error('AdSense error:', e);
             }
         }
-    }, []);
+    }, [user]);
+
+    // 광고 제거 효과가 있으면 렌더링하지 않음
+    const hasAdRemove = user?.expires_at?.['ad_remove'] && new Date(user.expires_at['ad_remove']) > new Date();
+    if (hasAdRemove) return null;
 
     // 슬롯별 스타일 설정
     const getSlotStyles = () => {
