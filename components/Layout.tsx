@@ -593,6 +593,9 @@ const Layout: React.FC = () => {
               <Link to="/game" className={`flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-lg transition-all ${location.pathname === '/game' ? 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                 <Gamepad2 size={18} /> 게임
               </Link>
+              <Link to="/persona" className={`flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-lg transition-all ${location.pathname === '/persona' ? 'bg-pink-50 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+                <Sparkles size={18} /> AI 친구
+              </Link>
               <Link to="/shop" className={`flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-lg transition-all ${location.pathname.startsWith('/shop') ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                 <ShoppingBag size={18} /> 상점
               </Link>

@@ -203,6 +203,65 @@ const PostPage: React.FC = () => {
             )}
           </>
         )}
+
+        {/* Poll Display */}
+        {post.poll && (
+          <div className="mt-6 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart2 className="text-indigo-600 dark:text-indigo-400" size={20} />
+              <h3 className="font-black text-lg text-gray-800 dark:text-white">{post.poll.question}</h3>
+            </div>
+            <div className="space-y-3">
+              {post.poll.options.map((option) => {
+                const totalVotes = post.poll!.options.reduce((sum, o) => sum + o.votes, 0);
+                const percentage = totalVotes > 0 ? Math.round((option.votes / totalVotes) * 100) : 0;
+                const hasVoted = user && post.poll!.voted_users?.includes(user.id);
+                const canVote = user && !hasVoted;
+
+                return (
+                  <button
+                    key={option.id}
+                    onClick={async () => {
+                      if (!canVote) return;
+                      // 투표 처리
+                      const updatedPoll = {
+                        ...post.poll!,
+                        options: post.poll!.options.map(o =>
+                          o.id === option.id ? { ...o, votes: o.votes + 1 } : o
+                        ),
+                        voted_users: [...(post.poll!.voted_users || []), user!.id]
+                      };
+                      await storage.updatePost({ ...post, poll: updatedPoll });
+                      setPost(prev => prev ? { ...prev, poll: updatedPoll } : null);
+                    }}
+                    disabled={!canVote}
+                    className={`w-full relative overflow-hidden rounded-xl transition-all ${canVote ? 'hover:shadow-md cursor-pointer' : 'cursor-default'}`}
+                  >
+                    <div className={`absolute inset-0 bg-indigo-400/30 dark:bg-indigo-600/30 transition-all`}
+                      style={{ width: `${percentage}%` }}
+                    />
+                    <div className="relative flex items-center justify-between p-4 bg-white/50 dark:bg-gray-800/50 border border-indigo-100 dark:border-indigo-800 rounded-xl">
+                      <span className="font-bold text-gray-800 dark:text-white">{option.text}</span>
+                      <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">
+                        {percentage}% ({option.votes}표)
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-4 text-center text-xs text-gray-500 dark:text-gray-400">
+              {user && post.poll.voted_users?.includes(user.id)
+                ? '✅ 투표 완료'
+                : user
+                  ? '클릭하여 투표하세요'
+                  : '로그인 후 투표 가능'}
+              <span className="ml-2">
+                (총 {post.poll.options.reduce((sum, o) => sum + o.votes, 0)}명 참여)
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Image Lightbox */}

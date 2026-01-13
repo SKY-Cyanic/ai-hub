@@ -23,6 +23,7 @@ import ToolsPage from './pages/ToolsPage';
 import NoteViewerPage from './pages/NoteViewerPage';
 import GamePage from './pages/GamePage';
 import ProfilePage from './pages/ProfilePage';
+import PersonaPage from './pages/PersonaPage';
 
 function App() {
   return (
@@ -44,6 +45,7 @@ function App() {
             <Route path="messages" element={<MessagesPage />} />
             <Route path="game" element={<GamePage />} />
             <Route path="profile/:username" element={<ProfilePage />} />
+            <Route path="persona" element={<PersonaPage />} />
             <Route path="tools" element={<ToolsPage />} />
             <Route path="tools/note/:noteId" element={<NoteViewerPage />} />
             <Route path="tools/encoder" element={<EncoderPage />} />

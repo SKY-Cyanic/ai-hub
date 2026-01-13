@@ -91,15 +91,62 @@ const WritePage: React.FC = () => {
     }
   };
 
-  const processFile = (file: File) => {
+  // 이미지 압축 함수
+  const compressImage = (file: File, maxWidth: number = 800, quality: number = 0.7): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // 최대 너비 제한
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Canvas context not available'));
+            return;
+          }
+
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+          resolve(compressedBase64);
+        };
+        img.onerror = () => reject(new Error('Image load failed'));
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('File read failed'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const processFile = async (file: File) => {
     if (!file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result as string;
-      // Only add to preview gallery, do NOT insert into content
-      setImages(prev => [...prev, base64String]);
-    };
-    reader.readAsDataURL(file);
+
+    try {
+      // 이미지 압축 (최대 800px, 70% 품질)
+      const compressedBase64 = await compressImage(file, 800, 0.7);
+
+      // 압축 후에도 너무 크면 더 압축
+      if (compressedBase64.length > 200000) { // 200KB 이상이면 더 압축
+        const smallerBase64 = await compressImage(file, 600, 0.5);
+        setImages(prev => [...prev, smallerBase64]);
+      } else {
+        setImages(prev => [...prev, compressedBase64]);
+      }
+    } catch (error) {
+      console.error('Image compression error:', error);
+      alert('이미지 처리 중 오류가 발생했습니다.');
+    }
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

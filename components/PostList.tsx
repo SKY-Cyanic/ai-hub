@@ -112,7 +112,7 @@ const PostList: React.FC<PostListProps> = ({ posts: initialPosts, boardSlug }) =
 
                   <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-[11px] text-gray-400 font-medium">
                     <span className="flex items-center gap-1">
-                      <UserNickname profile={post.author} />
+                      <UserNickname profile={post.author} linkToProfile={false} />
                     </span>
                     <span className="flex items-center gap-1 opacity-60"><Clock size={10} /> {new Date(post.created_at).toLocaleDateString().slice(5)}</span>
                     <span className="flex items-center gap-1 opacity-60"><Eye size={10} /> {post.view_count}</span>

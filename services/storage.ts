@@ -289,7 +289,10 @@ export const storage = {
 
   savePost: async (post: any) => {
     const user = storage.getUserByRawId(post.author_id);
-    if (!user) return null;
+    if (!user) {
+      console.error('savePost: User not found', post.author_id);
+      return null;
+    }
 
     // 가스비 소모 체크
     if (user.points < NODE_GAS_FEE) {
@@ -306,7 +309,10 @@ export const storage = {
       if (storage.getSession()?.id === user.id) storage.setSession(user);
       await storage.checkAchievements(user.id);
       return { id: docRef.id, ...data };
-    } catch (e) { return null; }
+    } catch (e) {
+      console.error('savePost error:', e);
+      return null;
+    }
   },
 
   updatePost: async (post: Post) => { try { await updateDoc(doc(db, "posts", post.id), sanitize(post)); } catch (e) { } },
@@ -501,15 +507,6 @@ export const storage = {
   },
 
   // --- Megaphone & Lottery Systems ---
-  subscribeMegaphone(callback: (msg: { text: string; author: string } | null) => void) {
-    return onSnapshot(doc(db, "global_state", "megaphone"), (snapshot) => {
-      if (snapshot.exists()) {
-        callback(snapshot.data() as any);
-      } else {
-        callback(null);
-      }
-    });
-  },
 
   getMegaphoneMessage() {
     // Legacy fallback for sync calls if any
