@@ -57,6 +57,17 @@ export interface User {
   invited_by?: string;
   invite_count: number;
   transactions: Transaction[];
+  item_purchases?: { [itemId: string]: number }; // 구매 횟수 추적
+}
+
+export interface Report {
+  id: string;
+  reporter_id: string;
+  target_id: string;
+  target_type: 'user' | 'post' | 'comment';
+  reason: string;
+  status: 'pending' | 'resolved' | 'rejected';
+  created_at: string;
 }
 
 export interface Achievement {
@@ -240,7 +251,7 @@ export interface ShopItem {
   icon: string;
   is_consumable?: boolean; // 사용 시 인벤토리에서 사라짐
   duration_days?: number; // 기간제 아이템 (7일, 30일 등)
-  effect_type?: 'nick_change' | 'ad_remove' | 'post_highlight' | 'exp_boost' | 'mystery_box' | 'megaphone' | 'shield' | 'coupon' | 'lottery' | 'wiki_reset';
+  effect_type?: 'nick_change' | 'ad_remove' | 'post_highlight' | 'exp_boost' | 'mystery_box' | 'megaphone' | 'shield' | 'coupon' | 'lottery' | 'wiki_reset' | 'custom_title';
 }
 
 export interface WikiHistoryItem {

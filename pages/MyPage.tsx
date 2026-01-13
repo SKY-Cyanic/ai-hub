@@ -59,6 +59,8 @@ const MyPage: React.FC = () => {
       });
     } else if (item.effect_type === 'mystery_box') {
       executeItem(item, {});
+    } else if (item.effect_type === 'custom_title') {
+      setItemModal({ isOpen: true, item, inputValue: '', selectOptions: undefined });
     } else {
       // 장착형 아이템
       executeItem(item, {});
@@ -104,6 +106,12 @@ const MyPage: React.FC = () => {
         return;
       }
       payload = { postId: itemModal.inputValue };
+    } else if (itemModal.item.effect_type === 'custom_title') {
+      if (!itemModal.inputValue.trim()) {
+        alert('칭호를 입력해주세요.');
+        return;
+      }
+      payload = { title: itemModal.inputValue.trim() };
     }
 
     setItemModal({ isOpen: false, item: null, inputValue: '', selectOptions: undefined });
@@ -393,6 +401,23 @@ const MyPage: React.FC = () => {
                       <option key={opt.id} value={opt.id}>{opt.label}</option>
                     ))}
                   </select>
+                </div>
+              )}
+
+              {/* 전문가 칭호 입력 */}
+              {itemModal.item.effect_type === 'custom_title' && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 dark:text-gray-300 mb-2">원하는 칭호 입력</label>
+                  <input
+                    type="text"
+                    maxLength={20}
+                    value={itemModal.inputValue}
+                    onChange={e => setItemModal(prev => ({ ...prev, inputValue: e.target.value }))}
+                    placeholder="예: AI 전문가, 게임 마스터"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    autoFocus
+                  />
+                  <div className="text-right text-[10px] text-gray-400 mt-1">{itemModal.inputValue.length}/20</div>
                 </div>
               )}
 

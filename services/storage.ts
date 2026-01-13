@@ -23,7 +23,7 @@ export const SHOP_ITEMS: ShopItem[] = [
   // --- Visual Effects & Branding ---
   { id: 'effect-rainbow', name: '🌈 무지개 닉네임', description: '닉네임이 RGB 컬러로 변하는 효과 (7일)', price: 1000, type: 'style', category: 'name', value: 'rainbow', icon: '🌈', duration_days: 7 },
   { id: 'effect-glitch', name: '⚡ 글리치 효과', description: '닉네임과 아바타에 지직거림 효과 부여', price: 2000, type: 'style', category: 'name', value: 'glitch', icon: '⚡' },
-  { id: 'item-title-pro', name: '🎓 전문가 칭호', description: '원하는 분야의 전문가 타이틀을 부여', price: 5000, type: 'custom_title', category: 'name', value: 'expert', icon: '🎓' },
+  { id: 'item-title-pro', name: '🎓 전문가 칭호', description: '원하는 분야의 전문가 타이틀을 부여', price: 5000, type: 'custom_title', category: 'name', effect_type: 'custom_title', is_consumable: true, icon: '🎓' },
 
   // --- Avatar Frames (Seasonal) ---
   { id: 'frame-shell', name: '🥚 뉴비의 알껍질', description: '귀여운 알껍질 테두리', price: 500, type: 'frame', category: 'avatar', value: 'border-yellow-200 border-2 rounded-full border-dashed', icon: '🥚' },
@@ -144,6 +144,89 @@ export const storage = {
       });
       return true;
     } catch (e) { return false; }
+  },
+
+  // --- User Report (신고) ---
+  reportUser: async (reporterId: string, targetId: string, reason: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const target = storage.getUserByRawId(targetId);
+      if (!target) return { success: false, message: '대상 사용자를 찾을 수 없습니다.' };
+
+      // 신고 저장
+      await addDoc(collection(db, "reports"), {
+        reporter_id: reporterId,
+        target_id: targetId,
+        target_type: 'user',
+        reason,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      });
+
+      // 경고 처리 (보호막 있으면 소모)
+      if (target.shields && target.shields > 0) {
+        target.shields -= 1;
+        await storage.saveUser(target);
+        await storage.sendNotification({
+          user_id: targetId,
+          type: 'system',
+          message: `⚠️ 신고가 접수되었으나 보호막이 발동되었습니다. (남은 보호막: ${target.shields})`,
+          link: '/mypage'
+        });
+      } else {
+        await storage.sendNotification({
+          user_id: targetId,
+          type: 'system',
+          message: `⚠️ 신고가 접수되었습니다. 사유: ${reason}`,
+          link: '/mypage'
+        });
+      }
+
+      return { success: true, message: '신고가 접수되었습니다.' };
+    } catch (e) {
+      console.error('Report error:', e);
+      return { success: false, message: '신고 처리 중 오류가 발생했습니다.' };
+    }
+  },
+
+  // --- Announcements (확성기) ---
+  getAnnouncements: async (): Promise<{ id: string; username: string; message: string; expires_at: string }[]> => {
+    try {
+      const now = new Date().toISOString();
+      const q = query(
+        collection(db, "announcements"),
+        where("expires_at", ">", now),
+        orderBy("expires_at", "desc"),
+        limit(5)
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+    } catch (e) {
+      return [];
+    }
+  },
+
+  // Real-time megaphone subscription
+  subscribeMegaphone: (callback: (data: { text: string; author: string } | null) => void): (() => void) => {
+    const now = new Date().toISOString();
+    const q = query(
+      collection(db, "announcements"),
+      where("expires_at", ">", now),
+      orderBy("created_at", "desc"),
+      limit(1)
+    );
+
+    return onSnapshot(q, (snapshot) => {
+      if (snapshot.empty) {
+        callback(null);
+        return;
+      }
+      const doc = snapshot.docs[0];
+      const data = doc.data();
+      callback({
+        text: data.message,
+        author: data.username
+      });
+    }, () => callback(null));
   },
 
   // --- Achievements ---
@@ -499,17 +582,49 @@ export const storage = {
     if (!user) return { success: false, message: '사용자를 찾을 수 없습니다.' };
     if (!item) return { success: false, message: '아이템을 찾을 수 없습니다.' };
 
-    if (user.points < item.price) return { success: false, message: 'CR이 부족합니다.' };
+    // 가격 계산 (닉네임 변경권은 구매할 때마다 50% 가격 인상)
+    let finalPrice = item.price;
+    if (!user.item_purchases) user.item_purchases = {};
 
-    // 중복 소유 체크 (소모품이 아닌 경우만)
-    if (!item.is_consumable && user.inventory?.includes(itemId)) {
+    if (itemId === 'item-nick-change') {
+      const purchaseCount = user.item_purchases['item-nick-change'] || 0;
+      finalPrice = Math.floor(item.price * Math.pow(1.5, purchaseCount));
+    }
+
+    // 할인 쿠폰 적용 확인
+    let discountApplied = false;
+    if (user.expires_at?.['discount_coupon'] && new Date(user.expires_at['discount_coupon']) > new Date()) {
+      finalPrice = Math.floor(finalPrice * 0.8); // 20% 할인
+      discountApplied = true;
+    }
+
+    if (user.points < finalPrice) return { success: false, message: `CR이 부족합니다. (필요: ${finalPrice.toLocaleString()} CR)` };
+
+    // 기간제 아이템 재구매 체크 (광고 제거 패스)
+    if (itemId === 'item-ad-remove') {
+      if (user.expires_at?.[itemId] && new Date(user.expires_at[itemId]) > new Date()) {
+        return { success: false, message: '이미 광고 제거 패스가 활성화되어 있습니다.' };
+      }
+    }
+
+    // 중복 소유 체크 (소모품과 특정 재구매 가능 아이템 제외)
+    const rebuybableItems = ['item-nick-change', 'item-ad-remove', 'item-coupon', 'item-shield'];
+    if (!item.is_consumable && !rebuybableItems.includes(itemId) && user.inventory?.includes(itemId)) {
       return { success: false, message: '이미 보유 중인 아이템입니다.' };
     }
 
     // 포인트 차감
-    user.points -= item.price;
+    user.points -= finalPrice;
     if (!user.inventory) user.inventory = [];
     user.inventory.push(itemId);
+
+    // 구매 횟수 기록
+    user.item_purchases[itemId] = (user.item_purchases[itemId] || 0) + 1;
+
+    // 할인 쿠폰 사용 처리
+    if (discountApplied && itemId !== 'item-coupon') {
+      delete user.expires_at['discount_coupon'];
+    }
 
     // 즉시 적용 효과 (시각적 아이템들 중 기간제가 아닌 것들)
     if (!item.is_consumable && !item.duration_days) {
@@ -517,7 +632,7 @@ export const storage = {
       if (item.type === 'frame') user.active_items.frame = item.value;
       if (item.type === 'badge') user.active_items.badge = item.value;
       if (item.type === 'theme') user.active_items.theme = item.value;
-      if (item.type === 'custom_title') user.active_items.custom_title = item.value;
+      // custom_title은 사용 시 값 입력받도록 변경
     }
 
     // 기간제 효과 설정
@@ -539,13 +654,13 @@ export const storage = {
     user.transactions.push({
       id: `tx-${Date.now()}`,
       type: 'spend',
-      amount: item.price,
-      description: `상점 구매: ${item.name}`,
+      amount: finalPrice,
+      description: `상점 구매: ${item.name}${discountApplied ? ' (20% 할인)' : ''}`,
       created_at: new Date().toISOString()
     });
 
     await storage.saveUser(user);
-    return { success: true, message: `${item.name} 구매 완료! 인벤토리를 확인하세요.` };
+    return { success: true, message: `${item.name} 구매 완료!${discountApplied ? ' (20% 할인 적용됨)' : ''} 인벤토리를 확인하세요.` };
   },
 
   useItem: async (userId: string, itemId: string, payload?: any): Promise<{ success: boolean; message: string }> => {
@@ -609,15 +724,23 @@ export const storage = {
           break;
 
         case 'megaphone':
-          // 확성기: 사이트 공지에 메시지 노출 (24시간)
+          // 확성기: Firestore announcements 컬렉션에 저장 (24시간)
           if (!payload?.message) return { success: false, message: '공지할 메시지를 입력해주세요.' };
-          // TODO: 실제 공지 시스템 연동 필요
-          await storage.sendNotification({
-            user_id: 'system',
-            type: 'system',
-            message: `📢 [${user.nickname || user.username}] ${payload.message}`,
-            link: '/'
+          const announcementExpiry = new Date();
+          announcementExpiry.setHours(announcementExpiry.getHours() + 24);
+          await addDoc(collection(db, "announcements"), {
+            user_id: userId,
+            username: user.nickname || user.username,
+            message: payload.message,
+            created_at: new Date().toISOString(),
+            expires_at: announcementExpiry.toISOString()
           });
+          break;
+
+        case 'custom_title':
+          // 전문가 칭호: 사용자 지정 칭호
+          if (!payload?.title) return { success: false, message: '칭호를 입력해주세요.' };
+          user.active_items.custom_title = payload.title;
           break;
 
         case 'shield':
