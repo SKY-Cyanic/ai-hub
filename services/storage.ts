@@ -30,6 +30,10 @@ export const SHOP_ITEMS: ShopItem[] = [
   { id: 'frame-laurel', name: '🌿 황금 월계관', description: '승리자의 상징인 황금 테두리', price: 5000, type: 'frame', category: 'avatar', value: 'border-yellow-500 border-4 shadow-[0_0_10px_gold] rounded-lg', icon: '🌿' },
   { id: 'frame-cyber', name: '🏙️ 사이버펑크 네온', description: '핑크-시안 네온 테두리', price: 3000, type: 'frame', category: 'avatar', value: 'border-pink-500 border-2 shadow-[0_0_15px_#ff00ff,#00ffff_inset]', icon: '🏙️' },
 
+  // --- AI Unlimited Pass (NEW) ---
+  { id: 'ai-pass-24h', name: '🎫 AI 24시간 무제한', description: 'AI 친구 & 바이브 코딩 24시간 무제한', price: 500, type: 'utility', category: 'system', effect_type: 'ai_unlimited_pass', is_consumable: true, icon: '🎫', duration_days: 1 },
+  { id: 'ai-pass-7d', name: '🎟️ AI 7일 무제한', description: 'AI 친구 & 바이브 코딩 7일 무제한 (30% 할인)', price: 2500, type: 'utility', category: 'system', effect_type: 'ai_unlimited_pass', is_consumable: true, icon: '🎟️', duration_days: 7 },
+
   // --- Functional / Utility Items ---
   { id: 'item-nick-change', name: '🆔 닉네임 변경권', description: '닉네임을 1회 변경할 수 있습니다.', price: 3000, type: 'utility', category: 'name', effect_type: 'nick_change', is_consumable: true, icon: '🆔' },
   { id: 'item-ad-remove', name: '🚫 광고 제거 패스', description: '30일 동안 사이트 내 광고를 제거합니다.', price: 5000, type: 'utility', category: 'system', effect_type: 'ad_remove', duration_days: 30, icon: '🚫' },
@@ -757,6 +761,24 @@ export const storage = {
           // 복권: 구매만 해도 인벤토리에 들어가는 것으로 충분 (추첨은 별도)
           // 이미 구매 시점에 인벤토리에 추가됨
           return { success: true, message: '복권 구매 완료! 금요일 밤 10시 추첨을 기다려주세요.' };
+
+        case 'ai_unlimited_pass':
+          // AI 무제한 이용권: user_usage 컬렉션에 만료 시간 설정
+          if (!user.expires_at) user.expires_at = {};
+          const aiPassExpiry = new Date();
+          aiPassExpiry.setDate(aiPassExpiry.getDate() + (item.duration_days || 1));
+          user.expires_at['ai_unlimited_pass'] = aiPassExpiry.toISOString();
+          user.expires_at[itemId] = aiPassExpiry.toISOString();
+          // Firestore user_usage 컬렉션에도 저장 (UsageService 연동)
+          try {
+            await setDoc(doc(db, "user_usage", userId), {
+              unlimitedPassExpiry: aiPassExpiry.toISOString(),
+              lastResetDate: new Date().toISOString().split('T')[0]
+            }, { merge: true });
+          } catch (e) {
+            console.error('AI pass activation error:', e);
+          }
+          break;
 
         case 'wiki_reset':
           // 위키 기여 초기화

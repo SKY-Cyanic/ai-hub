@@ -23,6 +23,22 @@ const HomePage: React.FC = () => {
 
   const slides = [
     {
+      title: "🤖 AI 친구가 왔어요!\n나만의 AI 친구와 대화하세요",
+      subtitle: "New Feature • Groq Qwen3-32B",
+      image: "/ai_friend_banner.png",
+      badge: "🔥 NEW",
+      link: "/persona",
+      btnText: "AI 친구 만나기"
+    },
+    {
+      title: "✨ 바이브 코딩으로\n나만의 웹사이트 만들기",
+      subtitle: "AI Code Generator • Beta",
+      image: "/vibe_code_banner.png",
+      badge: "BETA",
+      link: "/webdev",
+      btnText: "WEB DEV 갤러리"
+    },
+    {
       title: "차세대 지식 공유 노드\nAI-HUB에 접속 중입니다",
       subtitle: "Neural Core Active",
       image: "/ai_hub_hero_banner_1767869792651.png",

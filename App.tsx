@@ -15,6 +15,8 @@ import EncoderPage from './pages/EncoderPage';
 import ImageStudioPage from './pages/ImageStudioPage';
 import AIAnalyzerPage from './pages/tools/AIAnalyzerPage';
 import MockInvestmentPage from './pages/tools/MockInvestmentPage';
+import VibeCodePage from './pages/tools/VibeCodePage';
+import WebDevPage from './pages/WebDevPage';
 import { TermsPage, PrivacyPage, YouthPolicyPage } from './pages/PolicyPages';
 import ActivityPage from './pages/ActivityPage';
 import SearchPage from './pages/SearchPage';
@@ -46,12 +48,14 @@ function App() {
             <Route path="game" element={<GamePage />} />
             <Route path="profile/:username" element={<ProfilePage />} />
             <Route path="persona" element={<PersonaPage />} />
+            <Route path="webdev" element={<WebDevPage />} />
             <Route path="tools" element={<ToolsPage />} />
             <Route path="tools/note/:noteId" element={<NoteViewerPage />} />
             <Route path="tools/encoder" element={<EncoderPage />} />
             <Route path="tools/image-studio" element={<ImageStudioPage />} />
             <Route path="tools/ai-analysis" element={<AIAnalyzerPage />} />
             <Route path="tools/mock-invest" element={<MockInvestmentPage />} />
+            <Route path="tools/vibe-code" element={<VibeCodePage />} />
             <Route path="admin" element={<AdminPage />} />
             <Route path="terms" element={<TermsPage />} />
             <Route path="privacy" element={<PrivacyPage />} />

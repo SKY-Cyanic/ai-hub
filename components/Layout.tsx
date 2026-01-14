@@ -6,7 +6,7 @@ import { useTheme } from '../context/ThemeContext';
 import {
   Menu, User as UserIcon, LogOut, PenTool, Moon, Sun,
   BookOpen, Cpu, Sparkles, Home, ShoppingBag, Gamepad2,
-  ChevronRight, Bell, Zap, Lock, Search, BarChart2, RefreshCw, X
+  ChevronRight, Bell, Zap, Lock, Search, BarChart2, RefreshCw, X, Code2
 } from 'lucide-react';
 import { storage } from '../services/storage';
 import LiveChat from './LiveChat';
@@ -21,70 +21,122 @@ const MobileSidebar: React.FC<{
   boards: Board[];
   user: User | null;
 }> = ({ isOpen, onClose, boards, user }) => {
+  const location = useLocation();
+  const [isBoardOpen, setIsBoardOpen] = useState(false);
   if (!isOpen) return null;
 
+  const quickAccessItems = [
+    { path: '/', icon: <Home size={18} />, label: '홈' },
+    { path: '/wiki', icon: <BookOpen size={18} />, label: '위키' },
+  ];
+
+  const toolItems = [
+    { path: '/tools/encoder', icon: <Lock size={18} />, label: '변환기' },
+    { path: '/tools/image-studio', icon: <PenTool size={18} />, label: '이미지 스튜디오' },
+    { path: '/tools/ai-analysis', icon: <Zap size={18} />, label: 'AI 모델 분석기' },
+    { path: '/tools/mock-invest', icon: <BarChart2 size={18} />, label: '모의투자' },
+    { path: '/tools/vibe-code', icon: <Cpu size={18} />, label: '바이브 코딩' },
+    { path: '/webdev', icon: <Code2 size={18} />, label: 'WEB DEV' },
+  ];
+
   return (
-    <div className="fixed inset-0 z-[200] flex animate-fade-in" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={onClose}>
+    <div className="fixed inset-0 z-[200] flex animate-fade-in" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }} onClick={onClose}>
       <div
-        className="w-[80%] max-w-[300px] h-full bg-white dark:bg-gray-800 shadow-2xl p-5 overflow-y-auto animate-slide-in-right"
+        className="w-[75%] max-w-[280px] h-full bg-[#0f1419] shadow-2xl overflow-y-auto animate-slide-in-right"
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-lg font-bold dark:text-white">전체 메뉴</h2>
-          <button onClick={onClose} className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400">
-            <ChevronRight size={24} className="rotate-180" />
-          </button>
+        {/* Quick Access Section */}
+        <div className="p-4">
+          <h3 className="text-[10px] font-black text-gray-500 mb-3 uppercase tracking-[0.2em]">Quick Access</h3>
+          <nav className="space-y-0.5">
+            {quickAccessItems.map(item => {
+              const isActive = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={onClose}
+                  className={`flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${isActive ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                >
+                  <span className="flex items-center gap-3">
+                    <span className={isActive ? 'text-cyan-400' : 'text-gray-500'}>{item.icon}</span>
+                    {item.label}
+                  </span>
+                </Link>
+              );
+            })}
+
+            {/* 게시판 아코디언 */}
+            <button
+              onClick={() => setIsBoardOpen(!isBoardOpen)}
+              className={`w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${location.pathname.startsWith('/board') ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+            >
+              <span className="flex items-center gap-3">
+                <Menu size={18} className={location.pathname.startsWith('/board') ? 'text-cyan-400' : 'text-gray-500'} />
+                게시판
+              </span>
+              <ChevronRight size={14} className={`transition-transform ${isBoardOpen ? 'rotate-90' : ''}`} />
+            </button>
+            {isBoardOpen && (
+              <div className="ml-4 space-y-0.5 border-l border-gray-700 pl-3">
+                {boards.map(board => {
+                  const isLocked = board.required_achievement && !user?.achievements.includes(board.required_achievement);
+                  const isActive = location.pathname === `/board/${board.slug}`;
+                  return (
+                    <Link
+                      key={board.id}
+                      to={isLocked ? '#' : `/board/${board.slug}`}
+                      onClick={(e) => {
+                        if (isLocked) { e.preventDefault(); alert('접근 불가: 정보 요원 업적이 필요합니다.'); }
+                        else onClose();
+                      }}
+                      className={`flex items-center gap-2 px-2 py-2 text-xs font-medium rounded-lg transition-all ${isLocked ? 'opacity-40 text-gray-600' : isActive ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                    >
+                      {isLocked && <Lock size={12} />}
+                      <span>{board.emoji || '📝'}</span>
+                      {board.name}
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* 나머지 퀵 액세스 */}
+            <Link to="/game" onClick={onClose} className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${location.pathname === '/game' ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
+              <Gamepad2 size={18} className={location.pathname === '/game' ? 'text-cyan-400' : 'text-gray-500'} /> 게임
+            </Link>
+            <Link to="/persona" onClick={onClose} className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${location.pathname === '/persona' ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
+              <Sparkles size={18} className={location.pathname === '/persona' ? 'text-cyan-400' : 'text-gray-500'} /> AI 친구
+            </Link>
+            <Link to="/shop" onClick={onClose} className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${location.pathname === '/shop' ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}>
+              <ShoppingBag size={18} className={location.pathname === '/shop' ? 'text-cyan-400' : 'text-gray-500'} /> 상점
+            </Link>
+          </nav>
         </div>
 
-        <h3 className="text-[10px] font-black text-gray-400 mb-4 uppercase tracking-[0.2em]">Quick Access</h3>
-        <nav className="space-y-1">
-          {boards.map(b => {
-            const isLocked = b.required_achievement && !user?.achievements.includes(b.required_achievement);
-            return (
-              <Link
-                key={b.id}
-                to={isLocked ? '#' : `/board/${b.slug}`}
-                className={`flex items-center justify-between p-3 text-sm font-bold rounded-lg group transition-all ${isLocked ? 'opacity-40 cursor-not-allowed text-gray-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
-                onClick={(e) => {
-                  onClose();
-                  if (isLocked) { e.preventDefault(); alert('접근 불가: 정보 요원 업적이 필요합니다.'); }
-                }}
-              >
-                <span className="flex items-center gap-2">
-                  {isLocked ? <Lock size={14} /> : null}
-                  {b.name}
-                </span>
-                {!isLocked && <ChevronRight size={14} className="text-gray-300" />}
-              </Link>
-            )
-          })}
-        </nav>
-
-        <div className="border-t border-gray-100 dark:border-gray-700 my-4"></div>
-
-        <h3 className="text-[10px] font-black text-gray-400 mb-3 uppercase tracking-[0.2em]">Tools</h3>
-        <nav className="grid grid-cols-2 gap-2 mb-3">
-          <Link to="/tools/encoder" onClick={onClose} className="flex flex-col items-center gap-1.5 p-3 text-xs font-bold rounded-xl bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all border border-transparent hover:border-indigo-200 dark:hover:border-indigo-800">
-            <Lock size={18} className="text-gray-400" />
-            변환기
-          </Link>
-          <Link to="/tools/image-studio" onClick={onClose} className="flex flex-col items-center gap-1.5 p-3 text-xs font-bold rounded-xl bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 hover:bg-pink-50 dark:hover:bg-pink-900/30 hover:text-pink-600 dark:hover:text-pink-400 transition-all border border-transparent hover:border-pink-200 dark:hover:border-pink-800">
-            <PenTool size={18} className="text-gray-400" />
-            이미지
-          </Link>
-          <Link to="/tools/ai-analysis" onClick={onClose} className="flex flex-col items-center gap-1.5 p-3 text-xs font-bold rounded-xl bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 hover:bg-yellow-50 dark:hover:bg-yellow-900/30 hover:text-yellow-600 dark:hover:text-yellow-400 transition-all border border-transparent hover:border-yellow-200 dark:hover:border-yellow-800">
-            <Zap size={18} className="text-gray-400" />
-            AI 분석
-          </Link>
-          <Link to="/tools/mock-invest" onClick={onClose} className="flex flex-col items-center gap-1.5 p-3 text-xs font-bold rounded-xl bg-gray-50 dark:bg-gray-800/50 text-gray-600 dark:text-gray-400 hover:bg-green-50 dark:hover:bg-green-900/30 hover:text-green-600 dark:hover:text-green-400 transition-all border border-transparent hover:border-green-200 dark:hover:border-green-800">
-            <BarChart2 size={18} className="text-gray-400" />
-            모의투자
-          </Link>
-        </nav>
-        <Link to="/tools" onClick={onClose} className="flex items-center justify-center gap-2 py-2.5 text-xs font-bold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition-all shadow-sm">
-          <span>전체 도구 보기</span>
-          <ChevronRight size={14} />
-        </Link>
+        {/* Tools Section */}
+        <div className="p-4 pt-0">
+          <h3 className="text-[10px] font-black text-gray-500 mb-3 uppercase tracking-[0.2em]">Tools</h3>
+          <nav className="space-y-0.5">
+            {toolItems.map(item => {
+              const isActive = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={onClose}
+                  className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${isActive ? 'bg-cyan-500/20 text-cyan-400' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                >
+                  <span className={isActive ? 'text-cyan-400' : 'text-gray-500'}>{item.icon}</span>
+                  {item.label}
+                </Link>
+              );
+            })}
+            <Link to="/tools" onClick={onClose} className="flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg text-indigo-400 hover:bg-indigo-500/10 transition-all">
+              <ChevronRight size={18} className="text-indigo-400" /> 전체 도구 보기
+            </Link>
+          </nav>
+        </div>
       </div>
     </div>
   );
@@ -616,6 +668,12 @@ const Layout: React.FC = () => {
               </Link>
               <Link to="/tools/mock-invest" className={`flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-lg transition-all ${location.pathname === '/tools/mock-invest' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                 <BarChart2 size={18} /> 모의투자
+              </Link>
+              <Link to="/tools/vibe-code" className={`flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-lg transition-all ${location.pathname === '/tools/vibe-code' ? 'bg-pink-50 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+                <Cpu size={18} /> 바이브 코딩
+              </Link>
+              <Link to="/webdev" className={`flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-lg transition-all ${location.pathname === '/webdev' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+                <Code2 size={18} /> WEB DEV
               </Link>
               <Link to="/tools" className={`flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-lg transition-all ${location.pathname === '/tools' && !location.search ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'text-indigo-500 dark:text-indigo-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                 <ChevronRight size={18} /> 전체 도구 보기

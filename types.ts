@@ -251,7 +251,7 @@ export interface ShopItem {
   icon: string;
   is_consumable?: boolean; // 사용 시 인벤토리에서 사라짐
   duration_days?: number; // 기간제 아이템 (7일, 30일 등)
-  effect_type?: 'nick_change' | 'ad_remove' | 'post_highlight' | 'exp_boost' | 'mystery_box' | 'megaphone' | 'shield' | 'coupon' | 'lottery' | 'wiki_reset' | 'custom_title';
+  effect_type?: 'nick_change' | 'ad_remove' | 'post_highlight' | 'exp_boost' | 'mystery_box' | 'megaphone' | 'shield' | 'coupon' | 'lottery' | 'wiki_reset' | 'custom_title' | 'ai_unlimited_pass';
 }
 
 export interface WikiHistoryItem {
