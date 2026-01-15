@@ -13,6 +13,7 @@ import LiveChat from './LiveChat';
 import VoiceNeuralLink from './VoiceNeuralLink';
 import { UserNickname, UserAvatar } from './UserEffect';
 import AdBanner from './AdBanner';
+import BugReportWidget from './BugReportWidget';
 
 // 모바일 사이드바 컴포넌트
 const MobileSidebar: React.FC<{
@@ -821,6 +822,7 @@ const Layout: React.FC = () => {
 
       <SearchModal isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} />
 
+      <BugReportWidget />
       <LiveChat />
       <VoiceNeuralLink />
     </div>

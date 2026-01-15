@@ -670,18 +670,22 @@ ${persona.systemPromptMixin}
             )}
 
             {/* 메시지 영역 with optional character background */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 relative">
-                {/* 캐릭터 배경 이미지 (어둡게, 고정) */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 relative overflow-hidden" style={{ clipPath: 'inset(0)' }}>
+                {/* 캐릭터 배경 이미지 (채팅 영역 내에만 표시) */}
                 {(currentPersona as any).profileImage && (
                     <div
-                        className="fixed inset-0 opacity-80 pointer-events-none z-0"
+                        className="sticky top-0 left-0 right-0 h-full w-full opacity-40 pointer-events-none -z-10"
                         style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
                             backgroundImage: `url(${(currentPersona as any).profileImage})`,
                             backgroundSize: 'contain',
                             backgroundPosition: 'center',
                             backgroundRepeat: 'no-repeat',
-                            backgroundAttachment: 'fixed',
-                            filter: 'brightness(0.9)'
+                            filter: 'brightness(0.7)'
                         }}
                     />
                 )}

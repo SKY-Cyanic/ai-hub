@@ -36,6 +36,10 @@ const WritePage: React.FC = () => {
   const boards = storage.getBoards();
   const currentBoard = boards.find(b => b.slug === boardId);
 
+  // 버그 신고 모드 감지
+  const searchParams = new URLSearchParams(location.search);
+  const isBugReportMode = searchParams.get('type') === 'bug_report';
+
   useEffect(() => {
     if (!user) {
       alert('로그인이 필요한 서비스입니다.');
@@ -51,6 +55,16 @@ const WritePage: React.FC = () => {
       setCategory('');
     }
   }, [boardId, currentBoard, isEditMode]);
+
+  // 버그 신고 모드 초기화
+  useEffect(() => {
+    if (isBugReportMode && !isEditMode) {
+      setTitle('[버그/오류 신고]');
+      setBoardId('free');  // 자유 게시판에 작성
+      setTags(['버그신고', '오류']);
+      setShowPoll(false);  // 투표 비활성화
+    }
+  }, [isBugReportMode, isEditMode]);
 
   // Auto-save Draft
   useEffect(() => {
@@ -186,8 +200,8 @@ const WritePage: React.FC = () => {
     }
 
     if (!user) return;
-    // Check gas fee only for new posts
-    if (!isEditMode && user.points < NODE_GAS_FEE) {
+    // Check gas fee only for new posts (버그 신고는 무료)
+    if (!isEditMode && !isBugReportMode && user.points < NODE_GAS_FEE) {
       alert('포인트(가스비)가 부족합니다. 최소 10P가 필요합니다.');
       return;
     }
@@ -275,9 +289,14 @@ const WritePage: React.FC = () => {
     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-sm shadow-sm p-6 transition-colors">
       <div className="flex justify-between items-center mb-6 border-b border-gray-200 dark:border-gray-700 pb-3">
         <h2 className="text-xl font-bold text-gray-800 dark:text-white">{isEditMode ? '글 수정' : '글쓰기'}</h2>
-        {!isEditMode && (
+        {!isEditMode && !isBugReportMode && (
           <div className="flex items-center gap-2 text-[10px] font-black uppercase text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-3 py-1.5 rounded-full">
             <Zap size={12} /> NODE GAS FEE: {NODE_GAS_FEE}P
+          </div>
+        )}
+        {isBugReportMode && (
+          <div className="flex items-center gap-2 text-[10px] font-black uppercase text-green-600 bg-green-50 dark:bg-green-900/30 px-3 py-1.5 rounded-full">
+            💎 CR 소모 없음
           </div>
         )}
       </div>
@@ -321,7 +340,8 @@ const WritePage: React.FC = () => {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="제목을 입력해 주세요."
-            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-white rounded p-3 focus:outline-none focus:border-indigo-500 font-medium"
+            disabled={isBugReportMode}
+            className={`w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 dark:text-white rounded p-3 focus:outline-none focus:border-indigo-500 font-medium ${isBugReportMode ? 'bg-gray-100 dark:bg-gray-600' : ''}`}
           />
         </div>
 
@@ -350,7 +370,7 @@ const WritePage: React.FC = () => {
           <button type="button" onClick={() => fileInputRef.current?.click()} className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-gray-600 dark:text-gray-300 flex items-center gap-1 text-sm font-bold transition-colors">
             <ImageIcon size={18} /> <span className="hidden md:inline">사진</span>
           </button>
-          <button type="button" onClick={() => setShowPoll(!showPoll)} className={`p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded flex items-center gap-1 text-sm font-bold transition-colors ${showPoll ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30' : 'text-gray-600 dark:text-gray-300'}`}>
+          <button type="button" onClick={() => setShowPoll(!showPoll)} disabled={isBugReportMode} className={`p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded flex items-center gap-1 text-sm font-bold transition-colors ${showPoll ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30' : 'text-gray-600 dark:text-gray-300'} ${isBugReportMode ? 'opacity-50 cursor-not-allowed' : ''}`}>
             <BarChart2 size={18} /> <span className="hidden md:inline">투표</span>
           </button>
 
@@ -439,12 +459,23 @@ const WritePage: React.FC = () => {
 
         {isSpoiler && <p className="text-xs text-red-500 font-bold mt-1">* 스포일러 방지가 설정되었습니다. 목록에서 내용이 가려집니다.</p>}
 
-        {!isEditMode && (
+        {!isEditMode && !isBugReportMode && (
           <div className="bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 text-xs p-3 rounded flex items-start gap-2">
             <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
             <div>
               <p className="font-bold">이용 안내</p>
               <p className="mt-1">글 작성 시 2CR이 소모됩니다. 스팸 방지를 위한 정책입니다.</p>
+            </div>
+          </div>
+        )}
+
+        {isBugReportMode && (
+          <div className="bg-red-50 dark:bg-red-900/30 text-red-800 dark:text-red-200 text-xs p-3 rounded flex items-start gap-2">
+            <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-bold">🐛 버그/오류 신고</p>
+              <p className="mt-1">발생한 문제를 상세히 설명해주세요. 스크린샷을 첨부하면 더욱 도움이 됩니다!</p>
+              <p className="mt-1 text-green-600 dark:text-green-400 font-bold">💎 크레딧(CR)이 소모되지 않습니다.</p>
             </div>
           </div>
         )}
