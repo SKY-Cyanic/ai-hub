@@ -670,22 +670,18 @@ ${persona.systemPromptMixin}
             )}
 
             {/* 메시지 영역 with optional character background */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 relative overflow-hidden" style={{ clipPath: 'inset(0)' }}>
-                {/* 캐릭터 배경 이미지 (채팅 영역 내에만 표시) */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 relative" style={{ clipPath: 'inset(0)', isolation: 'isolate' }}>
+                {/* 캐릭터 배경 이미지 (고정, 채팅 영역 안에만 표시) */}
                 {(currentPersona as any).profileImage && (
                     <div
-                        className="sticky top-0 left-0 right-0 h-full w-full opacity-40 pointer-events-none -z-10"
+                        className="fixed inset-0 opacity-30 pointer-events-none"
                         style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
                             backgroundImage: `url(${(currentPersona as any).profileImage})`,
                             backgroundSize: 'contain',
                             backgroundPosition: 'center',
                             backgroundRepeat: 'no-repeat',
-                            filter: 'brightness(0.7)'
+                            filter: 'brightness(0.6)',
+                            zIndex: 0
                         }}
                     />
                 )}
@@ -840,7 +836,7 @@ ${persona.systemPromptMixin}
                                     <input type="text" value={customDescription} onChange={e => setCustomDescription(e.target.value)} placeholder="캐릭터 설명" className="w-full p-2 rounded-lg border dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm" />
                                     <textarea value={customPrompt} onChange={e => setCustomPrompt(e.target.value)} placeholder="성격/말투 설정" className="w-full p-2 rounded-lg border dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm h-16 resize-none" />
 
-                                    {/* AI 이미지 생성 */}
+                                    {/* AI 이미지 생성 - 임시 비활성화
                                     <div className="flex items-center gap-2">
                                         {customProfileImage && (
                                             <img src={customProfileImage} alt="캐릭터 이미지" className="w-16 h-16 rounded-full object-cover border-2 border-cyan-400" />
@@ -857,6 +853,7 @@ ${persona.systemPromptMixin}
                                             )}
                                         </button>
                                     </div>
+                                    */}
 
                                     <button onClick={handleSaveCustomPersona} disabled={!customName.trim()} className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50">
                                         <Save size={16} /> 저장하고 시작하기
