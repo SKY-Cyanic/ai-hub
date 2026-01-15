@@ -302,13 +302,19 @@ ${persona.systemPromptMixin}
         if (!user || !localNickname.trim()) return;
 
         try {
-            await MemoryService.updateProfile(user.id, {
+            // Firestore는 undefined 값을 허용하지 않으므로 조건부로 객체 구성
+            const profileData: any = {
                 nickname: localNickname,
                 personaType: localPersonaType === 'custom' ? 'custom' : localPersonaType,
-                customPersonaName: localPersonaType === 'custom' ? customName : undefined,
-                customPersonaDescription: localPersonaType === 'custom' ? customDescription : undefined,
-                customPersonaPrompt: localPersonaType === 'custom' ? customPrompt : undefined,
-            });
+            };
+
+            if (localPersonaType === 'custom') {
+                profileData.customPersonaName = customName || '';
+                profileData.customPersonaDescription = customDescription || '';
+                profileData.customPersonaPrompt = customPrompt || '';
+            }
+
+            await MemoryService.updateProfile(user.id, profileData);
 
             setShowOnboarding(false);
             setProfile({ ...profile!, nickname: localNickname, personaType: localPersonaType });
