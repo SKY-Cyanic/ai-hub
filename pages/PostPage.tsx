@@ -76,6 +76,16 @@ const PostPage: React.FC = () => {
     }
   };
 
+  const handleReportPost = async () => {
+    if (!user) return alert('로그인이 필요합니다.');
+    if (!post) return;
+    const reason = prompt('신고 사유를 입력해주세요:\n(예: 욕설/비방, 스팸/광고, 불법 콘텐츠, 기타)');
+    if (reason && reason.trim()) {
+      const res = await storage.reportPost(user.id, post.id, reason);
+      alert(res.message);
+    }
+  };
+
   const processContent = (html: string) => {
     // YouTube embed
     const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/g;
@@ -138,6 +148,15 @@ const PostPage: React.FC = () => {
                 className="flex items-center gap-1.5 px-3 py-1 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full text-[10px] font-black border border-red-100 dark:border-red-900/50 hover:bg-red-100 transition-all animate-pulse"
               >
                 <ShieldCheck size={12} /> REPORT AI ERROR (BUG BOUNTY)
+              </button>
+            )}
+            {/* 게시물 신고 버튼 */}
+            {user && user.id !== post.author_id && (
+              <button
+                onClick={handleReportPost}
+                className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-full text-[10px] font-bold border border-gray-200 dark:border-gray-600 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-all"
+              >
+                <Ban size={12} /> 신고
               </button>
             )}
           </div>

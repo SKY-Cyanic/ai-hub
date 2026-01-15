@@ -444,7 +444,7 @@ const WritePage: React.FC = () => {
             <AlertCircle size={16} className="mt-0.5 flex-shrink-0" />
             <div>
               <p className="font-bold">이용 안내</p>
-              <p className="mt-1">글 작성 시 10P가 소모됩니다. 스팸 방지를 위한 정책입니다.</p>
+              <p className="mt-1">글 작성 시 2CR이 소모됩니다. 스팸 방지를 위한 정책입니다.</p>
             </div>
           </div>
         )}

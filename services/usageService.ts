@@ -10,7 +10,7 @@ import { doc, getDoc, setDoc, updateDoc, increment } from "firebase/firestore";
 
 // 일일 무료 사용 한도
 const FREE_DAILY_LIMIT = 20; // 하루 20회 무료
-const CR_PER_MESSAGE = 2; // 무료 소진 후 메시지당 2CR
+const CR_PER_MESSAGE = 10; // 무료 소진 후 메시지당 10CR
 
 // 로컬 스토리지 키 (비로그인 사용자용)
 const LOCAL_USAGE_KEY = 'ai_daily_usage';

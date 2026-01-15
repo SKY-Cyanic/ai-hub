@@ -1,5 +1,5 @@
 import { db } from "./firebase";
-import { doc, getDoc, setDoc, updateDoc, collection, addDoc, query, where, orderBy, limit, getDocs, Timestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, collection, addDoc, query, where, orderBy, limit, getDocs, deleteDoc, increment } from "firebase/firestore";
 
 export interface UserPersonaProfile {
     uid: string;
@@ -12,24 +12,45 @@ export interface UserPersonaProfile {
     customPersonaDescription?: string;
     customPersonaPrompt?: string;
     interactionCount: number;
+    currentSessionId?: string;
 }
 
 export interface ConversationMessage {
     role: 'user' | 'assistant';
     content: string;
     timestamp: string;
+    imageUrl?: string; // 이미지 첨부용
 }
 
 export interface ConversationSession {
     id?: string;
     uid: string;
+    personaName: string;
     messages: ConversationMessage[];
     createdAt: string;
     updatedAt: string;
 }
 
+export interface CustomPersona {
+    id?: string;
+    creatorId: string;
+    creatorName: string;
+    name: string;
+    description: string;
+    prompt: string;
+    icon: string;
+    isShared: boolean;
+    downloads: number;
+    likes: number;
+    likedUsers: string[];
+    createdAt: string;
+}
+
 const COLLECTION_PROFILES = "persona_profiles";
 const COLLECTION_CONVERSATIONS = "persona_conversations";
+const COLLECTION_SESSIONS = "persona_sessions";
+const COLLECTION_CUSTOM_PERSONAS = "custom_personas";
+const COLLECTION_SHARED_PERSONAS = "shared_personas";
 
 export const MemoryService = {
     /**
@@ -66,15 +87,17 @@ export const MemoryService = {
     /**
      * Save conversation messages to Firebase
      */
-    async saveConversation(uid: string, messages: ConversationMessage[]) {
+    async saveConversation(uid: string, messages: ConversationMessage[], sessionId?: string) {
         if (messages.length === 0) return;
 
-        const docRef = doc(db, COLLECTION_CONVERSATIONS, uid);
+        const docId = sessionId || uid;
+        const docRef = doc(db, COLLECTION_CONVERSATIONS, docId);
         const now = new Date().toISOString();
 
         const data: ConversationSession = {
             uid,
-            messages: messages.slice(-20), // 최근 20개 메시지만 저장 (토큰 절약)
+            personaName: '',
+            messages: messages.slice(-30), // 최근 30개 메시지 저장
             createdAt: now,
             updatedAt: now
         };
@@ -93,8 +116,9 @@ export const MemoryService = {
     /**
      * Load previous conversation from Firebase
      */
-    async loadConversation(uid: string): Promise<ConversationMessage[]> {
-        const docRef = doc(db, COLLECTION_CONVERSATIONS, uid);
+    async loadConversation(uid: string, sessionId?: string): Promise<ConversationMessage[]> {
+        const docId = sessionId || uid;
+        const docRef = doc(db, COLLECTION_CONVERSATIONS, docId);
         const snap = await getDoc(docRef);
 
         if (snap.exists()) {
@@ -102,6 +126,29 @@ export const MemoryService = {
             return data.messages || [];
         }
         return [];
+    },
+
+    /**
+     * Clear current conversation (새 대화)
+     */
+    async clearConversation(uid: string, sessionId?: string) {
+        const docId = sessionId || uid;
+        const docRef = doc(db, COLLECTION_CONVERSATIONS, docId);
+        await deleteDoc(docRef);
+    },
+
+    /**
+     * Get conversation session list
+     */
+    async getConversationList(uid: string): Promise<ConversationSession[]> {
+        const q = query(
+            collection(db, COLLECTION_SESSIONS),
+            where("uid", "==", uid),
+            orderBy("updatedAt", "desc"),
+            limit(20)
+        );
+        const snap = await getDocs(q);
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as ConversationSession));
     },
 
     /**
@@ -128,5 +175,96 @@ export const MemoryService = {
         await updateDoc(docRef, {
             lastConversationSummary: summary
         });
+    },
+
+    // ============ 커스텀 캐릭터 관리 ============
+
+    /**
+     * Save custom persona
+     */
+    async saveCustomPersona(uid: string, creatorName: string, persona: Omit<CustomPersona, 'id' | 'creatorId' | 'creatorName' | 'isShared' | 'downloads' | 'likes' | 'likedUsers' | 'createdAt'>): Promise<string> {
+        const docRef = await addDoc(collection(db, COLLECTION_CUSTOM_PERSONAS), {
+            ...persona,
+            creatorId: uid,
+            creatorName,
+            isShared: false,
+            downloads: 0,
+            likes: 0,
+            likedUsers: [],
+            createdAt: new Date().toISOString()
+        });
+        return docRef.id;
+    },
+
+    /**
+     * Get my custom personas
+     */
+    async getMyPersonas(uid: string): Promise<CustomPersona[]> {
+        const q = query(
+            collection(db, COLLECTION_CUSTOM_PERSONAS),
+            where("creatorId", "==", uid),
+            orderBy("createdAt", "desc")
+        );
+        const snap = await getDocs(q);
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as CustomPersona));
+    },
+
+    /**
+     * Delete custom persona
+     */
+    async deleteCustomPersona(personaId: string) {
+        await deleteDoc(doc(db, COLLECTION_CUSTOM_PERSONAS, personaId));
+    },
+
+    /**
+     * Share custom persona to community
+     */
+    async sharePersona(personaId: string) {
+        await updateDoc(doc(db, COLLECTION_CUSTOM_PERSONAS, personaId), { isShared: true });
+    },
+
+    /**
+     * Get shared personas (커뮤니티 갤러리)
+     */
+    async getSharedPersonas(): Promise<CustomPersona[]> {
+        const q = query(
+            collection(db, COLLECTION_CUSTOM_PERSONAS),
+            where("isShared", "==", true),
+            orderBy("likes", "desc"),
+            limit(50)
+        );
+        const snap = await getDocs(q);
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as CustomPersona));
+    },
+
+    /**
+     * Like a shared persona
+     */
+    async likePersona(personaId: string, uid: string) {
+        const docRef = doc(db, COLLECTION_CUSTOM_PERSONAS, personaId);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+            const data = snap.data();
+            const likedUsers = data.likedUsers || [];
+            if (!likedUsers.includes(uid)) {
+                await updateDoc(docRef, {
+                    likes: (data.likes || 0) + 1,
+                    likedUsers: [...likedUsers, uid]
+                });
+            }
+        }
+    },
+
+    /**
+     * Download/Use a shared persona
+     */
+    async downloadPersona(personaId: string): Promise<CustomPersona | null> {
+        const docRef = doc(db, COLLECTION_CUSTOM_PERSONAS, personaId);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+            await updateDoc(docRef, { downloads: (snap.data().downloads || 0) + 1 });
+            return { id: snap.id, ...snap.data() } as CustomPersona;
+        }
+        return null;
     }
 };

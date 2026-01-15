@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { ChatMessage, Conversation } from '../types';
 import { storage } from '../services/storage';
-import { MessageSquare, Send, X, Hash, ChevronLeft } from 'lucide-react';
+import { MessageSquare, Send, X, Hash, ChevronLeft, Sparkles } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { UserNickname, UserAvatar } from './UserEffect';
 
 const LiveChat: React.FC = () => {
-    // ... existing component code ...
-    // (I will rewrite the whole top section up to the component start to be safe)
     const { user } = useAuth();
     const { isAiHubMode } = useTheme();
+    const navigate = useNavigate();
     const [isOpen, setIsOpen] = useState(false);
     const [channels, setChannels] = useState<Conversation[]>([]);
     const [currentChannel, setCurrentChannel] = useState<Conversation | null>(null);
@@ -105,7 +105,22 @@ const LiveChat: React.FC = () => {
             <div className="flex-1 overflow-y-auto bg-gray-50 dark:bg-gray-900/50 relative">
                 {!currentChannel ? (
                     <div className="p-2 space-y-2">
-                        <h3 className="px-2 text-xs font-bold text-gray-500 uppercase mt-2">Open Channels</h3>
+                        {/* AI 친구 바로가기 */}
+                        <h3 className="px-2 text-xs font-bold text-purple-500 uppercase mt-2">AI Chatbot</h3>
+                        <button
+                            onClick={() => { setIsOpen(false); navigate('/persona'); }}
+                            className="w-full text-left p-3 rounded-xl bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-300 dark:border-purple-700 hover:border-purple-500 hover:shadow-md transition-all flex items-center gap-3 group"
+                        >
+                            <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 text-white">
+                                <Sparkles size={18} />
+                            </div>
+                            <div>
+                                <div className="font-bold text-sm text-purple-600 dark:text-purple-400 group-hover:text-purple-700">AI 친구 💖</div>
+                                <div className="text-[10px] text-gray-500">유나, 민호, 지원, 조이와 대화하기</div>
+                            </div>
+                        </button>
+
+                        <h3 className="px-2 text-xs font-bold text-gray-500 uppercase mt-4">Open Channels</h3>
                         {channels.map(ch => (
                             <button
                                 key={ch.id}

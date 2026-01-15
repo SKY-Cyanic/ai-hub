@@ -2,8 +2,8 @@
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { PERSONAS, PersonaType } from '../constants/personas';
-import { Send, Sparkles, Settings, X, AlertTriangle, Zap, Plus, Save, ShoppingBag } from 'lucide-react';
-import { MemoryService, UserPersonaProfile, ConversationMessage } from '../services/memory';
+import { Send, Sparkles, Settings, X, AlertTriangle, Zap, Plus, Save, ShoppingBag, RotateCcw, Image, Upload, Heart, Share2, Trash2, Users } from 'lucide-react';
+import { MemoryService, UserPersonaProfile, ConversationMessage, CustomPersona } from '../services/memory';
 import { getGroqClient, ChatMessage } from '../services/groqClient';
 import { UsageService, UsageInfo } from '../services/usageService';
 
@@ -11,6 +11,7 @@ interface Message {
     role: 'user' | 'assistant';
     content: string;
     timestamp: Date;
+    imageUrl?: string; // 이미지 첨부용
 }
 
 // <think> 태그 제거 함수
@@ -56,6 +57,20 @@ const PersonaPage: React.FC = () => {
     const [usageInfo, setUsageInfo] = useState<UsageInfo | null>(null);
     const [userCredits, setUserCredits] = useState(0);
 
+    // 이미지 업로드
+    const [attachedImage, setAttachedImage] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // 내 커스텀 캐릭터
+    const [myPersonas, setMyPersonas] = useState<CustomPersona[]>([]);
+    const [showMyPersonas, setShowMyPersonas] = useState(false);
+    const [showCommunity, setShowCommunity] = useState(false);
+    const [communityPersonas, setCommunityPersonas] = useState<CustomPersona[]>([]);
+
+    // 커스텀 캐릭터 프로필 이미지 (Pollinations.ai)
+    const [customProfileImage, setCustomProfileImage] = useState<string | null>(null);
+    const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+
     const chatEndRef = useRef<HTMLDivElement>(null);
     const groqClient = getGroqClient();
 
@@ -67,6 +82,8 @@ const PersonaPage: React.FC = () => {
             description: profile?.customPersonaDescription || customDescription || '나만의 AI 친구',
             greeting: `안녕 ${localNickname}! 반가워~ ✨`,
             color: 'text-cyan-400',
+            bgGradient: 'from-cyan-500 to-blue-500',
+            profileImage: customProfileImage,
             systemPromptMixin: profile?.customPersonaPrompt || customPrompt || '친근하고 따뜻한 친구처럼 대화해.'
         }
         : getPersona(localPersonaType);
@@ -157,11 +174,16 @@ ${persona.systemPromptMixin}
 
         prompt += `
 규칙:
-1. 1~3문장으로 짧게 대답해
-2. 자연스럽고 친근하게
+1. 2~4문장으로 대답하고 반드시 끝에 질문이나 제안을 추가해
+2. 자연스럽고 친근하게, 호기심 가득하게 반응해
 3. <think> 태그 절대 사용 금지 - 바로 대답해
-4. 딱딱한 AI처럼 굴지 마
-5. 반드시 완성된 문장으로 끝내`;
+4. 딱딱한 AI처럼 굴지 마, 진짜 친구처럼 해
+5. 반드시 완성된 문장으로 끝내
+6. 절대 작별인사 하지마 - "그럼 안녕", "다음에 봐", "나중에 얘기하자" 금지!
+7. 대화가 끊기려고 하면 "아 참!", "그런데~", "갑자기 생각났는데" 등으로 새 화제 꺼내
+8. 사용자의 말에 공감하고 더 깊이 파고들어
+9. 재미있는 질문으로 호기심 자극해
+10. 항상 대화를 이어갈 떡밥을 던져`;
 
         return prompt;
     }, [currentPersona, profile, localNickname, conversationContext]);
@@ -305,12 +327,25 @@ ${persona.systemPromptMixin}
         if (!user || !customName.trim()) return;
 
         try {
+            // 프로필에 현재 캐릭터로 저장
             await MemoryService.updateProfile(user.id, {
                 personaType: 'custom',
                 customPersonaName: customName,
                 customPersonaDescription: customDescription,
                 customPersonaPrompt: customPrompt,
             });
+
+            // 캐릭터 라이브러리에도 저장
+            await MemoryService.saveCustomPersona(user.id, user.nickname, {
+                name: customName,
+                description: customDescription,
+                prompt: customPrompt,
+                icon: '✨'
+            });
+
+            // 내 캐릭터 목록 새로고침
+            const personas = await MemoryService.getMyPersonas(user.id);
+            setMyPersonas(personas);
 
             setLocalPersonaType('custom');
             setShowCustomCreate(false);
@@ -323,6 +358,146 @@ ${persona.systemPromptMixin}
             }]);
         } catch (e) {
             console.error('Save custom persona error:', e);
+        }
+    };
+
+    // 새 대화 시작
+    const handleNewConversation = async () => {
+        if (!user) return;
+        if (!window.confirm('새 대화를 시작하시겠습니까? 현재 대화가 초기화됩니다.')) return;
+
+        try {
+            await MemoryService.clearConversation(user.id);
+            setMessages([{
+                role: 'assistant',
+                content: `${currentPersona.icon} 새로운 대화를 시작합니다! 뭐 얘기해볼까? 😊`,
+                timestamp: new Date()
+            }]);
+        } catch (e) {
+            console.error('New conversation error:', e);
+        }
+    };
+
+    // 이미지 첨부
+    const handleImageAttach = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.size > 5 * 1024 * 1024) {
+            alert('이미지 크기는 5MB 이하만 가능합니다.');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            setAttachedImage(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    // 클립보드 붙여넣기
+    const handlePaste = (e: React.ClipboardEvent) => {
+        const items = e.clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                const blob = items[i].getAsFile();
+                if (blob) {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        setAttachedImage(reader.result as string);
+                    };
+                    reader.readAsDataURL(blob);
+                }
+                break;
+            }
+        }
+    };
+
+    // 커뮤니티 캐릭터 로드
+    const loadCommunityPersonas = async () => {
+        const personas = await MemoryService.getSharedPersonas();
+        setCommunityPersonas(personas);
+        setShowCommunity(true);
+    };
+
+    // 캐릭터 사용하기
+    const usePersona = async (persona: CustomPersona) => {
+        setCustomName(persona.name);
+        setCustomDescription(persona.description);
+        setCustomPrompt(persona.prompt);
+        setLocalPersonaType('custom');
+        setShowMyPersonas(false);
+        setShowCommunity(false);
+        setShowSettings(false);
+
+        setMessages([{
+            role: 'assistant',
+            content: `${persona.icon || '✨'} 안녕! 나는 ${persona.name}야~ 무슨 얘기 해볼까? 💖`,
+            timestamp: new Date()
+        }]);
+    };
+
+    // 캐릭터 공유하기
+    const sharePersona = async (personaId: string) => {
+        await MemoryService.sharePersona(personaId);
+        const personas = await MemoryService.getMyPersonas(user!.id);
+        setMyPersonas(personas);
+        alert('캐릭터가 커뮤니티에 공유되었습니다!');
+    };
+
+    // 캐릭터 삭제
+    const deletePersona = async (personaId: string) => {
+        if (!window.confirm('이 캐릭터를 삭제하시겠습니까?')) return;
+        await MemoryService.deleteCustomPersona(personaId);
+        const personas = await MemoryService.getMyPersonas(user!.id);
+        setMyPersonas(personas);
+    };
+
+    // Pollinations.ai로 커스텀 캐릭터 이미지 생성
+    const generateCharacterImage = async (characterName: string, characterDescription: string) => {
+        if (isGeneratingImage) return;
+        setIsGeneratingImage(true);
+
+        try {
+            // 프롬프트 생성
+            const prompt = `Anime-style portrait of a Korean character named ${characterName}, ${characterDescription}, cute kawaii style, digital art, vibrant colors, expressive eyes, detailed, high quality, transparent background`;
+            const encodedPrompt = encodeURIComponent(prompt);
+            const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=400&height=400&nologo=true`;
+
+            // 이미지 로드 확인
+            const img = document.createElement('img');
+            img.onload = () => {
+                setCustomProfileImage(imageUrl);
+                setIsGeneratingImage(false);
+            };
+            img.onerror = () => {
+                alert('이미지 생성에 실패했습니다. 다시 시도해주세요.');
+                setIsGeneratingImage(false);
+            };
+            img.src = imageUrl;
+        } catch (e) {
+            console.error('Image generation error:', e);
+            setIsGeneratingImage(false);
+        }
+    };
+
+    // 대화 기록 다시 불러오기
+    const reloadConversationHistory = async () => {
+        if (!user) return;
+        try {
+            const prevMessages = await MemoryService.loadConversation(user.id);
+            if (prevMessages.length > 0) {
+                setMessages(prevMessages.map(m => ({
+                    role: m.role,
+                    content: m.content,
+                    timestamp: new Date(m.timestamp),
+                    imageUrl: m.imageUrl
+                })));
+            } else {
+                alert('저장된 대화 기록이 없습니다.');
+            }
+        } catch (e) {
+            console.error('Load conversation error:', e);
         }
     };
 
@@ -439,24 +614,44 @@ ${persona.systemPromptMixin}
     }
 
     return (
-        <div className="flex flex-col h-[calc(100vh-120px)] md:h-[600px] max-w-2xl mx-auto bg-gradient-to-b from-purple-900/10 to-gray-900/10 dark:from-purple-950 dark:to-gray-950 md:rounded-3xl overflow-hidden border border-purple-500/20 shadow-2xl relative">
-            {/* 헤더 */}
-            <div className="p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-purple-500/20 flex justify-between items-center">
+        <div className="flex flex-col w-full mx-auto bg-white dark:bg-gray-950 overflow-hidden relative" style={{ height: 'calc(100vh - 60px)' }}>
+            {/* 인스타 DM 스타일 헤더 */}
+            <div className="px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-2xl shadow-lg">
-                        {currentPersona.icon}
+                    {/* 프로필 이미지 또는 아이콘 */}
+                    <div className={`w-11 h-11 bg-gradient-to-br ${(currentPersona as any).bgGradient || 'from-purple-500 to-pink-500'} rounded-full flex items-center justify-center text-xl shadow-md ring-2 ring-offset-2 ring-purple-400/50`}>
+                        {(currentPersona as any).profileImage ? (
+                            <img src={(currentPersona as any).profileImage} alt={currentPersona.name} className="w-full h-full rounded-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        ) : null}
+                        <span>{currentPersona.icon}</span>
                     </div>
                     <div>
-                        <h3 className="font-black text-lg">{currentPersona.name}</h3>
-                        <div className="flex items-center gap-1.5">
-                            <Zap size={12} className="text-yellow-500" />
-                            <span className="text-xs text-yellow-600 dark:text-yellow-400 font-medium">⚡ 초고속 AI</span>
-                        </div>
+                        <h3 className="font-bold text-base leading-tight">{currentPersona.name}</h3>
+                        <span className="text-xs text-green-500 font-medium">● 온라인</span>
                     </div>
                 </div>
-                <button onClick={() => setShowSettings(!showSettings)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
-                    <Settings size={20} className="text-gray-400" />
-                </button>
+                <div className="flex items-center gap-1">
+                    {/* 새 대화 */}
+                    <button onClick={handleNewConversation} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full" title="새 대화">
+                        <RotateCcw size={18} className="text-gray-400" />
+                    </button>
+                    {/* 대화 기록 불러오기 */}
+                    <button onClick={reloadConversationHistory} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full" title="대화 기록 불러오기">
+                        <Zap size={18} className="text-yellow-500" />
+                    </button>
+                    {/* 내 캐릭터 */}
+                    <button onClick={async () => { const p = await MemoryService.getMyPersonas(user!.id); setMyPersonas(p); setShowMyPersonas(true); }} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full" title="내 캐릭터">
+                        <Save size={18} className="text-gray-400" />
+                    </button>
+                    {/* 커뮤니티 */}
+                    <button onClick={loadCommunityPersonas} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full" title="커뮤니티 캐릭터">
+                        <Users size={18} className="text-gray-400" />
+                    </button>
+                    {/* 설정 */}
+                    <button onClick={() => setShowSettings(!showSettings)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full" title="설정">
+                        <Settings size={20} className="text-gray-400" />
+                    </button>
+                </div>
             </div>
 
             {/* 에러 표시 */}
@@ -468,19 +663,41 @@ ${persona.systemPromptMixin}
                 </div>
             )}
 
-            {/* 메시지 영역 */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* 메시지 영역 with optional character background */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 relative">
+                {/* 캐릭터 배경 이미지 (어둡게, 고정) */}
+                {(currentPersona as any).profileImage && (
+                    <div
+                        className="fixed inset-0 opacity-80 pointer-events-none z-0"
+                        style={{
+                            backgroundImage: `url(${(currentPersona as any).profileImage})`,
+                            backgroundSize: 'contain',
+                            backgroundPosition: 'center',
+                            backgroundRepeat: 'no-repeat',
+                            backgroundAttachment: 'fixed',
+                            filter: 'brightness(0.9)'
+                        }}
+                    />
+                )}
+
                 {messages.map((msg, idx) => (
-                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
+                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in relative z-10`}>
                         {msg.role === 'assistant' && (
-                            <div className="w-8 h-8 mr-2 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-sm flex-shrink-0">
-                                {currentPersona.icon}
+                            <div className={`w-8 h-8 mr-2 rounded-full bg-gradient-to-br ${(currentPersona as any).bgGradient || 'from-purple-500 to-pink-500'} flex items-center justify-center text-sm flex-shrink-0 overflow-hidden`}>
+                                {(currentPersona as any).profileImage ? (
+                                    <img src={(currentPersona as any).profileImage} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                    <span>{currentPersona.icon}</span>
+                                )}
                             </div>
                         )}
                         <div className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-md ${msg.role === 'user'
                             ? 'bg-gradient-to-br from-purple-600 to-indigo-600 text-white rounded-tr-sm'
                             : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-tl-sm border dark:border-gray-700'
                             }`}>
+                            {msg.imageUrl && (
+                                <img src={msg.imageUrl} alt="첨부 이미지" className="max-w-full rounded-lg mb-2" />
+                            )}
                             <p className="whitespace-pre-wrap">{msg.content || (isTyping ? '생각중...' : '')}</p>
                             <p className={`text-[10px] mt-1 ${msg.role === 'user' ? 'text-white/60' : 'text-gray-400'}`}>
                                 {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -490,9 +707,13 @@ ${persona.systemPromptMixin}
                 ))}
 
                 {isTyping && (!messages.length || !messages[messages.length - 1]?.content) && (
-                    <div className="flex justify-start animate-fade-in">
-                        <div className="w-8 h-8 mr-2 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-sm">
-                            {currentPersona.icon}
+                    <div className="flex justify-start animate-fade-in relative z-10">
+                        <div className={`w-8 h-8 mr-2 rounded-full bg-gradient-to-br ${(currentPersona as any).bgGradient || 'from-purple-500 to-pink-500'} flex items-center justify-center text-sm overflow-hidden`}>
+                            {(currentPersona as any).profileImage ? (
+                                <img src={(currentPersona as any).profileImage} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                                <span>{currentPersona.icon}</span>
+                            )}
                         </div>
                         <div className="bg-white dark:bg-gray-800 px-4 py-3 rounded-2xl rounded-tl-sm border dark:border-gray-700">
                             <div className="flex gap-1">
@@ -508,25 +729,52 @@ ${persona.systemPromptMixin}
             </div>
 
             {/* 입력 영역 */}
-            <div className="p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-t border-purple-500/20">
+            <div className="p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-t border-purple-500/20 sticky bottom-0">
+                {/* 이미지 미리보기 */}
+                {attachedImage && (
+                    <div className="mb-2 relative inline-block">
+                        <img src={attachedImage} alt="첨부 이미지" className="h-20 rounded-lg border border-gray-300 dark:border-gray-600" />
+                        <button
+                            onClick={() => setAttachedImage(null)}
+                            className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs"
+                        >
+                            ×
+                        </button>
+                    </div>
+                )}
                 <div className="flex gap-2">
+                    {/* 이미지 첨부 버튼 */}
+                    <input type="file" ref={fileInputRef} onChange={handleImageAttach} accept="image/*" className="hidden" />
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="p-3 bg-gray-100 dark:bg-gray-800 rounded-2xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-all"
+                        title="이미지 첨부 (Ctrl+V로 붙여넣기 가능)"
+                    >
+                        <Image size={20} className="text-gray-500" />
+                    </button>
                     <input
                         type="text"
+                        inputMode="text"
+                        enterKeyHint="send"
+                        autoComplete="off"
                         value={input}
                         onChange={e => setInput(e.target.value)}
+                        onPaste={handlePaste}
                         onKeyDown={e => {
+                            // IME 조합 중에는 무시 (한국어 입력 시)
+                            if (e.nativeEvent.isComposing) return;
                             if (e.key === 'Enter' && !e.shiftKey && input.trim() && !isTyping) {
                                 e.preventDefault();
                                 handleSend();
                             }
                         }}
-                        placeholder="메시지를 입력하세요..."
+                        placeholder="메시지를 입력하세요... (Ctrl+V로 이미지 붙여넣기)"
                         disabled={isTyping}
-                        className="flex-1 px-4 py-3 bg-gray-100 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 focus:border-purple-500 outline-none transition-all disabled:opacity-50"
+                        className="flex-1 px-4 py-3 bg-gray-100 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 focus:border-purple-500 outline-none transition-all disabled:opacity-50 text-base"
                     />
                     <button
                         onClick={handleSend}
-                        disabled={!input.trim() || isTyping}
+                        disabled={(!input.trim() && !attachedImage) || isTyping}
                         className="px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-2xl font-bold disabled:opacity-50 hover:shadow-lg transition-all active:scale-95"
                     >
                         <Send size={20} />
@@ -581,6 +829,25 @@ ${persona.systemPromptMixin}
                                     <input type="text" value={customName} onChange={e => setCustomName(e.target.value)} placeholder="캐릭터 이름" className="w-full p-2 rounded-lg border dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm" />
                                     <input type="text" value={customDescription} onChange={e => setCustomDescription(e.target.value)} placeholder="캐릭터 설명" className="w-full p-2 rounded-lg border dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm" />
                                     <textarea value={customPrompt} onChange={e => setCustomPrompt(e.target.value)} placeholder="성격/말투 설정" className="w-full p-2 rounded-lg border dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm h-16 resize-none" />
+
+                                    {/* AI 이미지 생성 */}
+                                    <div className="flex items-center gap-2">
+                                        {customProfileImage && (
+                                            <img src={customProfileImage} alt="캐릭터 이미지" className="w-16 h-16 rounded-full object-cover border-2 border-cyan-400" />
+                                        )}
+                                        <button
+                                            onClick={() => generateCharacterImage(customName, customDescription)}
+                                            disabled={!customName.trim() || isGeneratingImage}
+                                            className="flex-1 py-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+                                        >
+                                            {isGeneratingImage ? (
+                                                <>⏳ 생성중...</>
+                                            ) : (
+                                                <>🎨 AI 이미지 생성</>
+                                            )}
+                                        </button>
+                                    </div>
+
                                     <button onClick={handleSaveCustomPersona} disabled={!customName.trim()} className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50">
                                         <Save size={16} /> 저장하고 시작하기
                                     </button>
@@ -621,6 +888,103 @@ ${persona.systemPromptMixin}
                         <button className="mt-4 text-sm text-gray-400 hover:text-gray-600" onClick={() => setShowLimitModal(false)}>
                             닫기
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* 내 캐릭터 모달 */}
+            {showMyPersonas && (
+                <div className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setShowMyPersonas(false)}>
+                    <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-3xl p-6 animate-fade-in max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-xl font-black mb-4 flex items-center gap-2">
+                            <Save className="text-purple-500" /> 내 캐릭터
+                        </h3>
+                        {myPersonas.length === 0 ? (
+                            <p className="text-gray-500 text-center py-8">저장된 캐릭터가 없습니다.<br />설정에서 커스텀 캐릭터를 만들어보세요!</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {myPersonas.map(p => (
+                                    <div key={p.id} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-2xl">{p.icon || '✨'}</span>
+                                                <div>
+                                                    <h4 className="font-bold">{p.name}</h4>
+                                                    <p className="text-xs text-gray-500">{p.description}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                {!p.isShared && (
+                                                    <button onClick={() => sharePersona(p.id!)} className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg" title="공유">
+                                                        <Share2 size={16} className="text-blue-500" />
+                                                    </button>
+                                                )}
+                                                <button onClick={() => deletePersona(p.id!)} className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg" title="삭제">
+                                                    <Trash2 size={16} className="text-red-500" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2 mt-3">
+                                            <button onClick={() => usePersona(p)} className="flex-1 py-2 bg-purple-500 text-white rounded-lg text-sm font-bold">
+                                                사용하기
+                                            </button>
+                                            {p.isShared && <span className="text-xs text-green-500 font-bold">✓ 공유됨</span>}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <button className="w-full mt-4 py-3 bg-gray-200 dark:bg-gray-800 rounded-xl font-bold" onClick={() => setShowMyPersonas(false)}>닫기</button>
+                    </div>
+                </div>
+            )}
+
+            {/* 커뮤니티 캐릭터 모달 */}
+            {showCommunity && (
+                <div className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setShowCommunity(false)}>
+                    <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-3xl p-6 animate-fade-in max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-xl font-black mb-4 flex items-center gap-2">
+                            <Users className="text-cyan-500" /> 커뮤니티 캐릭터
+                        </h3>
+                        {communityPersonas.length === 0 ? (
+                            <p className="text-gray-500 text-center py-8">아직 공유된 캐릭터가 없습니다.<br />첫 번째로 캐릭터를 공유해보세요!</p>
+                        ) : (
+                            <div className="space-y-3">
+                                {communityPersonas.map(p => (
+                                    <div key={p.id} className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <span className="text-2xl">{p.icon || '✨'}</span>
+                                            <div className="flex-1">
+                                                <h4 className="font-bold">{p.name}</h4>
+                                                <p className="text-xs text-gray-500">{p.description}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
+                                            <span>by {p.creatorName}</span>
+                                            <div className="flex items-center gap-3">
+                                                <span className="flex items-center gap-1"><Heart size={12} className="text-red-400" /> {p.likes}</span>
+                                                <span className="flex items-center gap-1"><Upload size={12} /> {p.downloads}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={async () => { await MemoryService.likePersona(p.id!, user!.id); loadCommunityPersonas(); }}
+                                                className="flex-1 py-2 bg-pink-100 dark:bg-pink-900/30 text-pink-600 rounded-lg text-sm font-bold flex items-center justify-center gap-1"
+                                            >
+                                                <Heart size={14} /> 좋아요
+                                            </button>
+                                            <button
+                                                onClick={async () => { await MemoryService.downloadPersona(p.id!); usePersona(p); }}
+                                                className="flex-1 py-2 bg-cyan-500 text-white rounded-lg text-sm font-bold"
+                                            >
+                                                사용하기
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <button className="w-full mt-4 py-3 bg-gray-200 dark:bg-gray-800 rounded-xl font-bold" onClick={() => setShowCommunity(false)}>닫기</button>
                     </div>
                 </div>
             )}

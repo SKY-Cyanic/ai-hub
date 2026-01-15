@@ -105,7 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const isAdmin = username.toLowerCase() === 'admin';
 
         // Referral Logic
-        let points = 500;
+        let points = 100; // 기본 100CR로 축소
         let invitedBy = undefined;
 
         if (referralCode) {
@@ -135,14 +135,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             password,
             second_password: isAdmin ? secondPassword : undefined,
             is_admin: isAdmin,
-            level: isAdmin ? 9999 : 1,
+            level: 1, // 관리자 포함 모두 레벨 1 시작
             email: `${username}@aihub.io`,
             avatar_url: avatarUrl || '',
             exp: 0,
-            points: isAdmin ? 999999999 : points,
+            points: points, // 관리자도 동일 100CR
             credits: 0,
             inventory: [],
-            active_items: isAdmin ? { name_color: '#FF0000', name_style: 'bold', badge: '👑' } : { theme: 'standard' },
+            active_items: { theme: 'standard' }, // 관리자 우대 삭제
             blocked_users: [],
             scrapped_posts: [],
             achievements: [],
@@ -173,15 +173,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             let existingUser = users.find(u => u.google_uid === googleUser.uid);
 
             if (existingUser) {
-                // 관리자 체크 (기존 유저도 이메일이 일치하면 관리자로 승급)
-                const isAdmin = googleUser.email === 'lech.skynic@gmail.com';
-                if (isAdmin && !existingUser.is_admin) {
-                    existingUser.is_admin = true;
-                    existingUser.level = 999;
-                    if (existingUser.points < 1000000) existingUser.points = 1000000;
-                    existingUser.active_items = { ...existingUser.active_items, name_color: '#FF0000', name_style: 'bold', badge: '👑' };
-                    await storage.saveUser(existingUser);
-                }
+                // 관리자 우대 삭제 - 더 이상 자동 승급하지 않음
 
                 // 기존 사용자 로그인
                 setUser(existingUser);
@@ -190,23 +182,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 return { success: true, message: '로그인 성공!' };
             }
 
-            // 신규 사용자 생성
-            const isAdmin = googleUser.email === 'lech.skynic@gmail.com';
+            // 신규 사용자 생성 (관리자 우대 삭제)
             const newUser: User = {
                 id: `user-${Date.now()}`,
                 username: `google_${googleUser.uid.slice(0, 8)}`,
                 nickname: googleUser.displayName || '구글 사용자',
                 created_at: new Date().toISOString(),
                 google_uid: googleUser.uid,
-                is_admin: isAdmin,
-                level: isAdmin ? 999 : 1,
+                is_admin: false, // 자동 관리자 승급 제거
+                level: 1,
                 email: googleUser.email || '',
                 avatar_url: googleUser.photoURL || `https://api.dicebear.com/7.x/bottts/svg?seed=${googleUser.uid}`,
                 exp: 0,
-                points: isAdmin ? 1000000 : 500,
+                points: 100, // 100CR로 통일
                 credits: 0,
                 inventory: [],
-                active_items: isAdmin ? { name_color: '#FF0000', name_style: 'bold', badge: '👑' } : { theme: 'standard' },
+                active_items: { theme: 'standard' },
                 blocked_users: [],
                 scrapped_posts: [],
                 achievements: [],
@@ -248,7 +239,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             guest_expires_at: Date.now() + 30 * 60 * 1000, // 30분 후 만료
             level: 1,
             exp: 0,
-            points: 100,
+            points: 0, // 게스트는 CR 0
             credits: 0,
             avatar_url: `https://api.dicebear.com/7.x/bottts/svg?seed=${Date.now()}`,
             inventory: [],

@@ -11,7 +11,17 @@ const LeaderboardWidget: React.FC = () => {
 
     useEffect(() => {
         const users = storage.getUsers();
-        const sorted = [...users].sort((a, b) => b.level !== a.level ? b.level - a.level : b.points - a.points);
+        // 게스트 계정, 삭제된 계정 제외 및 중복 제거 (id 기준)
+        const uniqueUserMap = new Map<string, User>();
+        users.forEach(u => {
+            if (!u.is_guest && u.username && !u.username.startsWith('guest_')) {
+                if (!uniqueUserMap.has(u.id) || (uniqueUserMap.get(u.id)?.level || 0) < u.level) {
+                    uniqueUserMap.set(u.id, u);
+                }
+            }
+        });
+        const filtered = Array.from(uniqueUserMap.values());
+        const sorted = [...filtered].sort((a, b) => b.level !== a.level ? b.level - a.level : b.points - a.points);
         setTopUsers(sorted.slice(0, 5));
     }, []);
 

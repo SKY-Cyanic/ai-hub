@@ -121,14 +121,12 @@ const ShopPage: React.FC = () => {
 
     const handleCharge = async () => {
         if (!user) return;
+        // 실제 결제 연동 전에는 CR을 주지 않음
+        alert('결제 시스템 준비 중입니다. 🚧\n현재는 활동으로 CR을 획득해주세요!');
         setIsChargeModalOpen(false);
-        const success = await storage.chargePoints(user.id, chargeAmount);
-        if (success) {
-            alert(`${chargeAmount.toLocaleString()} CR 충전 완료!`);
-            refreshUser();
-            setPaymentStep(1);
-            setSelectedMethod(null);
-        }
+        setPaymentStep(1);
+        setSelectedMethod(null);
+        setChargeAmount(0);
     };
 
     const getPreviewProfile = () => {

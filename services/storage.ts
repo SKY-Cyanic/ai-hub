@@ -7,7 +7,7 @@ import {
 } from "firebase/firestore";
 import { Post, Comment, Board, User, WikiPage, ChatMessage, AiLog, ShopItem, Notification, Conversation, PrivateMessage, Achievement, AuctionItem, BalanceGame, FactCheckReport, GameSubmission, Transaction, WikiHistoryItem } from '../types';
 
-export const NODE_GAS_FEE = 10;
+export const NODE_GAS_FEE = 2;
 
 const BALANCE_GAMES: BalanceGame[] = [
   { id: 'bg-1', question: '일주일 동안 스마트폰 0% vs 인터넷 10년 전 속도', option_a: '스마트폰 압수', option_b: '3G 속도', reward_exp: 10, reward_points: 5 },
@@ -188,6 +188,26 @@ export const storage = {
       return { success: true, message: '신고가 접수되었습니다.' };
     } catch (e) {
       console.error('Report error:', e);
+      return { success: false, message: '신고 처리 중 오류가 발생했습니다.' };
+    }
+  },
+
+  // --- Post Report (게시물 신고) ---
+  reportPost: async (reporterId: string, postId: string, reason: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      // 신고 저장
+      await addDoc(collection(db, "reports"), {
+        reporter_id: reporterId,
+        target_id: postId,
+        target_type: 'post',
+        reason,
+        status: 'pending',
+        created_at: new Date().toISOString()
+      });
+
+      return { success: true, message: '게시물 신고가 접수되었습니다.' };
+    } catch (e) {
+      console.error('Post report error:', e);
       return { success: false, message: '신고 처리 중 오류가 발생했습니다.' };
     }
   },
@@ -408,6 +428,9 @@ export const storage = {
   processAttendance: async (userId: string) => {
     const user = storage.getUserByRawId(userId);
     if (!user) return;
+
+    // 게스트 계정은 출석 보상 없음
+    if (user.is_guest) return;
 
     // KST 기준 날짜 계산 (UTC+9)
     const kstOffset = 9 * 60 * 60 * 1000;
