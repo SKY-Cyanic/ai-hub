@@ -620,7 +620,7 @@ ${persona.systemPromptMixin}
     }
 
     return (
-        <div className="flex flex-col w-full mx-auto bg-white dark:bg-gray-950 overflow-hidden relative" style={{ height: 'calc(100vh - 60px)' }}>
+        <div className="flex flex-col w-full mx-auto bg-white dark:bg-gray-950 overflow-hidden relative min-h-0" style={{ height: 'calc(100dvh - 60px)', maxHeight: 'calc(100dvh - 60px)' }}>
             {/* 인스타 DM 스타일 헤더 */}
             <div className="px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
                 <div className="flex items-center gap-3">

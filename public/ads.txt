@@ -1,5 +1,2 @@
 # Google AdSense ads.txt
-# 아래 pub-XXXXXXXXXXXXXXXX 부분을 본인의 AdSense 게시자 ID로 교체하세요
-# AdSense 계정 > 계정 정보 > 게시자 ID에서 확인 가능
-
 google.com, pub-6612970567702495, DIRECT, f08c47fec0942fa0
