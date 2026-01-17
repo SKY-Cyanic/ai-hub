@@ -7,6 +7,7 @@ import { MemoryService, UserPersonaProfile, ConversationMessage, CustomPersona }
 import { getGroqClient, ChatMessage } from '../services/groqClient';
 import { UsageService, UsageInfo } from '../services/usageService';
 import { IntimacyService, QuestService, StreakService, Intimacy, DailyQuest, ConversationStreak } from '../services/intimacyService';
+import { StatsService, RewardService, ConversationStats } from '../services/statsService';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -86,6 +87,10 @@ const PersonaPage: React.FC = () => {
     const [streak, setStreak] = useState<ConversationStreak | null>(null);
     const [showLevelUp, setShowLevelUp] = useState(false);
     const [newLevel, setNewLevel] = useState(0);
+
+    // Phase 5: 통계
+    const [stats, setStats] = useState<ConversationStats | null>(null);
+    const [showStats, setShowStats] = useState(false);
 
     const chatEndRef = useRef<HTMLDivElement>(null);
     const groqClient = getGroqClient();
@@ -185,6 +190,12 @@ const PersonaPage: React.FC = () => {
                     lastMessage: s.messages[s.messages.length - 1]?.content.substring(0, 50) || '...',
                     timestamp: new Date(s.updatedAt)
                 })));
+
+                // Phase 5: 통계 로드
+                if (localPersonaType !== 'custom') {
+                    const statsData = await StatsService.getStats(user.id, localPersonaType);
+                    setStats(statsData);
+                }
 
                 if (!p.nickname) {
                     setShowOnboarding(true);

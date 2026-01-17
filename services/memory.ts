@@ -141,14 +141,20 @@ export const MemoryService = {
      * Get conversation session list
      */
     async getConversationList(uid: string): Promise<ConversationSession[]> {
-        const q = query(
-            collection(db, COLLECTION_SESSIONS),
-            where("uid", "==", uid),
-            orderBy("updatedAt", "desc"),
-            limit(20)
-        );
-        const snap = await getDocs(q);
-        return snap.docs.map(d => ({ id: d.id, ...d.data() } as ConversationSession));
+        try {
+            const q = query(
+                collection(db, COLLECTION_SESSIONS),
+                where("uid", "==", uid),
+                orderBy("updatedAt", "desc"),
+                limit(20)
+            );
+            const snap = await getDocs(q);
+            return snap.docs.map(d => ({ id: d.id, ...d.data() } as ConversationSession));
+        } catch (error) {
+            // Firebase 인덱스 에러 발생 시 빈 배열 반환
+            console.warn('Conversation list load failed (index required):', error);
+            return [];
+        }
     },
 
     /**
