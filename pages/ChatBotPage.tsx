@@ -28,10 +28,7 @@ const ChatBotPage: React.FC = () => {
         }
     }, []);
 
-    // 스크롤 자동 이동
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+
 
     const handleSend = async () => {
         if (!input.trim() || isLoading) return;
@@ -170,8 +167,8 @@ const ChatBotPage: React.FC = () => {
                             </div>
                         )}
                         <div className={`max-w-[80%] px-4 py-3 rounded-2xl ${msg.role === 'user'
-                                ? 'bg-blue-500 text-white rounded-br-sm'
-                                : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-bl-sm shadow-sm'
+                            ? 'bg-blue-500 text-white rounded-br-sm'
+                            : 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-bl-sm shadow-sm'
                             }`}>
                             <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
                             <p className={`text-[10px] mt-1 ${msg.role === 'user' ? 'text-blue-200' : 'text-gray-400'}`}>
@@ -197,7 +194,6 @@ const ChatBotPage: React.FC = () => {
                     </div>
                 )}
 
-                <div ref={messagesEndRef} />
             </div>
 
             {/* 입력 영역 */}

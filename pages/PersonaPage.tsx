@@ -908,8 +908,6 @@ ${persona.systemPromptMixin}
                         </div>
                     </div>
                 )}
-
-                <div ref={chatEndRef} />
             </div>
 
             {/* 입력 영역 */}
