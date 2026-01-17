@@ -5,6 +5,7 @@ import { PostIntegrationService, PostDraft } from '../services/postIntegrationSe
 import { useNavigate } from 'react-router-dom';
 import { Search, FileText, ExternalLink, TrendingUp, AlertCircle, CheckCircle, Loader2, Share2, Eye, Send, Sparkles, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const ResearchPage: React.FC = () => {
     const { user } = useAuth();
@@ -241,7 +242,7 @@ const ResearchPage: React.FC = () => {
                         <div className="mb-6">
                             <h3 className="font-bold text-lg mb-2 text-purple-600 dark:text-purple-400">🔍 상세 분석</h3>
                             <div className="prose dark:prose-invert max-w-none">
-                                <ReactMarkdown>{currentReport.detailedAnalysis}</ReactMarkdown>
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{currentReport.detailedAnalysis}</ReactMarkdown>
                             </div>
                         </div>
 
@@ -372,7 +373,7 @@ const ResearchPage: React.FC = () => {
 
                             {/* 본문 미리보기 */}
                             <div className="prose dark:prose-invert max-w-none mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl max-h-96 overflow-y-auto">
-                                <ReactMarkdown>{postDraft.content}</ReactMarkdown>
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{postDraft.content}</ReactMarkdown>
                             </div>
 
                             {/* 버튼 */}
