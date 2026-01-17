@@ -128,21 +128,28 @@ const ChatBotPage: React.FC = () => {
     };
 
     return (
-        <div className="flex flex-col bg-gray-50 dark:bg-gray-950" style={{ minHeight: 'calc(100dvh - 60px)', maxHeight: 'calc(100dvh - 60px)' }}>
-            {/* AdSense 자동 광고 숨김 */}
+        <div className="flex flex-col bg-gray-50 dark:bg-gray-950 overflow-hidden" style={{ height: '100dvh', maxHeight: '100dvh', width: '100%', maxWidth: '100vw' }}>
             <style>{`
-                .adsbygoogle {
+                /* 광고 숨김 */
+                .adsbygoogle, ins.adsbygoogle {
                     display: none !important;
                 }
-                ins.adsbygoogle {
-                    display: none !important;
+                
+                /* 모바일 레이아웃 최적화 */
+                body {
+                    overflow-x: hidden !important;
+                    max-width: 100vw !important;
                 }
-                /* 모바일 긴 화면 최적화 (20:9, 19.5:9) */
-                @media (max-width: 768px) and (min-aspect-ratio: 9/19) {
-                    .chat-bot-container {
-                        height: 100dvh !important;
-                        max-height: 100dvh !important;
-                    }
+                
+                /* 입력 필드 줌 방지 (iOS) */
+                input, textarea {
+                    font-size: 16px !important;
+                    -webkit-text-size-adjust: 100%;
+                }
+                
+                /* 가로 스크롤 완전 제거 */
+                * {
+                    box-sizing: border-box;
                 }
             `}</style>
 
@@ -221,7 +228,8 @@ const ChatBotPage: React.FC = () => {
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyPress}
                         placeholder="메시지를 입력하세요..."
-                        className="flex-1 bg-transparent resize-none outline-none text-sm dark:text-white max-h-24"
+                        className="flex-1 bg-transparent resize-none outline-none dark:text-white max-h-24"
+                        style={{ fontSize: '16px' }}
                         rows={1}
                         disabled={isLoading}
                     />
