@@ -769,7 +769,7 @@ ${persona.systemPromptMixin}
     }
 
     return (
-        <div className="flex flex-col w-full mx-auto bg-white dark:bg-gray-950 overflow-hidden relative min-h-0" style={{ height: 'calc(100dvh - 60px)', maxHeight: 'calc(100dvh - 60px)' }}>
+        <div className="flex flex-col w-full mx-auto bg-white dark:bg-gray-950 overflow-hidden relative" style={{ minHeight: 'calc(100dvh - 60px)', maxHeight: 'calc(100dvh - 60px)' }}>
             {/* AdSense 자동 광고 숨김 */}
             <style>{`
                 .adsbygoogle {
@@ -777,6 +777,13 @@ ${persona.systemPromptMixin}
                 }
                 ins.adsbygoogle {
                     display: none !important;
+                }
+                /* 모바일 긴 화면 최적화 (20:9, 19.5:9) */
+                @media (max-width: 768px) and (min-aspect-ratio: 9/19) {
+                    .chat-container {
+                        height: 100dvh !important;
+                        max-height: 100dvh !important;
+                    }
                 }
             `}</style>
 

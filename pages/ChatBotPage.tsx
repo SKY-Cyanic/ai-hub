@@ -128,7 +128,7 @@ const ChatBotPage: React.FC = () => {
     };
 
     return (
-        <div className="flex flex-col h-[calc(100dvh-60px)] bg-gray-50 dark:bg-gray-950">
+        <div className="flex flex-col bg-gray-50 dark:bg-gray-950" style={{ minHeight: 'calc(100dvh - 60px)', maxHeight: 'calc(100dvh - 60px)' }}>
             {/* AdSense 자동 광고 숨김 */}
             <style>{`
                 .adsbygoogle {
@@ -136,6 +136,13 @@ const ChatBotPage: React.FC = () => {
                 }
                 ins.adsbygoogle {
                     display: none !important;
+                }
+                /* 모바일 긴 화면 최적화 (20:9, 19.5:9) */
+                @media (max-width: 768px) and (min-aspect-ratio: 9/19) {
+                    .chat-bot-container {
+                        height: 100dvh !important;
+                        max-height: 100dvh !important;
+                    }
                 }
             `}</style>
 
