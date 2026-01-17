@@ -129,6 +129,16 @@ const ChatBotPage: React.FC = () => {
 
     return (
         <div className="flex flex-col h-[calc(100dvh-60px)] bg-gray-50 dark:bg-gray-950">
+            {/* AdSense 자동 광고 숨김 */}
+            <style>{`
+                .adsbygoogle {
+                    display: none !important;
+                }
+                ins.adsbygoogle {
+                    display: none !important;
+                }
+            `}</style>
+
             {/* 헤더 */}
             <div className="px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
                 <div className="flex items-center gap-3">

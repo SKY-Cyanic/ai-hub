@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useLocation } from 'react-router-dom';
 
 declare global {
     interface Window {
@@ -24,6 +25,7 @@ const AdBanner: React.FC<AdBannerProps> = ({ slot, className = '' }) => {
     const isLoaded = useRef(false);
 
     const { user } = useAuth();
+    const location = useLocation();
 
     useEffect(() => {
         // 개발 환경에서는 광고 로드 스킵
@@ -41,6 +43,13 @@ const AdBanner: React.FC<AdBannerProps> = ({ slot, className = '' }) => {
             }
         }
     }, [user]);
+
+    // AI 채팅 페이지에서는 광고 숨김
+    const isAIChatPage = location.pathname === '/chat' ||
+        location.pathname === '/ai-friend' ||
+        location.pathname === '/persona';
+
+    if (isAIChatPage) return null;
 
     // 광고 제거 효과가 있으면 렌더링하지 않음
     const hasAdRemove = user?.expires_at?.['ad_remove'] && new Date(user.expires_at['ad_remove']) > new Date();
