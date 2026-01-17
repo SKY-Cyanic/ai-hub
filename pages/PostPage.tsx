@@ -8,6 +8,8 @@ import { ThumbsUp, ThumbsDown, Share2, Eye, Clock, BarChart2, Ban, Trash2, Bookm
 import { useAuth } from '../context/AuthContext';
 import ImageLightbox from '../components/ImageLightbox';
 import { UserNickname } from '../components/UserEffect';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const PostPage: React.FC = () => {
   const { boardId, postId } = useParams<{ boardId: string; postId: string }>();
