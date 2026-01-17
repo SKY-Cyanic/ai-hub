@@ -1101,15 +1101,22 @@ ${persona.systemPromptMixin}
                                     if (!user) return;
                                     const result = await import('../services/storage').then(m => m.storage.purchaseAIFriendSubscription(user.id, '30d'));
                                     if (result.success) {
-                                        // 세션 다시 로드
-                                        const updatedUser = (await import('../services/storage')).storage.getSession();
-                                        if (updatedUser) {
+                                        // 세션에서 업데이트된 사용자 정보 가져오기
+                                        const storage = (await import('../services/storage')).storage;
+                                        const updatedUser = storage.getSession();
+
+                                        if (updatedUser && updatedUser.subscriptions?.ai_friend) {
+                                            // 구독 상태 즉시 업데이트
                                             setIsSubscribed(true);
                                             setShowSubscriptionModal(false);
-                                            setUserCredits(updatedUser.credits);
+
+                                            // 알림 표시
                                             alert(result.message);
-                                            // 페이지 새로고침 없이 사용자 정보 업데이트
-                                            window.location.reload();
+
+                                            // 모달을 닫고 페이지를 부드럽게 새로고침
+                                            setTimeout(() => {
+                                                window.location.href = window.location.href;
+                                            }, 500);
                                         }
                                     } else {
                                         alert(result.message);
@@ -1125,15 +1132,22 @@ ${persona.systemPromptMixin}
                                     if (!user) return;
                                     const result = await import('../services/storage').then(m => m.storage.purchaseAIFriendSubscription(user.id, '1y'));
                                     if (result.success) {
-                                        // 세션 다시 로드
-                                        const updatedUser = (await import('../services/storage')).storage.getSession();
-                                        if (updatedUser) {
+                                        // 세션에서 업데이트된 사용자 정보 가져오기
+                                        const storage = (await import('../services/storage')).storage;
+                                        const updatedUser = storage.getSession();
+
+                                        if (updatedUser && updatedUser.subscriptions?.ai_friend) {
+                                            // 구독 상태 즉시 업데이트
                                             setIsSubscribed(true);
                                             setShowSubscriptionModal(false);
-                                            setUserCredits(updatedUser.credits);
+
+                                            // 알림 표시
                                             alert(result.message);
-                                            // 페이지 새로고침 없이 사용자 정보 업데이트
-                                            window.location.reload();
+
+                                            // 모달을 닫고 페이지를 부드럽게 새로고침
+                                            setTimeout(() => {
+                                                window.location.href = window.location.href;
+                                            }, 500);
                                         }
                                     } else {
                                         alert(result.message);
