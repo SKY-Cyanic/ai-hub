@@ -731,9 +731,9 @@ const Layout: React.FC = () => {
             <button onClick={() => setIsSearchOpen(true)} className="p-2 rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
               <Search size={20} />
             </button>
-            <button onClick={toggleAiHubMode} className={`p-2 rounded-full transition-all ${isAiHubMode ? 'text-cyan-400 bg-cyan-400/10' : 'text-gray-400 hover:bg-gray-100'}`}>
+            <Link to="/research" className="p-2 rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800" title="AI Research Agent">
               <Sparkles size={20} />
-            </button>
+            </Link>
             <button onClick={toggleTheme} className="p-2 rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800">
               {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
             </button>

@@ -10,6 +10,11 @@ interface UserNicknameProps {
 }
 
 export const UserNickname: React.FC<UserNicknameProps> = ({ profile, className = "", linkToProfile = true }) => {
+    // profile이 없으면 기본값 반환
+    if (!profile) {
+        return <span className={className}>Unknown User</span>;
+    }
+
     const isRainbow = profile.active_items?.special_effects?.includes('rainbow');
     const isGlitch = profile.active_items?.special_effects?.includes('glitch');
     const displayName = (profile as any).nickname || profile.username;
@@ -48,6 +53,16 @@ interface UserAvatarProps {
 }
 
 export const UserAvatar: React.FC<UserAvatarProps> = ({ profile, size = 'md', className = "", linkToProfile = true }) => {
+    // profile이 없으면 기본 아바타 반환
+    if (!profile) {
+        const sizeMap = { sm: 'w-6 h-6', md: 'w-10 h-10', lg: 'w-16 h-16', xl: 'w-24 h-24' };
+        return (
+            <div className={`${sizeMap[size]} rounded-full bg-gray-300 flex items-center justify-center ${className}`}>
+                <span>?</span>
+            </div>
+        );
+    }
+
     const isGlitch = profile.active_items?.special_effects?.includes('glitch');
     const frameClass = profile.active_items?.frame || "";
 
