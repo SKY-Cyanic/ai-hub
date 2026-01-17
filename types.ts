@@ -58,6 +58,15 @@ export interface User {
   invite_count: number;
   transactions: Transaction[];
   item_purchases?: { [itemId: string]: number }; // 구매 횟수 추적
+
+  // AI 친구 구독 시스템
+  subscriptions?: {
+    ai_friend?: {
+      expires_at: string;  // ISO 날짜 문자열
+      plan: '30d' | '1y';
+      purchased_at: string;
+    }
+  }
 }
 
 export interface Report {

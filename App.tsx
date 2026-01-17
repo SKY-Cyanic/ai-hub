@@ -26,6 +26,7 @@ import NoteViewerPage from './pages/NoteViewerPage';
 import GamePage from './pages/GamePage';
 import ProfilePage from './pages/ProfilePage';
 import PersonaPage from './pages/PersonaPage';
+import ChatBotPage from './pages/ChatBotPage';
 
 function App() {
   return (
@@ -47,6 +48,8 @@ function App() {
             <Route path="messages" element={<MessagesPage />} />
             <Route path="game" element={<GamePage />} />
             <Route path="profile/:username" element={<ProfilePage />} />
+            <Route path="chat" element={<ChatBotPage />} />
+            <Route path="ai-friend" element={<PersonaPage />} />
             <Route path="persona" element={<PersonaPage />} />
             <Route path="webdev" element={<WebDevPage />} />
             <Route path="tools" element={<ToolsPage />} />

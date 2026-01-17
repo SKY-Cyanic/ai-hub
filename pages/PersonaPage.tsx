@@ -1,11 +1,12 @@
 ﻿import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { PERSONAS, PersonaType } from '../constants/personas';
+import { PERSONAS, ENHANCED_PERSONAS, PersonaType, buildEnhancedSystemPrompt } from '../constants/personas';
 import { Send, Sparkles, Settings, X, AlertTriangle, Zap, Plus, Save, ShoppingBag, RotateCcw, Image, Upload, Heart, Share2, Trash2, Users } from 'lucide-react';
 import { MemoryService, UserPersonaProfile, ConversationMessage, CustomPersona } from '../services/memory';
 import { getGroqClient, ChatMessage } from '../services/groqClient';
 import { UsageService, UsageInfo } from '../services/usageService';
+import { IntimacyService, QuestService, StreakService, Intimacy, DailyQuest, ConversationStreak } from '../services/intimacyService';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -71,6 +72,21 @@ const PersonaPage: React.FC = () => {
     const [customProfileImage, setCustomProfileImage] = useState<string | null>(null);
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
+    // 구독 체크
+    const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+    const [isSubscribed, setIsSubscribed] = useState(false);
+
+    // 사이드바 & 채팅 기록
+    const [showSidebar, setShowSidebar] = useState(false);
+    const [chatSessions, setChatSessions] = useState<Array<{ id: string, title: string, lastMessage: string, timestamp: Date }>>([]);
+
+    // Phase 3: 게이미피케이션
+    const [intimacy, setIntimacy] = useState<Intimacy | null>(null);
+    const [dailyQuests, setDailyQuests] = useState<DailyQuest[]>([]);
+    const [streak, setStreak] = useState<ConversationStreak | null>(null);
+    const [showLevelUp, setShowLevelUp] = useState(false);
+    const [newLevel, setNewLevel] = useState(0);
+
     const chatEndRef = useRef<HTMLDivElement>(null);
     const groqClient = getGroqClient();
 
@@ -113,6 +129,30 @@ const PersonaPage: React.FC = () => {
                 setProfile(p);
                 await loadUsageInfo();
 
+                // URL 쿼리 파라미터 확인 (바로 모달 표시용)
+                const searchParams = new URLSearchParams(location.search);
+                const shouldShowUnlock = searchParams.get('showUnlock') === 'true';
+
+                // 구독 상태 확인
+                const sub = user.subscriptions?.ai_friend;
+                if (sub) {
+                    const expiresAt = new Date(sub.expires_at);
+                    if (expiresAt > new Date()) {
+                        setIsSubscribed(true);
+                    } else {
+                        setIsSubscribed(false);
+                        setShowSubscriptionModal(true);
+                    }
+                } else {
+                    setIsSubscribed(false);
+                    // URL 파라미터가 있거나 구독이 없으면 모달 표시
+                    if (shouldShowUnlock) {
+                        setShowSubscriptionModal(true);
+                    } else {
+                        setShowSubscriptionModal(true); // 기본적으로 항상 표시
+                    }
+                }
+
                 const context = await MemoryService.getConversationContext(user.id);
                 setConversationContext(context);
 
@@ -124,6 +164,27 @@ const PersonaPage: React.FC = () => {
                         timestamp: new Date(m.timestamp)
                     })));
                 }
+
+                // Phase 3: 친밀도 & 퀘스트 로드
+                if (localPersonaType !== 'custom') {
+                    const intimacyData = await IntimacyService.getIntimacy(user.id, localPersonaType);
+                    setIntimacy(intimacyData);
+                }
+
+                const quests = await QuestService.getTodayQuests(user.id);
+                setDailyQuests(quests);
+
+                const streakData = await StreakService.getStreak(user.id);
+                setStreak(streakData);
+
+                // 대화 세션 목록 로드
+                const sessions = await MemoryService.getConversationList(user.id);
+                setChatSessions(sessions.map(s => ({
+                    id: s.id || '',
+                    title: s.personaName || '대화',
+                    lastMessage: s.messages[s.messages.length - 1]?.content.substring(0, 50) || '...',
+                    timestamp: new Date(s.updatedAt)
+                })));
 
                 if (!p.nickname) {
                     setShowOnboarding(true);
@@ -160,6 +221,33 @@ const PersonaPage: React.FC = () => {
     }, [user, loadUsageInfo]);
 
     const buildSystemPrompt = useCallback((): string => {
+        // Enhanced Persona를 사용하는 경우
+        const enhancedPersona = localPersonaType !== 'custom'
+            ? (ENHANCED_PERSONAS as any)[localPersonaType]
+            : null;
+
+        if (enhancedPersona) {
+            // Phase 2: 정교한 프롬프트 사용
+            let prompt = buildEnhancedSystemPrompt(enhancedPersona, localNickname);
+
+            // 추가 컨텍스트 (사용자 관심사, 대화 기억)
+            const interests = profile?.interests?.join(',') || '';
+            const lastSummary = profile?.lastConversationSummary || '';
+
+            if (interests) {
+                prompt += `\n\n추가 정보: 상대방이 ${interests}에 관심이 많아.`;
+            }
+            if (lastSummary) {
+                prompt += `\n이전 대화 요약: ${lastSummary}`;
+            }
+            if (conversationContext) {
+                prompt += `\n최근 대화 내용: ${conversationContext}`;
+            }
+
+            return prompt;
+        }
+
+        // 커스텀 캐릭터나 기본 페르소나는 기존 방식 유지
         const persona = currentPersona;
         const interests = profile?.interests?.join(',') || '';
         const lastSummary = profile?.lastConversationSummary || '';
@@ -186,7 +274,8 @@ ${persona.systemPromptMixin}
 10. 항상 대화를 이어갈 떡밥을 던져`;
 
         return prompt;
-    }, [currentPersona, profile, localNickname, conversationContext]);
+    }, [currentPersona, profile, localNickname, conversationContext, localPersonaType]);
+
 
     const saveMessages = useCallback(async (msgs: Message[]) => {
         if (!user || msgs.length === 0) return;
@@ -295,6 +384,37 @@ ${persona.systemPromptMixin}
             setMessages(updatedMessages);
         } finally {
             setIsTyping(false);
+
+            // Phase 3: 경험치 획득 & 퀘스트 업데이트
+            if (user && localPersonaType !== 'custom') {
+                try {
+                    // 경험치 획득
+                    const { intimacy: updatedIntimacy, leveledUp, newLevel: lvl } = await IntimacyService.addExp(user.id, localPersonaType, 1);
+                    setIntimacy(updatedIntimacy);
+
+                    // 레벨업 시 알림
+                    if (leveledUp && lvl) {
+                        setNewLevel(lvl);
+                        setShowLevelUp(true);
+                        setTimeout(() => setShowLevelUp(false), 3000);
+                    }
+
+                    // 퀘스트 진행도 업데이트
+                    const updatedQuests = await QuestService.updateQuestProgress(user.id, 'chat_count', 1);
+                    setDailyQuests(updatedQuests);
+
+                    // 스트릭 체크
+                    const { streak: updatedStreak, bonus } = await StreakService.checkTodayChat(user.id);
+                    setStreak(updatedStreak);
+
+                    if (bonus && bonus > 0) {
+                        // TODO: 스트릭 보너스 지급
+                        console.log(`스트릭 보너스: ${bonus} CR`);
+                    }
+                } catch (gameError) {
+                    console.error('Gamification error:', gameError);
+                }
+            }
         }
     };
 
@@ -370,13 +490,31 @@ ${persona.systemPromptMixin}
     // 새 대화 시작
     const handleNewConversation = async () => {
         if (!user) return;
-        if (!window.confirm('새 대화를 시작하시겠습니까? 현재 대화가 초기화됩니다.')) return;
 
         try {
-            await MemoryService.clearConversation(user.id);
+            // 현재 대화가 있으면 저장
+            if (messages.length > 1) {
+                const conversationMessages: ConversationMessage[] = messages.map(m => ({
+                    role: m.role,
+                    content: m.content,
+                    timestamp: m.timestamp.toISOString()
+                }));
+                await MemoryService.saveConversation(user.id, conversationMessages);
+
+                // 세션 목록 다시 로드
+                const sessions = await MemoryService.getConversationList(user.id);
+                setChatSessions(sessions.map(s => ({
+                    id: s.id || '',
+                    title: s.personaName || currentPersona.name,
+                    lastMessage: s.messages[s.messages.length - 1]?.content.substring(0, 50) || '...',
+                    timestamp: new Date(s.updatedAt)
+                })));
+            }
+
+            // 새 대화 시작
             setMessages([{
                 role: 'assistant',
-                content: `${currentPersona.icon} 새로운 대화를 시작합니다! 뭐 얘기해볼까? 😊`,
+                content: currentPersona.greeting || `새로운 대화를 시작합니다! 뭐 얘기해볼까? 😊`,
                 timestamp: new Date()
             }]);
         } catch (e) {
@@ -632,11 +770,40 @@ ${persona.systemPromptMixin}
                         <span>{currentPersona.icon}</span>
                     </div>
                     <div>
-                        <h3 className="font-bold text-base leading-tight">{currentPersona.name}</h3>
-                        <span className="text-xs text-green-500 font-medium">● 온라인</span>
+                        <h3 className="font-bold text-base leading-tight flex items-center gap-2">
+                            {currentPersona.name}
+                            {intimacy && (
+                                <span className="text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white px-2 py-0.5 rounded-full">
+                                    Lv.{intimacy.level}
+                                </span>
+                            )}
+                        </h3>
+                        {intimacy ? (
+                            <div className="flex items-center gap-2">
+                                <div className="w-20 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-300"
+                                        style={{ width: `${(intimacy.exp / intimacy.exp_to_next) * 100}%` }}
+                                    />
+                                </div>
+                                <span className="text-[10px] text-gray-400">{intimacy.exp}/{intimacy.exp_to_next}</span>
+                            </div>
+                        ) : (
+                            <span className="text-xs text-green-500 font-medium">● 온라인</span>
+                        )}
                     </div>
                 </div>
                 <div className="flex items-center gap-1">
+                    {/* 사이드바 토글 */}
+                    <button
+                        onClick={() => setShowSidebar(!showSidebar)}
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors"
+                        title="대화 기록"
+                    >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                    </button>
                     {/* 새 대화 */}
                     <button onClick={handleNewConversation} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full" title="새 대화">
                         <RotateCcw size={18} className="text-gray-400" />
@@ -814,10 +981,15 @@ ${persona.systemPromptMixin}
                                 {(Object.values(PERSONAS)).map(p => (
                                     <button
                                         key={p.id}
-                                        onClick={() => {
+                                        onClick={async () => {
                                             setLocalPersonaType(p.id);
-                                            MemoryService.updateProfile(user.id, { personaType: p.id });
-                                            setMessages([{ role: 'assistant', content: `${p.icon} ${p.greeting}`, timestamp: new Date() }]);
+                                            await MemoryService.updateProfile(user.id, { personaType: p.id });
+
+                                            // 친밀도 다시 로드 (캐릭터별 레벨)
+                                            const intimacyData = await IntimacyService.getIntimacy(user.id, p.id);
+                                            setIntimacy(intimacyData);
+
+                                            setMessages([{ role: 'assistant', content: p.greeting, timestamp: new Date() }]);
                                             setShowSettings(false);
                                         }}
                                         className={`p-3 rounded-xl border-2 transition-all flex items-center gap-2 ${localPersonaType === p.id ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30' : 'border-gray-200 dark:border-gray-700'
@@ -895,6 +1067,95 @@ ${persona.systemPromptMixin}
                         <button className="mt-4 text-sm text-gray-400 hover:text-gray-600" onClick={() => setShowLimitModal(false)}>
                             닫기
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* 구독 해금 모달 */}
+            {showSubscriptionModal && !isSubscribed && (
+                <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-3xl p-6 animate-fade-in text-center" onClick={e => e.stopPropagation()}>
+                        <div className="inline-flex p-4 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full mb-4">
+                            <Heart className="text-white" size={40} />
+                        </div>
+                        <h3 className="text-2xl font-black mb-2 bg-gradient-to-r from-pink-500 to-purple-600 bg-clip-text text-transparent">
+                            AI 친구 해금하기 💝
+                        </h3>
+                        <p className="text-gray-500 text-sm mb-6">
+                            다양한 성격의 AI 친구들과<br />
+                            친밀한 대화를 나눠보세요!
+                        </p>
+
+                        <div className="space-y-3 mb-6">
+                            <button
+                                onClick={async () => {
+                                    if (!user) return;
+                                    const result = await import('../services/storage').then(m => m.storage.purchaseAIFriendSubscription(user.id, '30d'));
+                                    if (result.success) {
+                                        // 세션 다시 로드
+                                        const updatedUser = (await import('../services/storage')).storage.getSession();
+                                        if (updatedUser) {
+                                            setIsSubscribed(true);
+                                            setShowSubscriptionModal(false);
+                                            setUserCredits(updatedUser.credits);
+                                            alert(result.message);
+                                            // 페이지 새로고침 없이 사용자 정보 업데이트
+                                            window.location.reload();
+                                        }
+                                    } else {
+                                        alert(result.message);
+                                    }
+                                }}
+                                className="w-full py-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:opacity-90 transition-opacity"
+                            >
+                                <span className="text-lg">30일권</span>
+                                <span className="px-3 py-1 bg-white/20 rounded-full text-sm">100 CR</span>
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    if (!user) return;
+                                    const result = await import('../services/storage').then(m => m.storage.purchaseAIFriendSubscription(user.id, '1y'));
+                                    if (result.success) {
+                                        // 세션 다시 로드
+                                        const updatedUser = (await import('../services/storage')).storage.getSession();
+                                        if (updatedUser) {
+                                            setIsSubscribed(true);
+                                            setShowSubscriptionModal(false);
+                                            setUserCredits(updatedUser.credits);
+                                            alert(result.message);
+                                            // 페이지 새로고침 없이 사용자 정보 업데이트
+                                            window.location.reload();
+                                        }
+                                    } else {
+                                        alert(result.message);
+                                    }
+                                }}
+                                className="w-full py-4 bg-gradient-to-r from-yellow-500 to-orange-500 text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:opacity-90 transition-opacity relative overflow-hidden"
+                            >
+                                <span className="absolute top-0 right-0 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold">BEST</span>
+                                <span className="text-lg">1년권</span>
+                                <span className="px-3 py-1 bg-white/20 rounded-full text-sm">1000 CR</span>
+                            </button>
+                        </div>
+
+                        <p className="text-xs text-gray-400 mb-4">
+                            보유 크레딧: <span className="font-bold text-purple-500">{userCredits} CR</span>
+                        </p>
+
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => navigate('/chat')}
+                                className="flex-1 py-3 bg-gray-100 dark:bg-gray-800 rounded-xl font-bold text-sm"
+                            >
+                                무료 챗봇 이용하기
+                            </button>
+                            <button
+                                onClick={() => navigate('/shop')}
+                                className="flex-1 py-3 bg-blue-500 text-white rounded-xl font-bold text-sm"
+                            >
+                                크레딧 구매
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -993,6 +1254,66 @@ ${persona.systemPromptMixin}
                         )}
                         <button className="w-full mt-4 py-3 bg-gray-200 dark:bg-gray-800 rounded-xl font-bold" onClick={() => setShowCommunity(false)}>닫기</button>
                     </div>
+                </div>
+            )}
+
+            {/* 사이드바 - 대화 기록 */}
+            {showSidebar && (
+                <div className="absolute inset-0 z-40 flex">
+                    {/* 사이드바 패널 */}
+                    <div className="w-80 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col">
+                        <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
+                            <h2 className="font-bold text-lg">대화 기록</h2>
+                            <button onClick={() => setShowSidebar(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                            {chatSessions.length === 0 ? (
+                                <div className="text-center text-gray-400 py-8">
+                                    <p className="text-sm">아직 대화 기록이 없습니다</p>
+                                    <p className="text-xs mt-2">새로운 대화를 시작해보세요!</p>
+                                </div>
+                            ) : (
+                                chatSessions.map((session) => (
+                                    <button
+                                        key={session.id}
+                                        onClick={() => {
+                                            // TODO: 세션 로드 로직
+                                            setShowSidebar(false);
+                                        }}
+                                        className="w-full p-3 text-left hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
+                                    >
+                                        <h3 className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">
+                                            {session.title}
+                                        </h3>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">
+                                            {session.lastMessage}
+                                        </p>
+                                        <p className="text-[10px] text-gray-400 mt-1">
+                                            {session.timestamp.toLocaleDateString('ko-KR')}
+                                        </p>
+                                    </button>
+                                ))
+                            )}
+                        </div>
+
+                        <div className="p-4 border-t border-gray-200 dark:border-gray-800">
+                            <button
+                                onClick={() => {
+                                    handleNewConversation();
+                                    setShowSidebar(false);
+                                }}
+                                className="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-xl font-bold hover:opacity-90 transition-opacity"
+                            >
+                                + 새 대화 시작
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* 오버레이 (클릭 시 닫기) */}
+                    <div className="flex-1 bg-black/30" onClick={() => setShowSidebar(false)} />
                 </div>
             )}
         </div>

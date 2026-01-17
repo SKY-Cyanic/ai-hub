@@ -1576,5 +1576,99 @@ export const storage = {
       console.error('Get stubs error:', e);
       return [];
     }
+  },
+
+  // AI 친구 구독 구매
+  purchaseAIFriendSubscription: async (userId: string, plan: '30d' | '1y'): Promise<{ success: boolean; message: string }> => {
+    try {
+      // 세션에서 현재 사용자 가져오기 (Firestore에서 찾지 않음)
+      const currentUser = storage.getSession();
+      if (!currentUser || currentUser.id !== userId) {
+        return { success: false, message: '로그인이 필요합니다.' };
+      }
+
+      const price = plan === '30d' ? 100 : 1000;
+
+      // points 필드 사용 (앱에서 CR은 points로 관리됨)
+      const userPoints = currentUser.points || 0;
+      if (userPoints < price) {
+        return { success: false, message: `크레딧이 부족합니다. (필요: ${price} CR, 보유: ${userPoints} CR)` };
+      }
+
+      // 구독 만료일 계산
+      const now = new Date();
+      const expiresAt = new Date(now);
+      if (plan === '30d') {
+        expiresAt.setDate(expiresAt.getDate() + 30);
+      } else {
+        expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+      }
+
+      // 기존 구독이 있으면 연장
+      const existingSub = currentUser.subscriptions?.ai_friend;
+      if (existingSub && new Date(existingSub.expires_at) > now) {
+        const currentExpiry = new Date(existingSub.expires_at);
+        if (plan === '30d') {
+          currentExpiry.setDate(currentExpiry.getDate() + 30);
+        } else {
+          currentExpiry.setFullYear(currentExpiry.getFullYear() + 1);
+        }
+        expiresAt.setTime(currentExpiry.getTime());
+      }
+
+      // 트랜잭션 기록
+      const transaction: Transaction = {
+        id: `txn-${Date.now()}`,
+        type: 'spend',
+        amount: price,
+        description: `AI 친구 ${plan === '30d' ? '30일권' : '1년권'} 구매`,
+        created_at: now.toISOString()
+      };
+
+      // 업데이트된 사용자 객체 생성 (points 차감)
+      const updatedUser: User = {
+        ...currentUser,
+        points: userPoints - price,
+        subscriptions: {
+          ...currentUser.subscriptions,
+          ai_friend: {
+            expires_at: expiresAt.toISOString(),
+            plan: plan,
+            purchased_at: now.toISOString()
+          }
+        },
+        transactions: [...(currentUser.transactions || []), transaction]
+      };
+
+      // Firestore 업데이트 시도
+      try {
+        const userDocRef = doc(db, "users", userId);
+        const userDoc = await getDoc(userDocRef);
+
+        if (userDoc.exists()) {
+          // 문서가 존재하면 업데이트
+          await updateDoc(userDocRef, {
+            points: updatedUser.points,  // points 필드 업데이트
+            subscriptions: updatedUser.subscriptions,
+            transactions: updatedUser.transactions
+          });
+        } else {
+          // 문서가 없으면 생성
+          await setDoc(userDocRef, sanitize(updatedUser));
+        }
+      } catch (firestoreError) {
+        console.error('Firestore update error:', firestoreError);
+        // Firestore 실패해도 계속 진행 (로컬 세션은 업데이트)
+      }
+
+      // 로컬 세션 업데이트
+      storage.saveUser(updatedUser);
+      storage.setSession(updatedUser);
+
+      return { success: true, message: `AI 친구가 해금되었습니다! (${plan === '30d' ? '30일' : '1년'})` };
+    } catch (e) {
+      console.error('Purchase subscription error:', e);
+      return { success: false, message: '구매 중 오류가 발생했습니다.' };
+    }
   }
 };
