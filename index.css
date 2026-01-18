@@ -147,6 +147,81 @@
   color: #f9fafb;
 }
 
+/* ===================================
+   Research Page Mobile Optimization
+   =================================== */
+
+@media (max-width: 640px) {
+
+  /* Container adjustments */
+  .max-w-6xl,
+  .max-w-5xl {
+    max-width: 100%;
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  /* Prevent horizontal scroll */
+  body,
+  html {
+    overflow-x: hidden;
+  }
+
+  /* Research cards */
+  .bg-white,
+  .dark .bg-gray-900,
+  .dark .bg-gray-800 {
+    margin-left: 0;
+    margin-right: 0;
+    border-radius: 0.75rem;
+  }
+
+  /* Text wrapping */
+  h1,
+  h2,
+  h3,
+  h4,
+  p {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* Button adjustments */
+  button {
+    white-space: normal;
+    min-width: fit-content;
+  }
+
+  /* Input font size (prevents zoom on iOS) */
+  input[type="text"],
+  input[type="search"],
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Flex containers */
+  .flex {
+    flex-wrap: wrap;
+  }
+
+  /* Grid adjustments */
+  .grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+
+  /* Prose max-width */
+  .prose {
+    max-width: 100%;
+  }
+
+  /* Table responsive */
+  .prose table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
 .dark .prose-invert a {
   color: #60a5fa;
 }
