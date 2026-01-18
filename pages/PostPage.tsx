@@ -3,13 +3,13 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import { storage } from '../services/storage';
 import { Post, Comment, FactCheckReport } from '../types';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import CommentSection from '../components/CommentSection';
 import { ThumbsUp, ThumbsDown, Share2, Eye, Clock, BarChart2, Ban, Trash2, Bookmark, Sparkles, AlertTriangle, ShieldCheck, ZoomIn } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import ImageLightbox from '../components/ImageLightbox';
 import { UserNickname } from '../components/UserEffect';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 
 const PostPage: React.FC = () => {
   const { boardId, postId } = useParams<{ boardId: string; postId: string }>();
@@ -187,8 +187,8 @@ const PostPage: React.FC = () => {
               <summary className="inline-block px-4 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-sm font-bold shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors dark:text-gray-200">
                 내용 보기 (클릭)
               </summary>
-              <div className="mt-6 text-left animate-fade-in">
-                <div dangerouslySetInnerHTML={{ __html: processContent(post.content) }} />
+              <div className="mt-6 text-left animate-fade-in prose dark:prose-invert max-w-none">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.content}</ReactMarkdown>
                 {/* Images inside spoiler */}
                 {post.images && post.images.length > 0 && (
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">
@@ -208,7 +208,9 @@ const PostPage: React.FC = () => {
         )}
         {!post.is_spoiler && (
           <>
-            <div dangerouslySetInnerHTML={{ __html: processContent(post.content) }} />
+            <div className="prose dark:prose-invert max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{post.content}</ReactMarkdown>
+            </div>
             {/* Images for non-spoiler posts */}
             {post.images && post.images.length > 0 && (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-4">

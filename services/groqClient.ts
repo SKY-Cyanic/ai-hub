@@ -3,7 +3,7 @@
  * Qwen3-32B (AI 친구), GPT-OSS-120B (바이브 코딩) 모델 지원
  */
 
-export type GroqModel = 'qwen/qwen3-32b' | 'openai/gpt-oss-120b';
+export type GroqModel = 'qwen/qwen3-32b' | 'llama-3.3-70b-versatile' | 'openai/gpt-oss-120b';
 
 export interface ChatMessage {
     role: 'system' | 'user' | 'assistant';

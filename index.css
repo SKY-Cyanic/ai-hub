@@ -1,4 +1,166 @@
 @import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Prose (Markdown) Styles */
+.prose {
+  color: #374151;
+  max-width: 65ch;
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4 {
+  font-weight: 800;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+
+.prose h1 {
+  font-size: 2em;
+}
+
+.prose h2 {
+  font-size: 1.5em;
+}
+
+.prose h3 {
+  font-size: 1.25em;
+}
+
+.prose h4 {
+  font-size: 1em;
+}
+
+.prose p {
+  margin-top: 1em;
+  margin-bottom: 1em;
+  line-height: 1.75;
+}
+
+.prose strong {
+  font-weight: 700;
+  color: #111827;
+}
+
+.prose ul,
+.prose ol {
+  margin-top: 1em;
+  margin-bottom: 1em;
+  padding-left: 1.5em;
+}
+
+.prose li {
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose a {
+  color: #3b82f6;
+  text-decoration: underline;
+}
+
+.prose a:hover {
+  color: #2563eb;
+}
+
+.prose code {
+  background: #f3f4f6;
+  padding: 0.2em 0.4em;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+}
+
+.prose blockquote {
+  border-left: 4px solid #e5e7eb;
+  padding-left: 1em;
+  font-style: italic;
+  color: #6b7280;
+  margin: 1.5em 0;
+}
+
+.prose hr {
+  border: 0;
+  border-top: 1px solid #e5e7eb;
+  margin: 2em 0;
+}
+
+/* Dark mode prose */
+.dark .prose {
+  color: #d1d5db;
+}
+
+.dark .prose strong {
+  color: #f3f4f6;
+}
+
+.dark .prose h1,
+.dark .prose h2,
+.dark .prose h3,
+.dark .prose h4 {
+  color: #f9fafb;
+}
+
+.dark .prose a {
+  color: #60a5fa;
+}
+
+.dark .prose a:hover {
+  color: #93c5fd;
+}
+
+.dark .prose code {
+  background: #374151;
+  color: #e5e7eb;
+}
+
+.dark .prose blockquote {
+  border-left-color: #4b5563;
+  color: #9ca3af;
+}
+
+.dark .prose hr {
+  border-top-color: #4b5563;
+}
+
+/* Prose max-width override */
+.prose.max-w-none {
+  max-width: none;
+}
+
+/* Prose-invert alias for dark mode */
+.dark .prose-invert {
+  color: #d1d5db;
+}
+
+.dark .prose-invert strong {
+  color: #f3f4f6;
+}
+
+.dark .prose-invert h1,
+.dark .prose-invert h2,
+.dark .prose-invert h3,
+.dark .prose-invert h4 {
+  color: #f9fafb;
+}
+
+.dark .prose-invert a {
+  color: #60a5fa;
+}
+
+.dark .prose-invert code {
+  background: #374151;
+  color: #e5e7eb;
+}
+
+.dark .prose-invert blockquote {
+  border-left-color: #4b5563;
+  color: #9ca3af;
+}
+
 
 /* Tailwind v4 다크 모드 설정 - class 기반 */
 @custom-variant dark (&:where(.dark, .dark *));
@@ -167,130 +329,4 @@ body {
 
 .hover-slide:hover {
   transform: translateX(4px);
-}
-
-/* Markdown Prose Styles */
-.prose {
-  color: #374151;
-  max-width: 65ch;
-  font-size: 1rem;
-  line-height: 1.75;
-}
-
-.prose h1 {
-  color: #111827;
-  font-weight: 800;
-  font-size: 2.25em;
-  margin-top: 0;
-  margin-bottom: 0.8888889em;
-  line-height: 1.1111111;
-}
-
-.prose h2 {
-  color: #111827;
-  font-weight: 700;
-  font-size: 1.5em;
-  margin-top: 2em;
-  margin-bottom: 1em;
-  line-height: 1.3333333;
-}
-
-.prose h3 {
-  color: #111827;
-  font-weight: 600;
-  font-size: 1.25em;
-  margin-top: 1.6em;
-  margin-bottom: 0.6em;
-  line-height: 1.6;
-}
-
-.prose p {
-  margin-top: 1.25em;
-  margin-bottom: 1.25em;
-}
-
-.prose a {
-  color: #3b82f6;
-  text-decoration: underline;
-  font-weight: 500;
-}
-
-.prose strong {
-  color: #111827;
-  font-weight: 600;
-}
-
-.prose ul, .prose ol {
-  margin-top: 1.25em;
-  margin-bottom: 1.25em;
-  padding-left: 1.625em;
-}
-
-.prose li {
-  margin-top: 0.5em;
-  margin-bottom: 0.5em;
-}
-
-.prose code {
-  color: #111827;
-  background-color: #f3f4f6;
-  padding: 0.2em 0.4em;
-  border-radius: 0.25rem;
-  font-size: 0.875em;
-  font-weight: 600;
-}
-
-.prose pre {
-  color: #e5e7eb;
-  background-color: #1f2937;
-  overflow-x: auto;
-  border-radius: 0.375rem;
-  padding: 0.8571429em 1.1428571em;
-  margin-top: 1.7142857em;
-  margin-bottom: 1.7142857em;
-}
-
-.prose pre code {
-  background-color: transparent;
-  color: inherit;
-  padding: 0;
-}
-
-.prose blockquote {
-  font-weight: 500;
-  font-style: italic;
-  color: #111827;
-  border-left: 0.25rem solid #e5e7eb;
-  padding-left: 1em;
-  margin-top: 1.6em;
-  margin-bottom: 1.6em;
-}
-
-.dark .prose {
-  color: #d1d5db;
-}
-
-.dark .prose h1,
-.dark .prose h2,
-.dark .prose h3,
-.dark .prose strong {
-  color: #f9fafb;
-}
-
-.dark .prose a {
-  color: #60a5fa;
-}
-
-.dark .prose code {
-  color: #f9fafb;
-  background-color: #374151;
-}
-
-.dark .prose blockquote {
-  color: #d1d5db;
-  border-left-color: #4b5563;
-}
-
-.dark .prose pre {
-  background-color: #111827;
 }

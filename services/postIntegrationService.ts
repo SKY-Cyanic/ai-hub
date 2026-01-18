@@ -61,7 +61,7 @@ export const PostIntegrationService = {
         let response = '';
         await groqClient.streamChat(
             {
-                model: 'qwen/qwen3-32b',
+                model: 'openai/gpt-oss-120b',
                 messages: [{ role: 'user', content: prompt }],
                 temperature: 0.3,
                 max_tokens: 20
@@ -93,7 +93,7 @@ export const PostIntegrationService = {
         let response = '';
         await groqClient.streamChat(
             {
-                model: 'qwen/qwen3-32b',
+                model: 'openai/gpt-oss-120b',
                 messages: [{ role: 'user', content: prompt }],
                 temperature: 0.5,
                 max_tokens: 100
@@ -126,6 +126,7 @@ export const PostIntegrationService = {
         if (report.prosAndCons.pros.length > 0) {
             content += `## ✅ 장점\n\n`;
             report.prosAndCons.pros.forEach(pro => {
+                // 볼드 마크다운 유지
                 content += `- ${pro}\n`;
             });
             content += `\n`;
@@ -134,6 +135,7 @@ export const PostIntegrationService = {
         if (report.prosAndCons.cons.length > 0) {
             content += `## ⚠️ 단점/우려사항\n\n`;
             report.prosAndCons.cons.forEach(con => {
+                // 볼드 마크다운 유지
                 content += `- ${con}\n`;
             });
             content += `\n`;
@@ -147,11 +149,15 @@ export const PostIntegrationService = {
         if (report.relatedTopics.length > 0) {
             content += `\n# 🔗 관련 주제\n\n`;
             report.relatedTopics.forEach(topic => {
-                content += `- ${topic}\n`;
+                // 볼드 제거
+                const cleanTopic = topic.replace(/\*\*/g, '');
+                content += `- ${cleanTopic}\n`;
             });
         }
 
-        content += `\n---\n*조사 일시: ${new Date(report.createdAt).toLocaleString('ko-KR')}*`;
+        content += `\n---\n\n`;
+        content += `*🕐 조사 일시: ${new Date(report.createdAt).toLocaleString('ko-KR')}*\n`;
+        content += `*🤖 AI 모델: Groq GPT-oss-120B*`;
 
         return content;
     },

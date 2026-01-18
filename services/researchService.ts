@@ -1,4 +1,4 @@
-import { GoogleSearchAPI, SearchResult } from './searchAPI';
+import { SearchAPI, SearchResult } from './searchAPI';
 import { getGroqClient } from './groqClient';
 
 export interface ResearchSource {
@@ -57,7 +57,7 @@ export const ResearchService = {
         updateProgress('웹 검색 수행', 'in-progress');
         let searchResults: SearchResult[] = [];
         try {
-            searchResults = await GoogleSearchAPI.multiSearch(optimizedQueries);
+            searchResults = await SearchAPI.multiSearch(optimizedQueries);
             updateProgress('웹 검색 수행', 'completed', `${searchResults.length}개 결과 발견`);
         } catch (error: any) {
             updateProgress('웹 검색 수행', 'failed', error.message);
@@ -109,7 +109,7 @@ ${sources.map((s, i) => `${i + 1}. ${s.title}\n   출처: ${s.domain}\n   내용
         let reportContent = '';
         await groqClient.streamChat(
             {
-                model: 'qwen/qwen3-32b',
+                model: 'openai/gpt-oss-120b',
                 messages: [{ role: 'user', content: analysisPrompt }],
                 temperature: 0.7,
                 max_tokens: 2048
@@ -120,20 +120,35 @@ ${sources.map((s, i) => `${i + 1}. ${s.title}\n   출처: ${s.domain}\n   내용
         );
 
         // 리포트 파싱
+        console.log('📄 Raw report content length:', reportContent.length);
+        console.log('📄 Report preview:', reportContent.substring(0, 200));
+
         const parsed = this.parseReport(reportContent);
+
+        // 파싱된 내용 검증
+        if (!parsed.summary || parsed.summary.trim().length === 0) {
+            console.warn('⚠️ Empty summary detected, using fallback');
+            parsed.summary = '검색 결과를 바탕으로 한 분석이 생성되지 않았습니다.';
+        }
+
+        if (!parsed.analysis || parsed.analysis.trim().length === 0) {
+            console.warn('⚠️ Empty analysis detected, using source snippets');
+            parsed.analysis = sources.map((s, i) => `${i + 1}. **${s.title}**: ${s.snippet}`).join('\n\n');
+        }
+
         updateProgress('AI 리포트 생성', 'completed');
 
         const report: ResearchReport = {
             id: reportId,
             query,
-            summary: parsed.summary,
-            detailedAnalysis: parsed.analysis,
+            summary: parsed.summary.trim(),
+            detailedAnalysis: parsed.analysis.trim(),
             sources,
             prosAndCons: {
-                pros: parsed.pros,
-                cons: parsed.cons
+                pros: parsed.pros.length > 0 ? parsed.pros : ['정보를 수집했습니다'],
+                cons: parsed.cons.length > 0 ? parsed.cons : ['추가 분석이 필요합니다']
             },
-            relatedTopics: parsed.relatedTopics,
+            relatedTopics: parsed.relatedTopics.length > 0 ? parsed.relatedTopics : [],
             createdAt: new Date().toISOString(),
             searchProgress: progress
         };
@@ -160,7 +175,7 @@ ${sources.map((s, i) => `${i + 1}. ${s.title}\n   출처: ${s.domain}\n   내용
         let response = '';
         await groqClient.streamChat(
             {
-                model: 'qwen/qwen3-32b',
+                model: 'openai/gpt-oss-120b',
                 messages: [{ role: 'user', content: prompt }],
                 temperature: 0.5,
                 max_tokens: 200
@@ -221,28 +236,47 @@ ${sources.map((s, i) => `${i + 1}. ${s.title}\n   출처: ${s.domain}\n   내용
         const lines = content.split('\n');
         let currentSection = '';
 
+        console.log('🔍 Parsing report, total lines:', lines.length);
+
         for (const line of lines) {
-            if (line.startsWith('# 요약')) {
+            const trimmed = line.trim();
+
+            if (trimmed.startsWith('# 요약')) {
                 currentSection = 'summary';
-            } else if (line.startsWith('# 상세 분석') || line.startsWith('# 분석')) {
+                console.log('📝 Found summary section');
+            } else if (trimmed.startsWith('# 상세 분석') || trimmed.startsWith('# 분석') || trimmed.startsWith('# 상세')) {
                 currentSection = 'analysis';
-            } else if (line.startsWith('# 장점')) {
+                console.log('🔍 Found analysis section');
+            } else if (trimmed.startsWith('# 장점')) {
                 currentSection = 'pros';
-            } else if (line.startsWith('# 단점') || line.startsWith('# 우려')) {
+                console.log('✅ Found pros section');
+            } else if (trimmed.startsWith('# 단점') || trimmed.startsWith('# 우려')) {
                 currentSection = 'cons';
-            } else if (line.startsWith('# 관련')) {
+                console.log('⚠️ Found cons section');
+            } else if (trimmed.startsWith('# 관련')) {
                 currentSection = 'related';
-            } else if (line.trim() && !line.startsWith('#')) {
+                console.log('🔗 Found related topics section');
+            } else if (trimmed && !trimmed.startsWith('#')) {
                 if (currentSection === 'summary' || currentSection === 'analysis') {
                     sections[currentSection] += line + '\n';
-                } else if (line.startsWith('-') || line.startsWith('*')) {
-                    const item = line.replace(/^[-*]\s*/, '').trim();
-                    if (currentSection === 'pros') sections.pros.push(item);
-                    else if (currentSection === 'cons') sections.cons.push(item);
-                    else if (currentSection === 'related') sections.relatedTopics.push(item);
+                } else if (trimmed.startsWith('-') || trimmed.startsWith('*') || trimmed.startsWith('•')) {
+                    const item = trimmed.replace(/^[-*•]\s*/, '').trim();
+                    if (item) {
+                        if (currentSection === 'pros') sections.pros.push(item);
+                        else if (currentSection === 'cons') sections.cons.push(item);
+                        else if (currentSection === 'related') sections.relatedTopics.push(item);
+                    }
                 }
             }
         }
+
+        console.log('📊 Parsed sections:', {
+            summary: sections.summary.length,
+            analysis: sections.analysis.length,
+            pros: sections.pros.length,
+            cons: sections.cons.length,
+            related: sections.relatedTopics.length
+        });
 
         return sections;
     },

@@ -228,7 +228,7 @@ const ResearchPage: React.FC = () => {
                         <div className="mb-4 px-3 py-2 bg-purple-50 dark:bg-purple-900/20 rounded-lg flex items-center gap-2 text-sm">
                             <Sparkles size={16} className="text-purple-600 dark:text-purple-400" />
                             <span className="text-purple-600 dark:text-purple-400 font-medium">
-                                Powered by Groq Qwen3-32B
+                                Powered by Groq GPT-oss-120B
                             </span>
                         </div>
 
@@ -252,21 +252,25 @@ const ResearchPage: React.FC = () => {
                                 <h3 className="font-bold text-lg mb-2 text-green-600 dark:text-green-400 flex items-center gap-2">
                                     ✅ 장점
                                 </h3>
-                                <ul className="space-y-1">
+                                <div className="space-y-2 prose dark:prose-invert prose-sm max-w-none">
                                     {currentReport.prosAndCons.pros.map((pro, idx) => (
-                                        <li key={idx} className="text-sm text-gray-700 dark:text-gray-300">• {pro}</li>
+                                        <div key={idx} className="text-sm text-gray-700 dark:text-gray-300">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{'• ' + pro}</ReactMarkdown>
+                                        </div>
                                     ))}
-                                </ul>
+                                </div>
                             </div>
                             <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl">
                                 <h3 className="font-bold text-lg mb-2 text-red-600 dark:text-red-400 flex items-center gap-2">
                                     ⚠️ 단점/우려사항
                                 </h3>
-                                <ul className="space-y-1">
+                                <div className="space-y-2 prose dark:prose-invert prose-sm max-w-none">
                                     {currentReport.prosAndCons.cons.map((con, idx) => (
-                                        <li key={idx} className="text-sm text-gray-700 dark:text-gray-300">• {con}</li>
+                                        <div key={idx} className="text-sm text-gray-700 dark:text-gray-300">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{'• ' + con}</ReactMarkdown>
+                                        </div>
                                     ))}
-                                </ul>
+                                </div>
                             </div>
                         </div>
 
@@ -314,7 +318,7 @@ const ResearchPage: React.FC = () => {
                                             onClick={() => { setQuery(topic); handleResearch(); }}
                                             className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full text-sm hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
                                         >
-                                            {topic}
+                                            {topic.replace(/\*\*/g, '')}
                                         </button>
                                     ))}
                                 </div>
@@ -373,7 +377,7 @@ const ResearchPage: React.FC = () => {
 
                             {/* 본문 미리보기 */}
                             <div className="prose dark:prose-invert max-w-none mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-xl max-h-96 overflow-y-auto">
-                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{postDraft.content}</ReactMarkdown>
+                                <ReactMarkdown>{postDraft.content}</ReactMarkdown>
                             </div>
 
                             {/* 버튼 */}
