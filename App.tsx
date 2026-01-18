@@ -28,6 +28,7 @@ import ProfilePage from './pages/ProfilePage';
 import PersonaPage from './pages/PersonaPage';
 import ChatBotPage from './pages/ChatBotPage';
 import ResearchPage from './pages/ResearchPage';
+import AICommentTest from './pages/AICommentTest';
 
 function App() {
   return (

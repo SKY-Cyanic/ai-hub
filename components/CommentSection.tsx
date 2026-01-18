@@ -6,6 +6,7 @@ import { storage } from '../services/storage';
 import { aiService } from '../services/ai';
 import { CornerDownRight, MessageCircle, MoreHorizontal, Ban, Flag, Bot, ShieldAlert } from 'lucide-react';
 import { UserNickname, UserAvatar } from './UserEffect';
+import { AI_PERSONAS } from '../services/aiCommentService';
 
 interface CommentProps {
   comment: Comment;
@@ -31,6 +32,8 @@ const CommentItem: React.FC<CommentProps> = ({ comment, allComments, onReply, on
   }
 
   const isBot = comment.author.is_bot;
+  const isAI = (comment as any).isAI;
+  const aiPersona = (comment as any).aiPersona;
 
   const handleSubmitReply = () => {
     if (!replyContent.trim()) return;
@@ -47,10 +50,23 @@ const CommentItem: React.FC<CommentProps> = ({ comment, allComments, onReply, on
 
           <UserAvatar profile={comment.author} size="sm" />
 
-          <UserNickname profile={comment.author} className="text-sm" />
+          {isAI && aiPersona ? (
+            <span className="text-sm font-semibold text-purple-600 dark:text-purple-400">
+              {AI_PERSONAS[aiPersona]?.name || comment.author.nickname}
+            </span>
+          ) : (
+            <UserNickname profile={comment.author} className="text-sm" />
+          )}
 
-          {isBot && <Bot size={16} className="text-blue-500" />}
-          {isBot && <span className="bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-200 text-[10px] px-1.5 rounded font-bold">BOT</span>}
+          {isAI && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-gradient-to-r from-purple-500 to-blue-500 text-white text-[10px] font-bold rounded-full">
+              <Bot size={12} />
+              AI
+            </span>
+          )}
+
+          {isBot && !isAI && <Bot size={16} className="text-blue-500" />}
+          {isBot && !isAI && <span className="bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-200 text-[10px] px-1.5 rounded font-bold">BOT</span>}
 
           <span className="text-xs text-gray-400 font-mono">
             {new Date(comment.created_at).toLocaleString()}
