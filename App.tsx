@@ -29,6 +29,7 @@ import PersonaPage from './pages/PersonaPage';
 import ChatBotPage from './pages/ChatBotPage';
 import ResearchPage from './pages/ResearchPage';
 import AICommentTest from './pages/AICommentTest';
+import CuratorDashboard from './pages/CuratorDashboard';
 
 function App() {
   return (
@@ -54,6 +55,7 @@ function App() {
             <Route path="ai-friend" element={<PersonaPage />} />
             <Route path="persona" element={<PersonaPage />} />
             <Route path="research" element={<ResearchPage />} />
+            <Route path="curator" element={<CuratorDashboard />} />
             <Route path="webdev" element={<WebDevPage />} />
             <Route path="tools" element={<ToolsPage />} />
             <Route path="tools/note/:noteId" element={<NoteViewerPage />} />
