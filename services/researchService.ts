@@ -66,23 +66,46 @@ export const ResearchService = {
 
         // 3. 소스 분석 및 신뢰도 평가
         updateProgress('정보 분석', 'in-progress');
-        const sources: ResearchSource[] = searchResults.map(result => ({
+        const allSources: ResearchSource[] = searchResults.map(result => ({
             title: result.title,
             url: result.link,
             snippet: result.snippet,
             domain: result.displayLink,
             trustScore: this.calculateTrustScore(result.displayLink)
         }));
-        updateProgress('정보 분석', 'completed');
 
-        // 4. AI 분석 및 리포트 생성
+        // 🔴 신뢰할 수 있는 출처만 필터링 (trustScore >= 70)
+        const sources = allSources
+            .filter(s => s.trustScore >= 70)
+            .sort((a, b) => b.trustScore - a.trustScore)
+            .slice(0, 10); // 상위 10개
+
+        if (sources.length === 0) {
+            console.warn('⚠️ No reliable sources found!');
+            updateProgress('정보 분석', 'failed', '신뢰할 수 있는 출처를 찾을 수 없음');
+            throw new Error('신뢰할 수 있는 출처를 찾을 수 없습니다.');
+        }
+
+        console.log(`✅ Found ${sources.length} reliable sources (filtered from ${allSources.length})`);
+        updateProgress('정보 분석', 'completed', `${sources.length}개 신뢰 출처`);
+
+        // 4. AI 분석 및 리포트 생성 (교차 검증 강조)
         updateProgress('AI 리포트 생성', 'in-progress');
         const groqClient = getGroqClient();
 
-        const analysisPrompt = `다음 검색 결과를 바탕으로 "${query}"에 대한 포괄적인 리포트를 작성해주세요.
+        const analysisPrompt = `다음 **신뢰할 수 있는 출처**의 검색 결과를 바탕으로 "${query}"에 대한 객관적이고 균형잡힌 리포트를 작성해주세요.
 
-검색 결과:
-${sources.map((s, i) => `${i + 1}. ${s.title}\n   출처: ${s.domain}\n   내용: ${s.snippet}`).join('\n\n')}
+🔍 검색 결과 (신뢰도 순):
+${sources.map((s, i) => `${i + 1}. [${s.domain}] ${s.title}
+   신뢰도: ${s.trustScore}점
+   내용: ${s.snippet}
+   URL: ${s.url}`).join('\n\n')}
+
+📋 작성 지침:
+- 여러 출처의 정보를 **교차 검증**하여 팩트만 작성
+- 출처마다 다른 내용이 있으면 명시
+- 편향된 표현 금지, 객관적 사실만
+- 참고자료 링크를 **정확하게** 포함
 
 다음 형식으로 작성해주세요:
 
@@ -90,21 +113,22 @@ ${sources.map((s, i) => `${i + 1}. ${s.title}\n   출처: ${s.domain}\n   내용
 (핵심 내용을 3-4문장으로 요약)
 
 # 상세 분석
-(검색 결과를 종합하여 깊이 있는 분석 제공)
+(검색 결과를 종합하여 깊이 있는 분석 제공. 출처별 정보를 명시)
 
 # 장점
 - (첫 번째 장점)
 - (두 번째 장점)
-- (세 번째 장점)
 
 # 단점/우려사항
 - (첫 번째 단점)
 - (두 번째 단점)
 
+# 참고자료
+${sources.map((s, i) => `${i + 1}. [${s.title}](${s.url}) - ${s.domain}`).join('\n')}
+
 # 관련 주제
 - (관련 주제 1)
-- (관련 주제 2)
-- (관련 주제 3)`;
+- (관련 주제 2)`;
 
         let reportContent = '';
         await groqClient.streamChat(
@@ -160,12 +184,17 @@ ${sources.map((s, i) => `${i + 1}. ${s.title}\n   출처: ${s.domain}\n   내용
     },
 
     /**
-     * 검색 쿼리 최적화 (AI로 관련 쿼리 생성)
+     * 검색 쿼리 최적화 (교차 검증용)
      */
     async optimizeQuery(query: string): Promise<string[]> {
         const groqClient = getGroqClient();
 
-        const prompt = `"${query}"에 대해 포괄적인 정보를 얻기 위한 3개의 검색 쿼리를 생성해주세요. 각 쿼리는 다른 측면을 다뤄야 합니다.
+        const prompt = `"${query}"에 대한 정보를 **신뢰할 수 있는 출처**에서 찾기 위한 3개의 검색 쿼리를 생성해주세요.
+        
+요구사항:
+1. 각 쿼리는 다른 관점을 다뤄야 함 (편향 방지)
+2. 학술 논문, 정부 자료, 뉴스 기사에서 검색 가능해야 함
+3. 구체적이고 팩트 중심이어야 함
 
 응답 형식:
 1. (첫 번째 쿼리)
@@ -200,19 +229,80 @@ ${sources.map((s, i) => `${i + 1}. ${s.title}\n   출처: ${s.domain}\n   내용
     },
 
     /**
-     * 도메인 신뢰도 점수 계산
+     * 도메인 신뢰도 점수 계산 (신뢰할 수 있는 출처만!)
+     * 나무위키, 개인 블로그 등은 낮은 점수
      */
     calculateTrustScore(domain: string): number {
-        // 신뢰도 높은 도메인
-        const highTrust = ['wikipedia.org', 'gov', 'edu', 'nature.com', 'science.org', 'ieee.org'];
-        // 중간 신뢰도
-        const mediumTrust = ['com', 'org', 'net'];
+        const lowerDomain = domain.toLowerCase();
 
-        if (highTrust.some(d => domain.includes(d))) return 90;
-        if (domain.includes('.gov') || domain.includes('.edu')) return 85;
-        if (mediumTrust.some(d => domain.endsWith('.' + d))) return 70;
+        // 🔴 차단 목록 (신뢰 불가)
+        const blockedSources = [
+            'namu.wiki', 'namuwiki', '나무위키',
+            'tistory.com', 'blog.naver', 'brunch.co.kr',
+            'medium.com', 'velog.io', 'tstory.com'
+        ];
 
-        return 60;
+        if (blockedSources.some(blocked => lowerDomain.includes(blocked))) {
+            return 0; // 차단!
+        }
+
+        // ✅ 최고 신뢰도 (95-100점) - 정부/공공/학술
+        const highestTrust = [
+            // 정부 기관
+            '.gov', '.go.kr', 'whitehouse.gov', 'europa.eu',
+            // 학술 기관
+            '.edu', '.ac.kr', 'scholar.google',
+            // 학술 출판
+            'arxiv.org', 'nature.com', 'science.org', 'ieee.org',
+            'acm.org', 'springer.com', 'sciencedirect.com',
+            'pubmed.ncbi.nlm.nih.gov', 'doi.org'
+        ];
+
+        for (const trusted of highestTrust) {
+            if (lowerDomain.includes(trusted)) return 100;
+        }
+
+        // ✅ 고 신뢰도 (85-94점) - 주요 뉴스/경제 기관
+        const highTrust = [
+            // 국내 주요 언론
+            'chosun.com', 'joongang.co.kr', 'donga.com',
+            'hani.co.kr', 'yonhapnews.co.kr', 'yna.co.kr',
+            // 경제 언론
+            'mk.co.kr', 'hankyung.com', 'edaily.co.kr',
+            'bloter.net', 'zdnet.co.kr', 'etnews.com',
+            // 해외 주요 언론
+            'reuters.com', 'bloomberg.com', 'wsj.com',
+            'ft.com', 'economist.com', 'forbes.com',
+            'nytimes.com', 'theguardian.com', 'bbc.com',
+            // 기술 언론
+            'techcrunch.com', 'theverge.com', 'wired.com',
+            'arstechnica.com', 'engadget.com'
+        ];
+
+        for (const trusted of highTrust) {
+            if (lowerDomain.includes(trusted)) return 90;
+        }
+
+        // ✅ 중 신뢰도 (70-84점) - 기업 공식 사이트
+        const mediumTrust = [
+            // 빅테크 공식
+            'nvidia.com', 'amd.com', 'intel.com',
+            'openai.com', 'anthropic.com', 'google.com',
+            'microsoft.com', 'apple.com', 'meta.com',
+            // 연구소
+            'deepmind.com', 'research.ibm.com'
+        ];
+
+        for (const trusted of mediumTrust) {
+            if (lowerDomain.includes(trusted)) return 80;
+        }
+
+        // ⚠️ 낮은 신뢰도 (40-69점) - 일반 사이트
+        if (lowerDomain.endsWith('.org')) return 60;
+        if (lowerDomain.endsWith('.com')) return 50;
+
+        // ❌ 기타 (40점 이하)
+        return 40;
     },
 
     /**

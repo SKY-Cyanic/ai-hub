@@ -356,6 +356,7 @@ export const CuratorService = {
             'wikipedia', 'birthday', 'anniversary', 'turns', 'celebrates',
             // 정치/사회 (AI 관련 제외)
             'trump', 'election', 'politics', 'protest', 'supporters',
+            'americans', 'younger', 'older', 'grown', 'competitive', 'insecure',
             // 엔터테인먼트
             'nsfw', 'porn', 'xxx', 'dating', 'casino', 'gambling',
             'meme', 'joke', 'funny', 'cute', 'aww', 'wholesome',

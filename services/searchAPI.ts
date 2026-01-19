@@ -66,34 +66,34 @@ export const SearchAPI = {
     },
 
     /**
-     * 보충 검색 결과 생성 (실제 사이트 링크)
+     * 보충 검색 결과 생성 (신뢰할 수 있는 출처!)
      */
     generateSupplementaryResults(query: string, num: number): SearchResult[] {
         const sources = [
             {
-                domain: 'namu.wiki',
-                base: 'https://namu.wiki/w/',
-                name: '나무위키'
+                domain: 'scholar.google.com',
+                base: 'https://scholar.google.com/scholar?q=',
+                name: 'Google Scholar'
             },
             {
-                domain: 'blog.naver.com',
-                base: 'https://blog.naver.com/PostView.naver?blogId=search&logNo=',
-                name: 'Naver 블로그'
+                domain: 'arxiv.org',
+                base: 'https://arxiv.org/search/?query=',
+                name: 'arXiv (학술 논문)'
             },
             {
-                domain: 'www.google.com',
-                base: 'https://www.google.com/search?q=',
-                name: 'Google 검색'
+                domain: 'news.google.com',
+                base: 'https://news.google.com/search?q=',
+                name: 'Google News'
             },
             {
-                domain: 'ko.wikihow.com',
-                base: 'https://ko.wikihow.com/',
-                name: 'wikiHow'
+                domain: 'reuters.com',
+                base: 'https://www.reuters.com/search/news?blob=',
+                name: 'Reuters'
             },
             {
-                domain: 'terms.naver.com',
-                base: 'https://terms.naver.com/search.naver?query=',
-                name: 'Naver 지식백과'
+                domain: 'techcrunch.com',
+                base: 'https://search.techcrunch.com/search?q=',
+                name: 'TechCrunch'
             }
         ];
 
@@ -104,7 +104,7 @@ export const SearchAPI = {
             results.push({
                 title: `${query} - ${source.name}`,
                 link: source.base + encodeURIComponent(query),
-                snippet: `${query}에 대한 ${source.name} 정보입니다. 관련 문서, 블로그 글, 전문가 의견 등을 확인할 수 있습니다.`,
+                snippet: `${query}에 대한 ${source.name} 검색 결과입니다. 신뢰할 수 있는 출처에서 정보를 확인할 수 있습니다.`,
                 displayLink: source.domain,
                 formattedUrl: source.base + encodeURIComponent(query)
             });
