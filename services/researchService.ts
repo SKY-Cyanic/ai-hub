@@ -89,65 +89,54 @@ export const ResearchService = {
         console.log(`✅ Found ${sources.length} reliable sources (filtered from ${allSources.length})`);
         updateProgress('정보 분석', 'completed', `${sources.length}개 신뢰 출처`);
 
-        // 4. AI 분석 및 리포트 생성 (교차 검증 강조)
+        // 4. AI 분석 및 리포트 생성 (표준 리포트 구조)
         updateProgress('AI 리포트 생성', 'in-progress');
         const groqClient = getGroqClient();
 
-        const analysisPrompt = `다음 **신뢰할 수 있는 출처**의 검색 결과를 바탕으로 "${query}"에 대한 객관적이고 균형잡힌 리포트를 작성해주세요.
+        // AI 분석 프롬프트 (두괄식 + MECE + 개조식)
+        const analysisPrompt = `다음 신뢰할 수 있는 출처의 검색 결과를 바탕으로 "${query}"에 대한 전문 리포트를 작성하세요.
 
-🔍 검색 결과 (신뢰도 순):
-${sources.map((s, i) => `${i + 1}. [${s.domain}] ${s.title}
-   신뢰도: ${s.trustScore}점
-   내용: ${s.snippet}
-   URL: ${s.url}`).join('\n\n')}
+**작성 원칙 (MECE + 두괄식 + 개조식)**:
+1. **두괄식**: 결론부터 먼저 제시
+2. **MECE**: 항목 간 중복 없이, 누락 없이
+3. **개조식**: 번호 붙인 항목별 나열
+4. **명확한 수치**: "매우" 대신 "15% 증가" 등 구체적 수치
+5. **객관성**: 여러 출처 교차 검증
 
-📋 작성 지침:
-- 여러 출처의 정보를 **교차 검증**하여 팩트만 작성
-- 출처마다 다른 내용이 있으면 명시
-- 편향된 표현 금지, 객관적 사실만
-- 참고자료 링크를 **정확하게** 포함
+**필수 구조**:
+- Executive Summary: 핵심 내용 3-5문장
+- 현황 분석: 객관적 사실
+- 주요 발견사항: 3-5개 번호 목록
+- 결론: 요약된 결론
 
-다음 형식으로 작성해주세요:
+**참고 출처**:
+${sources.map(s => `- ${s.domain} (신뢰도: ${s.trustScore}점): ${s.snippet?.substring(0, 150) || ''}...`).join('\n')}
 
-# 요약
-(핵심 내용을 3-4문장으로 요약)
+**중요**: 본문에 출처를 직접 언급하지 마세요. "연구에 따르면" 등 일반적 표현 사용.
 
-# 상세 분석
-(검색 결과를 종합하여 깊이 있는 분석 제공. 출처별 정보를 명시)
+리포트를 markdown 형식으로 작성하세요.`;
 
-# 장점
-- (첫 번째 장점)
-- (두 번째 장점)
-
-# 단점/우려사항
-- (첫 번째 단점)
-- (두 번째 단점)
-
-# 참고자료
-${sources.map((s, i) => `${i + 1}. [${s.title}](${s.url}) - ${s.domain}`).join('\n')}
-
-# 관련 주제
-- (관련 주제 1)
-- (관련 주제 2)`;
-
-        let reportContent = '';
+        let fullReport = '';
         await groqClient.streamChat(
             {
                 model: 'openai/gpt-oss-120b',
-                messages: [{ role: 'user', content: analysisPrompt }],
-                temperature: 0.7,
-                max_tokens: 2048
+                messages: [
+                    { role: 'user', content: analysisPrompt }
+                ],
+                temperature: 0.5,
+                max_tokens: 2000
             },
             (chunk, full) => {
-                reportContent = full;
+                fullReport = full;
+                updateProgress('AI 리포트 생성', 'in-progress', `${full.length}자 작성`);
             }
         );
 
-        // 리포트 파싱
-        console.log('📄 Raw report content length:', reportContent.length);
-        console.log('📄 Report preview:', reportContent.substring(0, 200));
+        updateProgress('AI 리포트 생성', 'completed', `${fullReport.length}자`);
+        console.log(`✅ Report generated: ${fullReport.substring(0, 100)}...`);
 
-        const parsed = this.parseReport(reportContent);
+        // 5. 리포트 파싱
+        const parsed = this.parseReport(fullReport, sources);
 
         // 파싱된 내용 검증
         if (!parsed.summary || parsed.summary.trim().length === 0) {
@@ -157,7 +146,7 @@ ${sources.map((s, i) => `${i + 1}. [${s.title}](${s.url}) - ${s.domain}`).join('
 
         if (!parsed.analysis || parsed.analysis.trim().length === 0) {
             console.warn('⚠️ Empty analysis detected, using source snippets');
-            parsed.analysis = sources.map((s, i) => `${i + 1}. **${s.title}**: ${s.snippet}`).join('\n\n');
+            parsed.analysis = sources.map((s, i) => `${i + 1}. ** ${s.title}**: ${s.snippet} `).join('\n\n');
         }
 
         updateProgress('AI 리포트 생성', 'completed');
@@ -189,17 +178,17 @@ ${sources.map((s, i) => `${i + 1}. [${s.title}](${s.url}) - ${s.domain}`).join('
     async optimizeQuery(query: string): Promise<string[]> {
         const groqClient = getGroqClient();
 
-        const prompt = `"${query}"에 대한 정보를 **신뢰할 수 있는 출처**에서 찾기 위한 3개의 검색 쿼리를 생성해주세요.
-        
-요구사항:
-1. 각 쿼리는 다른 관점을 다뤄야 함 (편향 방지)
+        const prompt = `"${query}"에 대한 정보를 ** 신뢰할 수 있는 출처 ** 에서 찾기 위한 3개의 검색 쿼리를 생성해주세요.
+
+    요구사항:
+1. 각 쿼리는 다른 관점을 다뤄야 함(편향 방지)
 2. 학술 논문, 정부 자료, 뉴스 기사에서 검색 가능해야 함
 3. 구체적이고 팩트 중심이어야 함
 
 응답 형식:
-1. (첫 번째 쿼리)
-2. (두 번째 쿼리)
-3. (세 번째 쿼리)`;
+1.(첫 번째 쿼리)
+2.(두 번째 쿼리)
+3.(세 번째 쿼리)`;
 
         let response = '';
         await groqClient.streamChat(

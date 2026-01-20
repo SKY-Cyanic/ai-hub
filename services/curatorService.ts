@@ -7,6 +7,10 @@ import { getGroqClient } from './groqClient';
 import { ResearchService } from './researchService';
 import { PostIntegrationService } from './postIntegrationService';
 import { storage } from './storage';
+import { CategoryDiversityManager } from './categoryDiversityManager';
+import { KeywordDuplicationManager } from './keywordDuplicationManager';
+import { SourceBalanceManager } from './sourceBalanceManager';
+import { QualityVerificationManager } from './qualityVerificationManager';
 
 export interface TrendingTopic {
     title: string;
@@ -35,6 +39,21 @@ export interface CuratorLog {
     reason?: string;
     postId?: string;
 }
+
+/**
+ * Phase 4.1 Enhancement: Category History Tracking
+ * 카테고리 다양성을 위한 최근 게시물 카테고리 추적
+ */
+export interface CategoryHistory {
+    category: string;
+    timestamp: number;
+    postId: string;
+    title: string;
+}
+
+const CATEGORY_HISTORY_KEY = 'curator_category_history';
+const MAX_CATEGORY_HISTORY = 10; // 최근 10개 추적
+const MAX_CONSECUTIVE_SAME_CATEGORY = 2; // 같은 카테고리 최대 2회 연속
 
 const DEFAULT_CONFIG: CuratorConfig = {
     enabled: false,
@@ -289,8 +308,20 @@ export const CuratorService = {
         // 2. 중복 제거 (제목 유사도 기반)
         const uniqueTopics = this.removeDuplicates(newTopics);
 
+        // 2.5. Phase 4.1 Checkpoint 2: 24시간 키워드 중복 필터링
+        const keywordUnique = uniqueTopics.filter(topic => {
+            const result = KeywordDuplicationManager.isDuplicateKeywords(topic.title);
+            if (result.isDuplicate) {
+                console.log(`🔑 Keyword dup: "${topic.title}" ~ "${result.matchedTitle}"`);
+                return false;
+            }
+            return true;
+        });
+
+        console.log(`🔑 Keyword filter: ${uniqueTopics.length} → ${keywordUnique.length}`);
+
         // 3. 점수 기반 정렬 (높은 순)
-        const sorted = uniqueTopics.sort((a, b) => b.score - a.score);
+        const sorted = keywordUnique.sort((a, b) => b.score - a.score);
 
         // 4. AI/기술 관련 키워드 가중치 부여
         const weighted = sorted.map(topic => ({
@@ -549,6 +580,20 @@ export const CuratorService = {
                 status: 'success',
                 postId: postId
             });
+
+            // 8. Phase 4.1 Checkpoint 1: 카테고리 히스토리 기록
+            CategoryDiversityManager.addCategoryHistory(
+                postDraft.category,
+                postId,
+                topic.title
+            );
+
+            // 9. Phase 4.1 Checkpoint 2: 키워드 히스토리 기록
+            const keywords = KeywordDuplicationManager.extractKeywords(topic.title);
+            KeywordDuplicationManager.addKeywordHistory(keywords, topic.title, postId);
+
+            // 10. Phase 4.1 Checkpoint 3: 출처 균형 기록
+            SourceBalanceManager.recordSource(topic.source);
 
             return postId;
 
