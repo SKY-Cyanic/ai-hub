@@ -1,395 +1,229 @@
 /**
- * Response Templates - Professional Report Structure
- * 두괄식 + MECE + 개조식 표준 리포트
+ * Response Templates - Phase B1
+ * 표준 리포트 구조 (두괄식 + MECE + 개조식)
  */
 
 import { IntentType } from './contextAnalyzer';
+import { ResearchSource } from './researchService';
+
+// ============================================
+// Types
+// ============================================
 
 export interface TemplateVariables {
-    [key: string]: any;
+    title: string;
+    executiveSummary: string;
+    introduction: string;
+    mainBody: string;
+    conclusion: string;
+    sources: ResearchSource[];
+    confidence: number;
+    generatedAt: string;
 }
 
-export const ResponseTemplates = {
-    selectTemplate(intentType: IntentType): (vars: TemplateVariables) => string {
-        const templates = {
-            definition: this.standardReportTemplate,
-            comparison: this.comparisonReportTemplate,
-            'fact-check': this.factCheckReportTemplate,
-            'how-to': this.howToReportTemplate,
-            opinion: this.opinionReportTemplate,
-            exploration: this.standardReportTemplate
-        };
-
-        return templates[intentType] || this.standardReportTemplate;
-    },
-
-    /**
-     * 표준 리포트 템플릿 (Definition/Exploration)
-     * 구조: 제목 → 요약 → 본론 → 결론
-     */
-    standardReportTemplate(vars: TemplateVariables): string {
-        return `# ${vars.title || '리서치 결과'}
-
-## 📋 Executive Summary (핵심 요약)
-
-${vars.executiveSummary || vars.summary || ''}
-
-**신뢰도**: ${vars.confidence || 'N/A'} | **출처 수**: ${vars.sourceCount || 0}개
-
----
-
-## 🎯 서론 (Introduction)
-
-${vars.introduction || `"${vars.query || vars.title}"에 대한 리서치 결과입니다.`}
-
----
-
-## 📊 본론 (Main Content)
-
-### 1. 현황 분석
-${vars.currentStatus || vars.mainContent || ''}
-
-${vars.keyPoints ? `### 2. 주요 발견사항 (Key Findings)\n${this.formatBulletPoints(vars.keyPoints)}` : ''}
-
-${vars.analysis ? `### 3. 상세 분석\n${vars.analysis}` : ''}
-
----
-
-## ✅ 결론 및 제언 (Conclusion & Recommendations)
-
-${vars.conclusion || ''}
-
-${vars.recommendations ? `\n**실행 방안 (Action Plan)**:\n${this.formatBulletPoints(vars.recommendations)}` : ''}
-
----
-
-## 📚 참고자료 (References)
-${this.formatReferences(vars.references)}`;
-    },
-
-    /**
-     * 비교 리포트 (Comparison)
-     */
-    comparisonReportTemplate(vars: TemplateVariables): string {
-        return `# ${vars.title || `${vars.itemA} vs ${vars.itemB}`}
-
-## 📋 Executive Summary
-
-${vars.executiveSummary || `${vars.itemA}와 ${vars.itemB}의 비교 분석 결과입니다.`}
-
-**결론**: ${vars.finalVerdict || '상황에 따라 선택'}
-
----
-
-## 📊 비교표 (Comparison Matrix)
-
-| 평가 항목 | ${vars.itemA} | ${vars.itemB} | 우위 |
-|----------|--------------|--------------|------|
-${this.formatComparisonRows(vars.comparisonRows)}
-
----
-
-## 🔍 상세 분석 (Detailed Analysis)
-
-### ${vars.itemA}의 특징
-${this.formatBulletPoints(vars.itemA_features || [])}
-
-**장점**:
-${this.formatBulletPoints(vars.itemA_pros || [])}
-
-**단점**:
-${this.formatBulletPoints(vars.itemA_cons || [])}
-
-### ${vars.itemB}의 특징
-${this.formatBulletPoints(vars.itemB_features || [])}
-
-**장점**:
-${this.formatBulletPoints(vars.itemB_pros || [])}
-
-**단점**:
-${this.formatBulletPoints(vars.itemB_cons || [])}
-
----
-
-## ✅ 추천 (Recommendation)
-
-${vars.recommendation || ''}
-
-**선택 기준**:
-${this.formatBulletPoints(vars.selectionCriteria || [])}
-
----
-
-## 📚 참고자료
-${this.formatReferences(vars.references)}`;
-    },
-
-    /**
-     * 사실 확인 리포트 (Fact-Check)
-     */
-    factCheckReportTemplate(vars: TemplateVariables): string {
-        const verdictIcon = {
-            'true': '✅',
-            'partially-true': '⚠️',
-            'false': '❌',
-            'unverified': '❓'
-        };
-
-        return `# 사실 확인: ${vars.claim}
-
-## 📋 검증 결과 (Verdict)
-
-${verdictIcon[vars.verdict as keyof typeof verdictIcon] || '❓'} **${vars.verdictText || '확인 불가'}**
-
-**신뢰도**: ${vars.confidence || 'N/A'} | **출처 일치도**: ${vars.agreementScore || 'N/A'}%
-
----
-
-## 🔍 검증 과정 (Verification Process)
-
-### 1. 출처 분석
-${this.formatBulletPoints(vars.sourceAnalysis || [])}
-
-### 2. 팩트 체크
-${this.formatBulletPoints(vars.factChecks || [])}
-
-### 3. 교차 검증
-${vars.crossVerification || ''}
-
----
-
-## 📊 근거 (Evidence)
-
-${vars.evidence || ''}
-
-${vars.supportingData ? `\n**데이터 지표**:\n${this.formatBulletPoints(vars.supportingData)}` : ''}
-
----
-
-## ⚠️ 주의사항 (Caveats)
-
-${this.formatBulletPoints(vars.caveats || [])}
-
----
-
-## 📚 참고자료
-${this.formatReferences(vars.references)}`;
-    },
-
-    /**
-     * How-To 리포트
-     */
-    howToReportTemplate(vars: TemplateVariables): string {
-        return `# ${vars.title || vars.task}
-
-## 📋 Executive Summary
-
-${vars.executiveSummary || `"${vars.task}" 실행 가이드입니다.`}
-
-**예상 소요시간**: ${vars.estimatedTime || 'N/A'} | **난이도**: ${vars.difficulty || '중'}
-
----
-
-## 🎯 실행 단계 (Step-by-Step Guide)
-
-${this.formatHowToSteps(vars.steps || [])}
-
----
-
-## ⚠️ 주의사항 (Precautions)
-
-${this.formatBulletPoints(vars.warnings || [])}
-
----
-
-## 💡 Pro Tips
-
-${this.formatBulletPoints(vars.proTips || [])}
-
-${vars.alternatives ? `\n## 🔄 대안 방법 (Alternatives)\n\n${vars.alternatives}` : ''}
-
----
-
-## 📚 참고자료
-${this.formatReferences(vars.references)}`;
-    },
-
-    /**
-     * 의견/논쟁 리포트 (Opinion)
-     */
-    opinionReportTemplate(vars: TemplateVariables): string {
-        return `# ${vars.title || vars.topic}
-
-## 📋 Executive Summary
-
-${vars.executiveSummary || `"${vars.topic}"에 대한 다양한 관점 분석입니다.`}
-
-**편향도**: ${vars.biasScore || 'Low'} | **신뢰도**: ${vars.confidence || 'N/A'}
-
----
-
-## 🔍 관점 분석 (Perspective Analysis)
-
-### 찬성 입장 (Pro)
-${vars.proArgument || ''}
-
-**주요 근거**:
-${this.formatBulletPoints(vars.proEvidence || [])}
-
-### 반대 입장 (Con)
-${vars.conArgument || ''}
-
-**주요 근거**:
-${this.formatBulletPoints(vars.conEvidence || [])}
-
-${vars.neutralPerspective ? `\n### 중립 입장 (Neutral)\n${vars.neutralPerspective}` : ''}
-
----
-
-## 📊 비교 분석
-
-| 요소 | 찬성 | 반대 |
-|------|------|------|
-${this.formatOpinionRows(vars.opinionRows || [])}
-
----
-
-## ✅ 균형잡힌 결론 (Balanced Conclusion)
-
-${vars.balancedConclusion || ''}
-
-**고려사항**:
-${this.formatBulletPoints(vars.considerations || [])}
-
----
-
-## 📚 참고자료
-${this.formatReferences(vars.references)}`;
-    },
-
-    // ============================================
-    // 헬퍼 함수들
-    // ============================================
-
-    /**
-     * Bullet points 포맷
-     */
-    formatBulletPoints(items: string[] | any[]): string {
-        if (!Array.isArray(items) || items.length === 0) {
-            return '- (정보 없음)';
-        }
-
-        return items.map((item, i) => {
-            if (typeof item === 'string') {
-                return `${i + 1}. ${item}`;
-            } else if (item.title && item.description) {
-                return `${i + 1}. **${item.title}**: ${item.description}`;
-            }
-            return `${i + 1}. ${JSON.stringify(item)}`;
-        }).join('\n');
-    },
-
-    /**
-     * 비교표 행 포맷
-     */
-    formatComparisonRows(rows: any[]): string {
-        if (!Array.isArray(rows) || rows.length === 0) {
-            return '| 성능 | 데이터 없음 | 데이터 없음 | - |';
-        }
-
-        return rows.map(row => {
-            const winner = row.winner || '-';
-            return `| ${row.category} | ${row.itemA} | ${row.itemB} | ${winner} |`;
-        }).join('\n');
-    },
-
-    /**
-     * 의견 비교표 행 포맷
-     */
-    formatOpinionRows(rows: any[]): string {
-        if (!Array.isArray(rows) || rows.length === 0) {
-            return '| 근거 강도 | 데이터 없음 | 데이터 없음 |';
-        }
-
-        return rows.map(row => {
-            return `| ${row.aspect} | ${row.pro} | ${row.con} |`;
-        }).join('\n');
-    },
-
-    /**
-     * How-To 단계 포맷
-     */
-    formatHowToSteps(steps: any[]): string {
-        if (!Array.isArray(steps) || steps.length === 0) {
-            return '1. (단계 정보 없음)';
-        }
-
-        return steps.map((step, i) => {
-            let output = `### 단계 ${i + 1}: ${step.title}\n\n${step.description}`;
-
-            if (step.code) {
-                output += `\n\n\`\`\`${step.language || ''}\n${step.code}\n\`\`\``;
-            }
-
-            if (step.notes) {
-                output += `\n\n> 💡 **참고**: ${step.notes}`;
-            }
-
-            return output;
-        }).join('\n\n');
-    },
-
-    /**
-     * 참고자료 포맷
-     */
-    formatReferences(refs: any[]): string {
-        if (!Array.isArray(refs) || refs.length === 0) {
-            return '(참고자료 없음)';
-        }
-
-        return refs.map((ref, i) => {
-            const title = ref.title || ref.domain || 'Unknown';
-            const url = ref.url || '#';
-            const domain = ref.domain || '';
-            const trustScore = ref.trustScore ? ` (신뢰도: ${ref.trustScore}점)` : '';
-
-            return `${i + 1}. [${title}](${url}) - ${domain}${trustScore}`;
-        }).join('\n');
-    }
-};
+export interface FormattedReport {
+    markdown: string;
+    plainText: string;
+    metadata: {
+        intent: IntentType;
+        wordCount: number;
+        sourceCount: number;
+        confidence: number;
+    };
+}
+
+// ============================================
+// Standard Report Template
+// ============================================
 
 /**
- * GPT 프롬프트 생성 헬퍼
+ * 표준 리포트 구조
+ * 1. 제목 (Title)
+ * 2. 요약 (Executive Summary)
+ * 3. 서론 (Introduction)
+ * 4. 본론 (Main Body)
+ * 5. 결론 및 제언 (Conclusion & Recommendation)
+ * 6. 참고자료 (References)
  */
-export const PromptTemplates = {
+function generateStandardReport(vars: TemplateVariables): string {
+    return `# ${vars.title}
+
+## 📋 요약 (Executive Summary)
+
+${vars.executiveSummary}
+
+---
+
+## 📍 서론
+
+${vars.introduction}
+
+---
+
+## 📊 본론
+
+${vars.mainBody}
+
+---
+
+## ✅ 결론 및 제언
+
+${vars.conclusion}
+
+---
+
+${formatSources(vars.sources)}
+
+---
+*🔹 신뢰도: ${(vars.confidence * 100).toFixed(0)}% | 📅 작성일: ${vars.generatedAt}*`;
+}
+
+// ============================================
+// Intent-Specific Adaptations
+// ============================================
+
+const TEMPLATES: Record<IntentType, (vars: TemplateVariables) => string> = {
     /**
-     * 표준 리포트 작성 프롬프트
+     * 정의 질문: 개념 정의 → 특징 → 활용
      */
-    getStandardReportPrompt(query: string, sources: string): string {
-        return `"${query}"에 대한 전문 리포트를 작성하세요.
+    'definition': (vars) => generateStandardReport({
+        ...vars,
+        introduction: `### 작성 배경\n${vars.introduction}\n\n### 보고서 범위\n본 보고서는 해당 개념의 정의, 특징, 활용 분야를 다룹니다.`
+    }),
 
-**출처**:
-${sources}
+    /**
+     * 비교 질문: 비교 분석 → 차이점 → 권장사항
+     */
+    'comparison': (vars) => generateStandardReport({
+        ...vars,
+        introduction: `### 비교 배경\n${vars.introduction}\n\n### 비교 범위\n본 보고서는 각 대상의 특징을 분석하고 차이점을 도출합니다.`
+    }),
 
-**작성 원칙**:
-1. **두괄식**: 결론부터 먼저 제시
-2. **MECE**: 중복 없이, 누락 없이
-3. **개조식**: 번호 붙인 항목별 나열
-4. **수치 명확**: "매우" 대신 "15% 증가" 등 구체적 수치 사용
+    /**
+     * 팩트체크: 주장 검증 → 근거 분석 → 판정
+     */
+    'fact-check': (vars) => generateStandardReport({
+        ...vars,
+        introduction: `### 검증 대상\n${vars.introduction}\n\n### 검증 방법\n신뢰할 수 있는 출처를 교차 검증하여 사실 여부를 확인합니다.`
+    }),
 
-**필수 구조**:
-1. Executive Summary (핵심 내용 3-5문장)
-2. 현황 분석 (객관적 사실)
-3. 주요 발견사항 (번호 목록)
-4. 결론 및 제언 (action plan 포함)
+    /**
+     * How-to: 단계별 가이드
+     */
+    'how-to': (vars) => generateStandardReport({
+        ...vars,
+        introduction: `### 가이드 목적\n${vars.introduction}\n\n### 적용 범위\n본 가이드는 단계별 실행 방법을 제시합니다.`
+    }),
 
-JSON 형식으로 응답:
-{
-  "executiveSummary": "...",
-  "currentStatus": "...",
-  "keyPoints": ["1. ...", "2. ..."],
-  "conclusion": "...",
-  "recommendations": ["1. ...", "2. ..."]
-}`;
+    /**
+     * 의견/전망: 현황 분석 → 다양한 시각 → 전망
+     */
+    'opinion': (vars) => generateStandardReport({
+        ...vars,
+        introduction: `### 분석 배경\n${vars.introduction}\n\n### 분석 범위\n본 보고서는 현황을 분석하고 향후 전망을 제시합니다.`
+    }),
+
+    /**
+     * 탐색/동향: 최신 동향 → 주요 변화 → 시사점
+     */
+    'exploration': (vars) => generateStandardReport({
+        ...vars,
+        introduction: `### 조사 배경\n${vars.introduction}\n\n### 조사 범위\n본 보고서는 최신 동향과 주요 변화를 분석합니다.`
+    })
+};
+
+// ============================================
+// Helper Functions
+// ============================================
+
+function formatSources(sources: ResearchSource[]): string {
+    if (!sources || sources.length === 0) {
+        return `## 📚 참고자료\n\n> 출처 정보 없음`;
+    }
+
+    const validSources = sources
+        .filter(s => s.url && s.trustScore >= 70)
+        .slice(0, 10);
+
+    if (validSources.length === 0) {
+        return `## 📚 참고자료\n\n> 신뢰할 수 있는 출처 없음`;
+    }
+
+    const sourceList = validSources.map((s, i) => {
+        const trustEmoji = s.trustScore >= 90 ? '🏆' : s.trustScore >= 80 ? '✅' : '📄';
+        return `${i + 1}. ${trustEmoji} [${s.title}](${s.url}) - ${s.domain} (신뢰도: ${s.trustScore}점)`;
+    }).join('\n');
+
+    return `## 📚 참고자료\n\n${sourceList}`;
+}
+
+// ============================================
+// Response Templates
+// ============================================
+
+export const ResponseTemplates = {
+    /**
+     * 의도에 맞는 리포트 포맷팅
+     */
+    format(intent: IntentType, variables: TemplateVariables): FormattedReport {
+        const template = TEMPLATES[intent] || TEMPLATES['definition'];
+        const markdown = template(variables);
+
+        // 마크다운에서 텍스트 추출
+        const plainText = markdown
+            .replace(/#{1,6}\s/g, '')
+            .replace(/\*\*/g, '')
+            .replace(/\*/g, '')
+            .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+            .replace(/>\s/g, '')
+            .replace(/---/g, '');
+
+        return {
+            markdown,
+            plainText,
+            metadata: {
+                intent,
+                wordCount: plainText.split(/\s+/).length,
+                sourceCount: variables.sources.length,
+                confidence: variables.confidence
+            }
+        };
+    },
+
+    /**
+     * 기본 변수 생성
+     */
+    createDefaultVariables(
+        title: string,
+        executiveSummary: string,
+        introduction: string,
+        mainBody: string,
+        conclusion: string,
+        sources: ResearchSource[],
+        confidence: number
+    ): TemplateVariables {
+        return {
+            title,
+            executiveSummary,
+            introduction,
+            mainBody,
+            conclusion,
+            sources,
+            confidence,
+            generatedAt: new Date().toLocaleDateString('ko-KR', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            })
+        };
+    },
+
+    /**
+     * 모든 템플릿 유형 반환
+     */
+    getAvailableTemplates(): IntentType[] {
+        return Object.keys(TEMPLATES) as IntentType[];
     }
 };
+
+export default ResponseTemplates;

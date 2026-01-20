@@ -1,12 +1,34 @@
+/**
+ * Research Service - Refactored with Phase A-B Modules
+ * 통합 리서치 서비스: 맥락분석 → 검색 → 추론 → 품질검증 → 템플릿 포맷
+ * + 후속 질문 기능 + 심화 분석 (50CR)
+ */
+
 import { SearchAPI, SearchResult } from './searchAPI';
 import { getGroqClient } from './groqClient';
+import { ContextAnalyzer, ContextAnalysis, IntentType } from './contextAnalyzer';
+import { ReasoningEngine, ReasoningResult } from './reasoningEngine';
+import { QualityVerifier, QualityScore } from './qualityVerifier';
+import { ResponseTemplates, TemplateVariables, FormattedReport } from './responseTemplates';
+import { SourceManager, ValidatedSource } from './sourceManager';
+import { storage } from './storage';
+
+// ============================================
+// Constants
+// ============================================
+
+export const DEEP_ANALYSIS_COST = 50; // 심화 분석 비용 (CR)
+
+// ============================================
+// Types
+// ============================================
 
 export interface ResearchSource {
     title: string;
     url: string;
     snippet: string;
     domain: string;
-    trustScore: number; // 0-100
+    trustScore: number;
 }
 
 export interface ResearchReport {
@@ -22,6 +44,17 @@ export interface ResearchReport {
     relatedTopics: string[];
     createdAt: string;
     searchProgress: SearchProgress[];
+
+    // 새 필드 (Phase A-B)
+    contextAnalysis?: ContextAnalysis;
+    reasoningResult?: ReasoningResult;
+    qualityScore?: QualityScore;
+    formattedReport?: FormattedReport;
+
+    // 후속 질문 관련
+    parentReportId?: string;       // 원본 리포트 ID (후속 질문인 경우)
+    followUpQuestions?: string[];  // 추천 후속 질문
+    isDeepAnalysis?: boolean;      // 심화 분석 여부
 }
 
 export interface SearchProgress {
@@ -31,333 +64,433 @@ export interface SearchProgress {
     details?: string;
 }
 
+export interface ResearchOptions {
+    isDeepAnalysis?: boolean;      // 심화 분석 모드 (50CR)
+    parentReportId?: string;       // 후속 질문인 경우 원본 리포트 ID
+    userId?: string;               // CR 차감을 위한 사용자 ID
+}
+
+// ============================================
+// Research Service
+// ============================================
+
 export const ResearchService = {
     /**
-     * 리서치 수행 (검색 → 분석 → 리포트 생성)
+     * 🚀 메인 리서치 함수 (Phase A-B 통합)
      */
     async performResearch(
         query: string,
-        onProgress?: (progress: SearchProgress) => void
+        onProgress?: (progress: SearchProgress) => void,
+        options?: ResearchOptions
     ): Promise<ResearchReport> {
         const progress: SearchProgress[] = [];
         const reportId = `research_${Date.now()}`;
+        const isDeepAnalysis = options?.isDeepAnalysis ?? false;
 
-        // 1. 검색 쿼리 최적화
         const updateProgress = (step: string, status: SearchProgress['status'], details?: string) => {
             const newProgress: SearchProgress = { step, status, timestamp: new Date(), details };
             progress.push(newProgress);
             if (onProgress) onProgress(newProgress);
         };
 
-        updateProgress('검색 쿼리 최적화', 'in-progress');
-        const optimizedQueries = await this.optimizeQuery(query);
-        updateProgress('검색 쿼리 최적화', 'completed', `${optimizedQueries.length}개 쿼리 생성`);
+        console.log(`🚀 Starting research: "${query}" ${isDeepAnalysis ? '(심화 분석)' : ''}`);
 
-        // 2. 웹 검색
-        updateProgress('웹 검색 수행', 'in-progress');
+        // ============================================
+        // 심화 분석 CR 차감 (50CR)
+        // ============================================
+        if (isDeepAnalysis && options?.userId) {
+            updateProgress('CR 차감', 'in-progress', `${DEEP_ANALYSIS_COST}CR 결제 중...`);
+
+            const user = storage.getUserByRawId(options.userId);
+            if (!user) {
+                updateProgress('CR 차감', 'failed', '사용자를 찾을 수 없습니다');
+                throw new Error('사용자를 찾을 수 없습니다.');
+            }
+
+            if (user.points < DEEP_ANALYSIS_COST) {
+                updateProgress('CR 차감', 'failed', `CR 부족 (보유: ${user.points})`);
+                throw new Error(`CR이 부족합니다. (필요: ${DEEP_ANALYSIS_COST}CR, 보유: ${user.points}CR)`);
+            }
+
+            // CR 차감
+            user.points -= DEEP_ANALYSIS_COST;
+            if (!user.transactions) user.transactions = [];
+            user.transactions.push({
+                id: `tx-research-${Date.now()}`,
+                type: 'spend',
+                amount: DEEP_ANALYSIS_COST,
+                description: `심화 분석: ${query.substring(0, 30)}...`,
+                created_at: new Date().toISOString()
+            });
+
+            await storage.saveUser(user);
+
+            // 세션 업데이트
+            if (storage.getSession()?.id === user.id) {
+                storage.setSession(user);
+            }
+
+            updateProgress('CR 차감', 'completed', `${DEEP_ANALYSIS_COST}CR 결제 완료`);
+        }
+
+        // ============================================
+        // Phase A1: 맥락 분석
+        // ============================================
+        updateProgress('맥락 분석', 'in-progress', '질문 의도 파악 중...');
+
+        let contextAnalysis: ContextAnalysis;
+        try {
+            contextAnalysis = await ContextAnalyzer.analyze(query);
+            updateProgress('맥락 분석', 'completed',
+                `의도: ${contextAnalysis.intent}, 키워드: ${contextAnalysis.searchKeywords.length}개`);
+        } catch (error) {
+            console.error('Context analysis failed, using fallback:', error);
+            contextAnalysis = {
+                originalQuery: query,
+                intent: 'definition',
+                intentConfidence: 0.5,
+                entities: [],
+                abbreviationExpansions: [],
+                searchKeywords: [query],
+                isAmbiguous: false,
+                possibleMeanings: [],
+                complexity: 'simple'
+            };
+            updateProgress('맥락 분석', 'completed', '폴백 모드');
+        }
+
+        // ============================================
+        // 웹 검색 (분석된 키워드 사용)
+        // ============================================
+        updateProgress('웹 검색', 'in-progress', '신뢰 출처에서 검색 중...');
+
         let searchResults: SearchResult[] = [];
         try {
-            searchResults = await SearchAPI.multiSearch(optimizedQueries);
-            updateProgress('웹 검색 수행', 'completed', `${searchResults.length}개 결과 발견`);
+            // 맥락 분석된 키워드로 검색 (원본 질문 직접 검색 X)
+            searchResults = await SearchAPI.multiSearch(contextAnalysis.searchKeywords);
+            updateProgress('웹 검색', 'completed', `${searchResults.length}개 결과`);
         } catch (error: any) {
-            updateProgress('웹 검색 수행', 'failed', error.message);
+            updateProgress('웹 검색', 'failed', error.message);
             throw error;
         }
 
-        // 3. 소스 분석 및 신뢰도 평가
-        updateProgress('정보 분석', 'in-progress');
-        const allSources: ResearchSource[] = searchResults.map(result => ({
+        // ============================================
+        // Phase B2: 출처 검증 및 필터링
+        // ============================================
+        updateProgress('출처 검증', 'in-progress', 'URL 및 신뢰도 검증...');
+
+        const rawSources: ResearchSource[] = searchResults.map(result => ({
             title: result.title,
             url: result.link,
             snippet: result.snippet,
             domain: result.displayLink,
-            trustScore: this.calculateTrustScore(result.displayLink)
+            trustScore: SourceManager.calculateTrustScore(result.displayLink)
         }));
 
-        // 🔴 신뢰할 수 있는 출처만 필터링 (trustScore >= 70)
-        const sources = allSources
-            .filter(s => s.trustScore >= 70)
-            .sort((a, b) => b.trustScore - a.trustScore)
-            .slice(0, 10); // 상위 10개
+        const validationResult = await SourceManager.validateAndFilter(rawSources);
+        const reliableSources = SourceManager.filterReliableSources(validationResult.sources, 70);
 
-        if (sources.length === 0) {
-            console.warn('⚠️ No reliable sources found!');
-            updateProgress('정보 분석', 'failed', '신뢰할 수 있는 출처를 찾을 수 없음');
+        if (reliableSources.length === 0) {
+            updateProgress('출처 검증', 'failed', '신뢰 출처 없음');
             throw new Error('신뢰할 수 있는 출처를 찾을 수 없습니다.');
         }
 
-        console.log(`✅ Found ${sources.length} reliable sources (filtered from ${allSources.length})`);
-        updateProgress('정보 분석', 'completed', `${sources.length}개 신뢰 출처`);
+        updateProgress('출처 검증', 'completed',
+            `${reliableSources.length}/${rawSources.length}개 신뢰 출처`);
 
-        // 4. AI 분석 및 리포트 생성 (표준 리포트 구조)
-        updateProgress('AI 리포트 생성', 'in-progress');
-        const groqClient = getGroqClient();
+        // ============================================
+        // Phase A2: 5단계 추론 엔진
+        // ============================================
+        updateProgress('AI 추론', 'in-progress',
+            contextAnalysis.complexity === 'simple' ? '직접 답변 생성...' : '5단계 추론 수행...');
 
-        // AI 분석 프롬프트 (두괄식 + MECE + 개조식)
-        const analysisPrompt = `다음 신뢰할 수 있는 출처의 검색 결과를 바탕으로 "${query}"에 대한 전문 리포트를 작성하세요.
-
-**작성 원칙 (MECE + 두괄식 + 개조식)**:
-1. **두괄식**: 결론부터 먼저 제시
-2. **MECE**: 항목 간 중복 없이, 누락 없이
-3. **개조식**: 번호 붙인 항목별 나열
-4. **명확한 수치**: "매우" 대신 "15% 증가" 등 구체적 수치
-5. **객관성**: 여러 출처 교차 검증
-
-**필수 구조**:
-- Executive Summary: 핵심 내용 3-5문장
-- 현황 분석: 객관적 사실
-- 주요 발견사항: 3-5개 번호 목록
-- 결론: 요약된 결론
-
-**참고 출처**:
-${sources.map(s => `- ${s.domain} (신뢰도: ${s.trustScore}점): ${s.snippet?.substring(0, 150) || ''}...`).join('\n')}
-
-**중요**: 본문에 출처를 직접 언급하지 마세요. "연구에 따르면" 등 일반적 표현 사용.
-
-리포트를 markdown 형식으로 작성하세요.`;
-
-        let fullReport = '';
-        await groqClient.streamChat(
-            {
-                model: 'openai/gpt-oss-120b',
-                messages: [
-                    { role: 'user', content: analysisPrompt }
-                ],
-                temperature: 0.5,
-                max_tokens: 2000
-            },
-            (chunk, full) => {
-                fullReport = full;
-                updateProgress('AI 리포트 생성', 'in-progress', `${full.length}자 작성`);
+        const reasoningResult = await ReasoningEngine.process(
+            query,
+            contextAnalysis,
+            reliableSources,
+            (step) => {
+                if (step.status === 'completed') {
+                    console.log(`  ✓ ${step.name}: ${step.result || 'OK'}`);
+                }
             }
         );
 
-        updateProgress('AI 리포트 생성', 'completed', `${fullReport.length}자`);
-        console.log(`✅ Report generated: ${fullReport.substring(0, 100)}...`);
+        updateProgress('AI 추론', 'completed',
+            `신뢰도: ${(reasoningResult.confidence * 100).toFixed(0)}%`);
 
-        // 5. 리포트 파싱
-        const parsed = this.parseReport(fullReport, sources);
+        // ============================================
+        // Phase A3: 품질 검증
+        // ============================================
+        updateProgress('품질 검증', 'in-progress', '교차 검증 및 품질 평가...');
 
-        // 파싱된 내용 검증
-        if (!parsed.summary || parsed.summary.trim().length === 0) {
-            console.warn('⚠️ Empty summary detected, using fallback');
-            parsed.summary = '검색 결과를 바탕으로 한 분석이 생성되지 않았습니다.';
-        }
+        const qualityScore = QualityVerifier.verify(
+            reasoningResult.clearAnswer,
+            reliableSources
+        );
 
-        if (!parsed.analysis || parsed.analysis.trim().length === 0) {
-            console.warn('⚠️ Empty analysis detected, using source snippets');
-            parsed.analysis = sources.map((s, i) => `${i + 1}. ** ${s.title}**: ${s.snippet} `).join('\n\n');
-        }
+        updateProgress('품질 검증', 'completed',
+            `품질 점수: ${qualityScore.overall}/10 (${qualityScore.passed ? 'PASS' : 'FAIL'})`);
 
-        updateProgress('AI 리포트 생성', 'completed');
+        // ============================================
+        // Phase B1: 템플릿 포맷팅 (표준 리포트 구조)
+        // ============================================
+        updateProgress('리포트 포맷', 'in-progress', `${contextAnalysis.intent} 템플릿 적용...`);
 
+        // 콘텐츠 구조화
+        const structuredContent = this.structureContent(
+            query,
+            contextAnalysis,
+            reasoningResult.clearAnswer
+        );
+
+        const templateVars: TemplateVariables = ResponseTemplates.createDefaultVariables(
+            structuredContent.title,           // 제목
+            structuredContent.executiveSummary, // 요약
+            structuredContent.introduction,     // 서론
+            structuredContent.mainBody,         // 본론
+            structuredContent.conclusion,       // 결론
+            reliableSources,
+            reasoningResult.confidence
+        );
+
+        const formattedReport = ResponseTemplates.format(contextAnalysis.intent, templateVars);
+
+        updateProgress('리포트 포맷', 'completed',
+            `${formattedReport.metadata.wordCount}단어, ${formattedReport.metadata.sourceCount}개 출처`);
+
+        // ============================================
+        // 후속 질문 생성
+        // ============================================
+        updateProgress('후속 질문 생성', 'in-progress', '관련 질문 추천 중...');
+
+        const followUpQuestions = await this.generateFollowUpQuestions(
+            query,
+            contextAnalysis,
+            reasoningResult.clearAnswer
+        );
+
+        updateProgress('후속 질문 생성', 'completed', `${followUpQuestions.length}개 질문 생성`);
+
+        // ============================================
+        // 최종 리포트 생성
+        // ============================================
         const report: ResearchReport = {
             id: reportId,
             query,
-            summary: parsed.summary.trim(),
-            detailedAnalysis: parsed.analysis.trim(),
-            sources,
-            prosAndCons: {
-                pros: parsed.pros.length > 0 ? parsed.pros : ['정보를 수집했습니다'],
-                cons: parsed.cons.length > 0 ? parsed.cons : ['추가 분석이 필요합니다']
-            },
-            relatedTopics: parsed.relatedTopics.length > 0 ? parsed.relatedTopics : [],
+            summary: structuredContent.executiveSummary,
+            detailedAnalysis: formattedReport.markdown,
+            sources: reliableSources,
+            prosAndCons: { pros: [], cons: [] },
+            relatedTopics: [],
             createdAt: new Date().toISOString(),
-            searchProgress: progress
+            searchProgress: progress,
+
+            // Phase A-B 필드
+            contextAnalysis,
+            reasoningResult,
+            qualityScore,
+            formattedReport,
+
+            // 후속 질문 관련
+            parentReportId: options?.parentReportId,
+            followUpQuestions,
+            isDeepAnalysis
         };
 
-        // 로컬 스토리지에 저장
+        // 저장
         this.saveReport(report);
 
+        console.log(`✅ Research complete: ${reportId}`);
         return report;
     },
 
     /**
-     * 검색 쿼리 최적화 (교차 검증용)
+     * 🔄 후속 질문 생성
      */
-    async optimizeQuery(query: string): Promise<string[]> {
+    async generateFollowUpQuestions(
+        query: string,
+        context: ContextAnalysis,
+        answer: string
+    ): Promise<string[]> {
         const groqClient = getGroqClient();
 
-        const prompt = `"${query}"에 대한 정보를 ** 신뢰할 수 있는 출처 ** 에서 찾기 위한 3개의 검색 쿼리를 생성해주세요.
+        const prompt = `다음 질문과 답변을 바탕으로 사용자가 이어서 물어볼 수 있는 후속 질문 3개를 생성하세요.
 
-    요구사항:
-1. 각 쿼리는 다른 관점을 다뤄야 함(편향 방지)
-2. 학술 논문, 정부 자료, 뉴스 기사에서 검색 가능해야 함
-3. 구체적이고 팩트 중심이어야 함
+## 원본 질문
+"${query}"
 
-응답 형식:
-1.(첫 번째 쿼리)
-2.(두 번째 쿼리)
-3.(세 번째 쿼리)`;
+## 질문 의도
+${context.intent}
+
+## 답변 요약
+${answer.substring(0, 500)}...
+
+## 지시
+JSON 배열 형식으로 3개의 후속 질문을 생성하세요 (순수 JSON만):
+["후속 질문 1", "후속 질문 2", "후속 질문 3"]
+
+## 후속 질문 원칙
+1. 원본 질문을 더 깊이 파고드는 질문
+2. 관련 주제로 확장하는 질문
+3. 실용적 적용을 묻는 질문`;
 
         let response = '';
-        await groqClient.streamChat(
-            {
-                model: 'openai/gpt-oss-120b',
-                messages: [{ role: 'user', content: prompt }],
-                temperature: 0.5,
-                max_tokens: 200
-            },
-            (chunk, full) => {
-                response = full;
-            }
-        );
+        try {
+            await groqClient.streamChat(
+                {
+                    model: 'openai/gpt-oss-120b',
+                    messages: [{ role: 'user', content: prompt }],
+                    temperature: 0.5,
+                    max_tokens: 300
+                },
+                (chunk: string, full: string) => { response = full; }
+            );
 
-        // 쿼리 추출
-        const queries = [query]; // 원본 쿼리 포함
-        const lines = response.split('\n').filter(line => line.trim());
-
-        lines.forEach(line => {
-            const match = line.match(/^\d+\.\s*(.+)$/);
-            if (match && match[1]) {
-                queries.push(match[1].trim());
+            const match = response.match(/\[[\s\S]*\]/);
+            if (match) {
+                return JSON.parse(match[0]).slice(0, 3);
             }
+        } catch (e) {
+            console.error('Follow-up question generation failed:', e);
+        }
+
+        // 폴백
+        return [
+            `${query}의 장단점은 무엇인가요?`,
+            `${query}와 관련된 최신 동향은?`,
+            `${query}를 실제로 적용하려면 어떻게 해야 하나요?`
+        ];
+    },
+
+    /**
+     * 🔄 후속 질문으로 리서치 수행
+     */
+    async performFollowUpResearch(
+        followUpQuery: string,
+        parentReportId: string,
+        onProgress?: (progress: SearchProgress) => void,
+        options?: ResearchOptions
+    ): Promise<ResearchReport> {
+        return this.performResearch(followUpQuery, onProgress, {
+            ...options,
+            parentReportId
         });
-
-        return queries.slice(0, 4); // 최대 4개
     },
 
     /**
-     * 도메인 신뢰도 점수 계산 (신뢰할 수 있는 출처만!)
-     * 나무위키, 개인 블로그 등은 낮은 점수
+     * 콘텐츠 구조화 (표준 리포트 구조)
+     * 제목 → 요약 → 서론 → 본론 → 결론
      */
-    calculateTrustScore(domain: string): number {
-        const lowerDomain = domain.toLowerCase();
-
-        // 🔴 차단 목록 (신뢰 불가)
-        const blockedSources = [
-            'namu.wiki', 'namuwiki', '나무위키',
-            'tistory.com', 'blog.naver', 'brunch.co.kr',
-            'medium.com', 'velog.io', 'tstory.com'
-        ];
-
-        if (blockedSources.some(blocked => lowerDomain.includes(blocked))) {
-            return 0; // 차단!
-        }
-
-        // ✅ 최고 신뢰도 (95-100점) - 정부/공공/학술
-        const highestTrust = [
-            // 정부 기관
-            '.gov', '.go.kr', 'whitehouse.gov', 'europa.eu',
-            // 학술 기관
-            '.edu', '.ac.kr', 'scholar.google',
-            // 학술 출판
-            'arxiv.org', 'nature.com', 'science.org', 'ieee.org',
-            'acm.org', 'springer.com', 'sciencedirect.com',
-            'pubmed.ncbi.nlm.nih.gov', 'doi.org'
-        ];
-
-        for (const trusted of highestTrust) {
-            if (lowerDomain.includes(trusted)) return 100;
-        }
-
-        // ✅ 고 신뢰도 (85-94점) - 주요 뉴스/경제 기관
-        const highTrust = [
-            // 국내 주요 언론
-            'chosun.com', 'joongang.co.kr', 'donga.com',
-            'hani.co.kr', 'yonhapnews.co.kr', 'yna.co.kr',
-            // 경제 언론
-            'mk.co.kr', 'hankyung.com', 'edaily.co.kr',
-            'bloter.net', 'zdnet.co.kr', 'etnews.com',
-            // 해외 주요 언론
-            'reuters.com', 'bloomberg.com', 'wsj.com',
-            'ft.com', 'economist.com', 'forbes.com',
-            'nytimes.com', 'theguardian.com', 'bbc.com',
-            // 기술 언론
-            'techcrunch.com', 'theverge.com', 'wired.com',
-            'arstechnica.com', 'engadget.com'
-        ];
-
-        for (const trusted of highTrust) {
-            if (lowerDomain.includes(trusted)) return 90;
-        }
-
-        // ✅ 중 신뢰도 (70-84점) - 기업 공식 사이트
-        const mediumTrust = [
-            // 빅테크 공식
-            'nvidia.com', 'amd.com', 'intel.com',
-            'openai.com', 'anthropic.com', 'google.com',
-            'microsoft.com', 'apple.com', 'meta.com',
-            // 연구소
-            'deepmind.com', 'research.ibm.com'
-        ];
-
-        for (const trusted of mediumTrust) {
-            if (lowerDomain.includes(trusted)) return 80;
-        }
-
-        // ⚠️ 낮은 신뢰도 (40-69점) - 일반 사이트
-        if (lowerDomain.endsWith('.org')) return 60;
-        if (lowerDomain.endsWith('.com')) return 50;
-
-        // ❌ 기타 (40점 이하)
-        return 40;
-    },
-
-    /**
-     * AI 리포트 파싱
-     */
-    parseReport(content: string): {
-        summary: string;
-        analysis: string;
-        pros: string[];
-        cons: string[];
-        relatedTopics: string[];
+    structureContent(
+        query: string,
+        context: ContextAnalysis,
+        rawContent: string
+    ): {
+        title: string;
+        executiveSummary: string;
+        introduction: string;
+        mainBody: string;
+        conclusion: string;
     } {
-        const sections = {
-            summary: '',
-            analysis: '',
-            pros: [] as string[],
-            cons: [] as string[],
-            relatedTopics: [] as string[]
+        const intentTitles: Record<IntentType, string> = {
+            'definition': '개념 분석',
+            'comparison': '비교 분석',
+            'fact-check': '팩트 체크',
+            'how-to': '실행 가이드',
+            'opinion': '전망 분석',
+            'exploration': '동향 분석'
         };
 
-        const lines = content.split('\n');
-        let currentSection = '';
+        // 1. 제목 생성
+        const mainTopic = context.entities[0]?.text || query.replace(/[?？]/g, '').trim();
+        const title = `${mainTopic} - ${intentTitles[context.intent] || '분석 보고서'}`;
 
-        console.log('🔍 Parsing report, total lines:', lines.length);
+        // 2. 본문에서 섹션 추출
+        const sections = this.parseSections(rawContent);
 
-        for (const line of lines) {
-            const trimmed = line.trim();
-
-            if (trimmed.startsWith('# 요약')) {
-                currentSection = 'summary';
-                console.log('📝 Found summary section');
-            } else if (trimmed.startsWith('# 상세 분석') || trimmed.startsWith('# 분석') || trimmed.startsWith('# 상세')) {
-                currentSection = 'analysis';
-                console.log('🔍 Found analysis section');
-            } else if (trimmed.startsWith('# 장점')) {
-                currentSection = 'pros';
-                console.log('✅ Found pros section');
-            } else if (trimmed.startsWith('# 단점') || trimmed.startsWith('# 우려')) {
-                currentSection = 'cons';
-                console.log('⚠️ Found cons section');
-            } else if (trimmed.startsWith('# 관련')) {
-                currentSection = 'related';
-                console.log('🔗 Found related topics section');
-            } else if (trimmed && !trimmed.startsWith('#')) {
-                if (currentSection === 'summary' || currentSection === 'analysis') {
-                    sections[currentSection] += line + '\n';
-                } else if (trimmed.startsWith('-') || trimmed.startsWith('*') || trimmed.startsWith('•')) {
-                    const item = trimmed.replace(/^[-*•]\s*/, '').trim();
-                    if (item) {
-                        if (currentSection === 'pros') sections.pros.push(item);
-                        else if (currentSection === 'cons') sections.cons.push(item);
-                        else if (currentSection === 'related') sections.relatedTopics.push(item);
-                    }
-                }
-            }
+        // 3. 요약 (Executive Summary) - 핵심 내용 3-4문장
+        let executiveSummary = sections.summary || '';
+        if (!executiveSummary) {
+            // 첫 번째 의미있는 단락 사용
+            const paragraphs = rawContent.split('\n\n').filter(p => p.trim().length > 50);
+            executiveSummary = paragraphs[0]?.substring(0, 300) || `${mainTopic}에 대한 분석 결과입니다.`;
         }
 
-        console.log('📊 Parsed sections:', {
-            summary: sections.summary.length,
-            analysis: sections.analysis.length,
-            pros: sections.pros.length,
-            cons: sections.cons.length,
-            related: sections.relatedTopics.length
-        });
+        // 4. 서론 - 배경, 목적, 범위
+        const introduction = `본 보고서는 "${query}"에 대한 분석을 제공합니다.\n\n` +
+            `신뢰할 수 있는 출처를 기반으로 객관적인 정보를 정리하였으며, ` +
+            `${context.intent === 'definition' ? '개념 정의와 특징' :
+                context.intent === 'comparison' ? '비교 분석과 차이점' :
+                    context.intent === 'fact-check' ? '사실 검증 결과' :
+                        context.intent === 'how-to' ? '단계별 실행 방법' :
+                            context.intent === 'opinion' ? '다양한 시각과 전망' :
+                                '최신 동향과 시사점'}을 다룹니다.`;
 
-        return sections;
+        // 5. 본론 - 현황 분석 → 문제점/특징 → 대안/시사점
+        let mainBody = sections.analysis || sections.content || rawContent;
+        // 마크다운 정리
+        mainBody = mainBody
+            .replace(/^#+\s*요약.*$/gm, '')
+            .replace(/^#+\s*결론.*$/gm, '')
+            .replace(/^#+\s*장점.*$/gm, '')
+            .replace(/^#+\s*단점.*$/gm, '')
+            .replace(/^#+\s*긍정적.*$/gm, '')
+            .replace(/^#+\s*우려.*$/gm, '')
+            .trim();
+
+        // 6. 결론 및 제언
+        let conclusion = sections.conclusion || '';
+        if (!conclusion) {
+            conclusion = `${mainTopic}에 대한 분석 결과, ` +
+                `위 내용을 종합하여 의사결정에 참고하시기 바랍니다.\n\n` +
+                `**주요 시사점:**\n` +
+                `- 신뢰할 수 있는 출처를 기반으로 분석되었습니다.\n` +
+                `- 추가적인 검토가 필요한 경우 참고자료를 확인하세요.`;
+        }
+
+        return {
+            title,
+            executiveSummary,
+            introduction,
+            mainBody,
+            conclusion
+        };
+    },
+
+    /**
+     * 본문에서 섹션 파싱
+     */
+    parseSections(content: string): {
+        summary?: string;
+        analysis?: string;
+        content?: string;
+        conclusion?: string;
+    } {
+        const result: any = {};
+
+        // 요약 섹션
+        const summaryMatch = content.match(/#{1,3}\s*요약[:\s]*([\s\S]*?)(?=#{1,3}\s|$)/i);
+        if (summaryMatch) result.summary = summaryMatch[1].trim();
+
+        // 분석/본문 섹션
+        const analysisMatch = content.match(/#{1,3}\s*(분석|본론|상세)[:\s]*([\s\S]*?)(?=#{1,3}\s*(결론|장점|단점)|$)/i);
+        if (analysisMatch) result.analysis = analysisMatch[2].trim();
+
+        // 결론 섹션
+        const conclusionMatch = content.match(/#{1,3}\s*결론[:\s]*([\s\S]*?)(?=#{1,3}\s|$)/i);
+        if (conclusionMatch) result.conclusion = conclusionMatch[1].trim();
+
+        // 전체 콘텐츠 (폴백)
+        result.content = content;
+
+        return result;
+    },
+
+    /**
+     * 신뢰도 점수 계산 (레거시 호환)
+     */
+    calculateTrustScore(domain: string): number {
+        return SourceManager.calculateTrustScore(domain);
     },
 
     /**
@@ -365,8 +498,8 @@ ${sources.map(s => `- ${s.domain} (신뢰도: ${s.trustScore}점): ${s.snippet?.
      */
     saveReport(report: ResearchReport): void {
         const reports = this.getReports();
-        reports.unshift(report); // 최신순
-        localStorage.setItem('research_reports', JSON.stringify(reports.slice(0, 20))); // 최근 20개만
+        reports.unshift(report);
+        localStorage.setItem('research_reports', JSON.stringify(reports.slice(0, 20)));
     },
 
     /**
@@ -385,3 +518,5 @@ ${sources.map(s => `- ${s.domain} (신뢰도: ${s.trustScore}점): ${s.snippet?.
         return reports.find(r => r.id === id) || null;
     }
 };
+
+export default ResearchService;

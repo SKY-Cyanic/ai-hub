@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { ResearchService, ResearchReport, SearchProgress } from '../services/researchService';
+import { ResearchService, ResearchReport, SearchProgress, DEEP_ANALYSIS_COST } from '../services/researchService';
 import { PostIntegrationService, PostDraft } from '../services/postIntegrationService';
 import { useNavigate } from 'react-router-dom';
-import { Search, FileText, ExternalLink, TrendingUp, AlertCircle, CheckCircle, Loader2, Share2, Eye, Send, Sparkles, X } from 'lucide-react';
+import { Search, FileText, ExternalLink, TrendingUp, AlertCircle, CheckCircle, Loader2, Share2, Send, Sparkles, Zap, MessageCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -16,6 +16,9 @@ const ResearchPage: React.FC = () => {
     const [progress, setProgress] = useState<SearchProgress[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [recentReports, setRecentReports] = useState<ResearchReport[]>([]);
+
+    // 심화 분석 모드
+    const [isDeepAnalysis, setIsDeepAnalysis] = useState(false);
 
     // Phase 2: 게시물 발행
     const [showPostModal, setShowPostModal] = useState(false);
@@ -44,6 +47,10 @@ const ResearchPage: React.FC = () => {
                 query,
                 (progressUpdate) => {
                     setProgress(prev => [...prev.filter(p => p.step !== progressUpdate.step), progressUpdate]);
+                },
+                {
+                    isDeepAnalysis,
+                    userId: user?.id
                 }
             );
 
@@ -155,6 +162,29 @@ const ResearchPage: React.FC = () => {
                         </button>
                     </div>
 
+                    {/* 심화 분석 토글 */}
+                    <div className="mt-4 flex items-center gap-3">
+                        <button
+                            onClick={() => setIsDeepAnalysis(!isDeepAnalysis)}
+                            className={`px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-all ${isDeepAnalysis
+                                ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-lg'
+                                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                }`}
+                        >
+                            <Zap size={18} />
+                            심화 분석
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${isDeepAnalysis ? 'bg-white/20' : 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400'
+                                }`}>
+                                {DEEP_ANALYSIS_COST}CR
+                            </span>
+                        </button>
+                        {isDeepAnalysis && (
+                            <span className="text-sm text-amber-600 dark:text-amber-400">
+                                ⚡ 더 깊이 있는 분석과 더 많은 출처를 검토합니다
+                            </span>
+                        )}
+                    </div>
+
                     {/* 추천 질문 */}
                     {!isResearching && !currentReport && (
                         <div className="mt-4">
@@ -232,47 +262,47 @@ const ResearchPage: React.FC = () => {
                             </span>
                         </div>
 
-                        {/* 요약 */}
-                        <div className="mb-6">
-                            <h3 className="font-bold text-lg mb-2 text-blue-600 dark:text-blue-400">📝 요약</h3>
-                            <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{currentReport.summary}</p>
-                        </div>
+                        {/* 심화 분석 배지 */}
+                        {currentReport.isDeepAnalysis && (
+                            <div className="mb-4 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg flex items-center gap-2 text-sm">
+                                <Zap size={16} className="text-amber-600 dark:text-amber-400" />
+                                <span className="text-amber-600 dark:text-amber-400 font-medium">
+                                    ⚡ 심화 분석 리포트 (50CR 소모)
+                                </span>
+                            </div>
+                        )}
 
-                        {/* 상세 분석 */}
+                        {/* 전체 리포트 (한 번만 표시) */}
                         <div className="mb-6">
-                            <h3 className="font-bold text-lg mb-2 text-purple-600 dark:text-purple-400">🔍 상세 분석</h3>
-                            <div className="prose dark:prose-invert max-w-none">
+                            <div className="prose dark:prose-invert max-w-none prose-headings:text-blue-600 dark:prose-headings:text-blue-400 prose-strong:text-gray-900 dark:prose-strong:text-gray-100">
                                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{currentReport.detailedAnalysis}</ReactMarkdown>
                             </div>
                         </div>
 
-                        {/* 장단점 */}
-                        <div className="grid md:grid-cols-2 gap-4 mb-6">
-                            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl">
-                                <h3 className="font-bold text-lg mb-2 text-green-600 dark:text-green-400 flex items-center gap-2">
-                                    ✅ 장점
+                        {/* 후속 질문 */}
+                        {currentReport.followUpQuestions && currentReport.followUpQuestions.length > 0 && (
+                            <div className="mb-6">
+                                <h3 className="font-bold text-lg mb-3 flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                                    <MessageCircle size={20} />
+                                    이어서 물어보기
                                 </h3>
-                                <div className="space-y-2 prose dark:prose-invert prose-sm max-w-none">
-                                    {currentReport.prosAndCons.pros.map((pro, idx) => (
-                                        <div key={idx} className="text-sm text-gray-700 dark:text-gray-300">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{'• ' + pro}</ReactMarkdown>
-                                        </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {currentReport.followUpQuestions.map((fq, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => {
+                                                setQuery(fq);
+                                                setCurrentReport(null);
+                                            }}
+                                            className="px-4 py-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 rounded-xl text-sm hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors border border-emerald-200 dark:border-emerald-800 flex items-center gap-2"
+                                        >
+                                            <span>💬</span>
+                                            {fq}
+                                        </button>
                                     ))}
                                 </div>
                             </div>
-                            <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl">
-                                <h3 className="font-bold text-lg mb-2 text-red-600 dark:text-red-400 flex items-center gap-2">
-                                    ⚠️ 단점/우려사항
-                                </h3>
-                                <div className="space-y-2 prose dark:prose-invert prose-sm max-w-none">
-                                    {currentReport.prosAndCons.cons.map((con, idx) => (
-                                        <div key={idx} className="text-sm text-gray-700 dark:text-gray-300">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{'• ' + con}</ReactMarkdown>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
+                        )}
 
                         {/* 출처 */}
                         <div className="mb-6">
