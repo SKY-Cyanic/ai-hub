@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <!-- 메인 페이지 -->
+    <url>
+        <loc>https://ai-commu-hub.vercel.app/</loc>
+        <lastmod>2026-01-21</lastmod>
+        <changefreq>daily</changefreq>
+        <priority>1.0</priority>
+    </url>
+    
+    <!-- 게시판 -->
+    <url>
+        <loc>https://ai-commu-hub.vercel.app/posts</loc>
+        <lastmod>2026-01-21</lastmod>
+        <changefreq>hourly</changefreq>
+        <priority>0.9</priority>
+    </url>
+    
+    <!-- AI 리서치 -->
+    <url>
+        <loc>https://ai-commu-hub.vercel.app/research</loc>
+        <lastmod>2026-01-21</lastmod>
+        <changefreq>daily</changefreq>
+        <priority>0.9</priority>
+    </url>
+    
+    <!-- AI 친구 -->
+    <url>
+        <loc>https://ai-commu-hub.vercel.app/ai-friend</loc>
+        <lastmod>2026-01-21</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.8</priority>
+    </url>
+    
+    <!-- 넥서스 위키 -->
+    <url>
+        <loc>https://ai-commu-hub.vercel.app/nexus-wiki</loc>
+        <lastmod>2026-01-21</lastmod>
+        <changefreq>daily</changefreq>
+        <priority>0.8</priority>
+    </url>
+    
+    <!-- 게임 -->
+    <url>
+        <loc>https://ai-commu-hub.vercel.app/games</loc>
+        <lastmod>2026-01-21</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.7</priority>
+    </url>
+    
+    <!-- 샵 -->
+    <url>
+        <loc>https://ai-commu-hub.vercel.app/shop</loc>
+        <lastmod>2026-01-21</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.7</priority>
+    </url>
+    
+    <!-- 프로필 -->
+    <url>
+        <loc>https://ai-commu-hub.vercel.app/profile</loc>
+        <lastmod>2026-01-21</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.5</priority>
+    </url>
+</urlset>

@@ -1,0 +1,16 @@
+# AI-Hub Robots.txt
+# https://ai-commu-hub.vercel.app/
+
+User-agent: *
+Allow: /
+
+# Sitemaps
+Sitemap: https://ai-commu-hub.vercel.app/sitemap.xml
+
+# Crawl-delay for polite crawling
+Crawl-delay: 1
+
+# Disallow admin/private pages
+Disallow: /admin
+Disallow: /api/
+Disallow: /_next/
