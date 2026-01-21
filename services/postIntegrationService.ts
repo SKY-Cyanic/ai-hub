@@ -119,37 +119,44 @@ export const PostIntegrationService = {
     formatReportAsPost(report: ResearchReport): string {
         let content = `> 🤖 이 게시물은 AI Research Agent가 자동으로 조사하고 작성한 리포트입니다.\n\n`;
 
-        content += `# 📝 요약\n\n${report.summary}\n\n`;
+        // detailedAnalysis가 이미 참고자료를 포함하는지 확인
+        const hasReferencesInAnalysis = report.detailedAnalysis?.includes('📚 참고자료') ||
+            report.detailedAnalysis?.includes('참고자료');
 
-        content += `# 🔍 상세 분석\n\n${report.detailedAnalysis}\n\n`;
+        if (hasReferencesInAnalysis) {
+            // 이미 포맷된 리포트면 그대로 사용
+            content += report.detailedAnalysis;
+        } else {
+            // 레거시 포맷: 개별 섹션으로 구성
+            content += `# 📝 요약\n\n${report.summary}\n\n`;
+            content += `# 🔍 상세 분석\n\n${report.detailedAnalysis}\n\n`;
 
-        if (report.prosAndCons.pros.length > 0) {
-            content += `## ✅ 장점\n\n`;
-            report.prosAndCons.pros.forEach(pro => {
-                // 볼드 마크다운 유지
-                content += `- ${pro}\n`;
+            if (report.prosAndCons.pros.length > 0) {
+                content += `## ✅ 장점\n\n`;
+                report.prosAndCons.pros.forEach(pro => {
+                    content += `- ${pro}\n`;
+                });
+                content += `\n`;
+            }
+
+            if (report.prosAndCons.cons.length > 0) {
+                content += `## ⚠️ 단점/우려사항\n\n`;
+                report.prosAndCons.cons.forEach(con => {
+                    content += `- ${con}\n`;
+                });
+                content += `\n`;
+            }
+
+            // 참고자료 추가 (레거시용)
+            content += `# 📚 참고 자료\n\n`;
+            report.sources.forEach((source, i) => {
+                content += `${i + 1}. [${source.title}](${source.url}) - ${source.domain} (신뢰도: ${source.trustScore})\n`;
             });
-            content += `\n`;
         }
-
-        if (report.prosAndCons.cons.length > 0) {
-            content += `## ⚠️ 단점/우려사항\n\n`;
-            report.prosAndCons.cons.forEach(con => {
-                // 볼드 마크다운 유지
-                content += `- ${con}\n`;
-            });
-            content += `\n`;
-        }
-
-        content += `# 📚 참고 자료\n\n`;
-        report.sources.forEach((source, i) => {
-            content += `${i + 1}. [${source.title}](${source.url}) - ${source.domain} (신뢰도: ${source.trustScore})\n`;
-        });
 
         if (report.relatedTopics.length > 0) {
             content += `\n# 🔗 관련 주제\n\n`;
             report.relatedTopics.forEach(topic => {
-                // 볼드 제거
                 const cleanTopic = topic.replace(/\*\*/g, '');
                 content += `- ${cleanTopic}\n`;
             });

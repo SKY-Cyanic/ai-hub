@@ -1,132 +1,141 @@
 /**
- * AI Curator Scheduler - Phase 4
- * setInterval 기반 자동 큐레이션 스케줄러
+ * AI Curator Auto Scheduler - Phase 4 Enhanced
+ * 매시 정각 자동 큐레이션 (수동 활성화 불필요)
+ * 1:00, 2:00, ..., 23:00, 0:00 자동 실행
  */
 
-import { CuratorService, CuratorConfig } from './curatorService';
+import { CuratorService, CuratorConfig, DiversityManager, QualityGate } from './curatorService';
+import { ErrorRecoveryService } from './researchErrorRecovery';
 
-const STORAGE_KEY_LAST_RUN = 'curator_last_run';
+// ============================================
+// Constants
+// ============================================
+
+const STORAGE_KEY_LAST_RUN = 'curator_last_run_hour';
 const STORAGE_KEY_SCHEDULER_STATE = 'curator_scheduler_state';
+const STORAGE_KEY_EMERGENCY_STOP = 'curator_emergency_stop';
+
+// ============================================
+// Types
+// ============================================
 
 interface SchedulerStatus {
     enabled: boolean;
-    lastRunTime: number | null;
-    nextRunTime: number | null;
+    lastRunHour: number;
+    lastRunDate: string;
+    nextRunHour: number;
+    isProcessing: boolean;
+    totalRuns: number;
+    successfulRuns: number;
 }
 
-export class CuratorScheduler {
-    private intervalId: number | null = null;
-    private userId: string;
-    private isRunning: boolean = false; // 중복 실행 방지 플래그
-    private status: SchedulerStatus = {
-        enabled: false,
-        lastRunTime: null,
-        nextRunTime: null
-    };
+// ============================================
+// Auto Hourly Curator Scheduler
+// ============================================
 
-    private readonly LAST_RUN_KEY = 'curator_last_run';
-    private readonly STATUS_KEY = 'curator_status';
+export class AutoCuratorScheduler {
+    private checkIntervalId: number | null = null;
+    private userId: string;
+    private isProcessing: boolean = false;
+    private emergencyStop: boolean = false;
+
+    private status: SchedulerStatus = {
+        enabled: true,  // 기본 활성화
+        lastRunHour: -1,
+        lastRunDate: '',
+        nextRunHour: -1,
+        isProcessing: false,
+        totalRuns: 0,
+        successfulRuns: 0
+    };
 
     constructor(userId: string) {
         this.userId = userId;
-        // Load initial status from storage
-        const storedStatus = localStorage.getItem(this.STATUS_KEY);
-        if (storedStatus) {
-            this.status = JSON.parse(storedStatus);
-        }
-        const storedLastRun = localStorage.getItem(this.LAST_RUN_KEY);
-        if (storedLastRun) {
-            this.status.lastRunTime = parseInt(storedLastRun, 10);
-        }
+        this.loadStatus();
+        this.checkEmergencyStop();
     }
 
     /**
-     * 스케줄러 시작
+     * 🚀 자동 스케줄러 시작 (앱 로드 시 자동 호출)
      */
-    start(config: CuratorConfig) {
-        if (this.isRunning) {
-            console.log('⚠️ Scheduler already running');
+    startAutoScheduler(): void {
+        if (this.emergencyStop) {
+            console.log('🛑 Emergency stop is active. Scheduler disabled.');
             return;
         }
 
-        if (!config.enabled) {
-            console.log('📴 Curator is disabled');
-            return;
-        }
+        console.log('🤖 Auto Curator Scheduler starting...');
 
-        console.log(`🚀 Starting Curator Scheduler (every ${config.intervalHours}h)`);
+        // 1분마다 현재 시간 체크
+        this.checkIntervalId = setInterval(() => {
+            this.checkAndRunHourly();
+        }, 60 * 1000) as unknown as number; // 60초마다 체크
 
-        this.isRunning = true;
-        this.status.enabled = true;
-        this.saveSchedulerState();
+        // 즉시 한 번 체크
+        this.checkAndRunHourly();
 
-        // 즉시 한 번 실행 (누락 확인)
-        this.checkAndRun(config);
-
-        // Interval 설정
-        const intervalMs = config.intervalHours * 60 * 60 * 1000;
-        this.intervalId = setInterval(() => {
-            this.checkAndRun(config);
-        }, intervalMs) as unknown as number; // Cast to number for browser compatibility
-
-        console.log(`✅ Scheduler started. Next run in ${config.intervalHours}h`);
+        console.log('✅ Auto Scheduler is now running (every hour at :00)');
     }
 
     /**
-     * 스케줄러 중지
+     * 🛑 스케줄러 중지
      */
-    stop() {
-        if (this.intervalId) {
-            clearInterval(this.intervalId);
-            this.intervalId = null;
+    stop(): void {
+        if (this.checkIntervalId) {
+            clearInterval(this.checkIntervalId);
+            this.checkIntervalId = null;
         }
-
-        this.isRunning = false;
         this.status.enabled = false;
-        this.saveSchedulerState();
-        console.log('🛑 Scheduler stopped');
+        this.saveStatus();
+        console.log('🛑 Auto Scheduler stopped');
     }
 
     /**
-     * 실행 여부 확인 및 큐레이션 실행
+     * ⏰ 매시 정각 실행 체크
      */
-    private async checkAndRun(config: CuratorConfig) {
-        console.log('⏰ Scheduler tick - checking conditions...');
+    private async checkAndRunHourly(): Promise<void> {
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentMinute = now.getMinutes();
+        const currentDate = now.toISOString().split('T')[0]; // YYYY-MM-DD
 
-        // 1. 마지막 실행 시간 확인
-        const lastRun = this.status.lastRunTime || 0;
-        const now = Date.now();
-        const elapsed = now - lastRun;
-        const interval = config.intervalHours * 60 * 60 * 1000;
-
-        if (elapsed < interval) {
-            const remaining = Math.ceil((interval - elapsed) / (1000 * 60));
-            console.log(`⏳ Too soon. Next run in ${remaining} minutes`);
-            this.status.nextRunTime = now + (interval - elapsed);
-            this.saveSchedulerState();
+        // 정각 체크 (0-5분 사이만 실행)
+        if (currentMinute > 5) {
             return;
         }
 
-        // 2. 오늘 게시 가능 여부 확인 (runCuration 내부로 이동)
+        // 이미 이 시간에 실행했는지 체크
+        if (this.status.lastRunHour === currentHour &&
+            this.status.lastRunDate === currentDate) {
+            return;
+        }
 
-        // 3. 큐레이션 실행
-        await this.runCuration(this.userId);
-        this.status.nextRunTime = (this.status.lastRunTime || now) + interval;
-        this.saveSchedulerState();
+        // Emergency stop 체크
+        if (this.checkEmergencyStop()) {
+            console.log('🛑 Emergency stop active');
+            return;
+        }
+
+        // 처리 중이면 스킵
+        if (this.isProcessing) {
+            console.log('⏳ Already processing, skipping...');
+            return;
+        }
+
+        console.log(`⏰ Hourly trigger: ${currentHour}:00`);
+        await this.runCuration(currentHour, currentDate);
     }
 
     /**
-     * 큐레이션 실행
+     * 🤖 큐레이션 실행
      */
-    private async runCuration(userId: string): Promise<void> {
-        // 중복 실행 방지
-        if (this.isRunning) {
-            console.log('⏸️ Curator already running, skipping...');
-            return;
-        }
+    private async runCuration(hour: number, date: string): Promise<void> {
+        this.isProcessing = true;
+        this.status.isProcessing = true;
+        this.status.totalRuns++;
+        this.saveStatus();
 
-        this.isRunning = true;
-        console.log('🤖 Starting AI Curator run...');
+        console.log(`🚀 Starting auto curation at ${hour}:00...`);
 
         try {
             // 1. 게시 가능 여부 확인
@@ -135,13 +144,20 @@ export class CuratorScheduler {
                 return;
             }
 
-            // 2. 토픽 수집
-            const topics = await CuratorService.fetchAllTrendingTopics();
+            // 2. 토픽 수집 (with retry)
+            const topicsResult = await ErrorRecoveryService.withRetry(
+                () => CuratorService.fetchAllTrendingTopics(),
+                { maxRetries: 3 },
+                async () => [] // 폴백: 빈 배열
+            );
 
-            if (topics.length === 0) {
+            if (!topicsResult.success || !topicsResult.data || topicsResult.data.length === 0) {
                 console.log('⚠️ No topics found');
                 return;
             }
+
+            const topics = topicsResult.data;
+            console.log(`📰 Found ${topics.length} topics`);
 
             // 3. 우선순위 결정
             const prioritized = CuratorService.prioritizeTopics(topics);
@@ -151,87 +167,155 @@ export class CuratorScheduler {
                 return;
             }
 
-            // 4. 최고 우선순위 토픽 선택
-            const selectedTopic = prioritized[0];
-            console.log(`🎯 Selected topic: ${selectedTopic.title} (score: ${selectedTopic.score})`);
+            // 4. 다양성 통과하는 토픽 선택 (첫 번째가 실패하면 다음 시도)
+            let selectedTopic = null;
+            for (const topic of prioritized.slice(0, 5)) {
+                const keywords = topic.title.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+                const diversityCheck = DiversityManager.checkDiversity(topic, keywords);
 
-            // 5. 자동 리서치 & 게시 (한번만)
-            const postId = await CuratorService.autoResearchAndPost(selectedTopic, userId);
+                if (diversityCheck.pass) {
+                    selectedTopic = topic;
+                    break;
+                } else {
+                    console.log(`⏭️ Skipping (diversity): ${diversityCheck.reason}`);
+                }
+            }
+
+            if (!selectedTopic) {
+                console.log('⚠️ No topics passed diversity check');
+                return;
+            }
+
+            console.log(`🎯 Selected: ${selectedTopic.title}`);
+
+            // 5. 자동 리서치 & 게시
+            const postId = await CuratorService.autoResearchAndPost(selectedTopic, this.userId);
 
             if (postId) {
-                console.log(`✅ Successfully curated and posted: ${postId}`);
-                // 마지막 실행 시간 저장
-                this.status.lastRunTime = Date.now();
-                localStorage.setItem(this.LAST_RUN_KEY, this.status.lastRunTime.toString());
-            } else {
-                console.warn('⚠️ Curation failed or skipped');
+                console.log(`✅ Successfully curated: ${postId}`);
+                this.status.successfulRuns++;
+                this.status.lastRunHour = hour;
+                this.status.lastRunDate = date;
             }
 
         } catch (error) {
             console.error('❌ Curation error:', error);
         } finally {
-            this.isRunning = false;
+            this.isProcessing = false;
+            this.status.isProcessing = false;
+            this.status.nextRunHour = (hour + 1) % 24;
+            this.saveStatus();
         }
     }
 
     /**
-     * 마지막 실행 시간 조회
+     * 🔧 수동 실행 (디버그/테스트용)
      */
-    private getLastRunTime(): number {
-        const stored = localStorage.getItem(STORAGE_KEY_LAST_RUN);
-        return stored ? parseInt(stored, 10) : 0;
+    async runNow(): Promise<void> {
+        const now = new Date();
+        await this.runCuration(now.getHours(), now.toISOString().split('T')[0]);
     }
 
     /**
-     * 스케줄러 상태 저장
+     * 🚨 긴급 중단
      */
-    private saveSchedulerState() {
-        localStorage.setItem(STORAGE_KEY_SCHEDULER_STATE, JSON.stringify({
-            isRunning: this.isRunning,
-            enabled: this.status.enabled,
-            lastUpdate: Date.now()
-        }));
+    emergencyStopNow(): void {
+        console.log('🚨 EMERGENCY STOP ACTIVATED');
+        localStorage.setItem(STORAGE_KEY_EMERGENCY_STOP, 'true');
+        this.emergencyStop = true;
+        this.stop();
     }
 
     /**
-     * 스케줄러 상태 조회
+     * ✅ 긴급 중단 해제
      */
-    static getSchedulerState(): { isRunning: boolean; lastUpdate: number } | null {
-        const stored = localStorage.getItem(STORAGE_KEY_SCHEDULER_STATE);
-        return stored ? JSON.parse(stored) : null;
+    clearEmergencyStop(): void {
+        localStorage.removeItem(STORAGE_KEY_EMERGENCY_STOP);
+        this.emergencyStop = false;
+        console.log('✅ Emergency stop cleared');
     }
 
     /**
-     * 수동 실행
+     * 긴급 중단 상태 확인
      */
-    async runNow(config: CuratorConfig) {
-        console.log('🔧 Manual curation triggered');
-        await this.runCuration(config);
+    private checkEmergencyStop(): boolean {
+        this.emergencyStop = localStorage.getItem(STORAGE_KEY_EMERGENCY_STOP) === 'true';
+        return this.emergencyStop;
     }
 
     /**
-     * 실행 상태 확인
+     * 상태 저장
      */
-    getStatus(): { isRunning: boolean; lastRun: number; nextRun: number } {
-        const lastRun = this.getLastRunTime();
-        const config = CuratorService.loadConfig();
-        const interval = config.intervalHours * 60 * 60 * 1000;
-        const nextRun = lastRun + interval;
+    private saveStatus(): void {
+        localStorage.setItem(STORAGE_KEY_SCHEDULER_STATE, JSON.stringify(this.status));
+    }
+
+    /**
+     * 상태 로드
+     */
+    private loadStatus(): void {
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY_SCHEDULER_STATE);
+            if (stored) {
+                this.status = { ...this.status, ...JSON.parse(stored) };
+            }
+        } catch (e) {
+            console.error('Failed to load scheduler status:', e);
+        }
+    }
+
+    /**
+     * 📊 상태 조회
+     */
+    getStatus(): {
+        isRunning: boolean;
+        lastRunHour: number;
+        lastRunDate: string;
+        nextRunHour: number;
+        isProcessing: boolean;
+        successRate: number;
+        emergencyStop: boolean;
+    } {
+        const successRate = this.status.totalRuns > 0
+            ? this.status.successfulRuns / this.status.totalRuns
+            : 1;
 
         return {
-            isRunning: this.isRunning,
-            lastRun,
-            nextRun
+            isRunning: this.checkIntervalId !== null,
+            lastRunHour: this.status.lastRunHour,
+            lastRunDate: this.status.lastRunDate,
+            nextRunHour: this.status.nextRunHour,
+            isProcessing: this.isProcessing,
+            successRate,
+            emergencyStop: this.emergencyStop
         };
     }
 }
 
-// 싱글톤 인스턴스
-let schedulerInstance: CuratorScheduler | null = null;
+// ============================================
+// Singleton Instance
+// ============================================
 
-export function getCuratorScheduler(userId: string): CuratorScheduler {
-    if (!schedulerInstance) {
-        schedulerInstance = new CuratorScheduler(userId);
+let autoSchedulerInstance: AutoCuratorScheduler | null = null;
+
+export function getAutoCuratorScheduler(userId: string): AutoCuratorScheduler {
+    if (!autoSchedulerInstance) {
+        autoSchedulerInstance = new AutoCuratorScheduler(userId);
     }
-    return schedulerInstance;
+    return autoSchedulerInstance;
+}
+
+/**
+ * 앱 초기화 시 자동 시작
+ */
+export function initAutoCurator(userId: string): AutoCuratorScheduler {
+    const scheduler = getAutoCuratorScheduler(userId);
+    scheduler.startAutoScheduler();
+    return scheduler;
+}
+
+// Legacy compatibility
+export { AutoCuratorScheduler as CuratorScheduler };
+export function getCuratorScheduler(userId: string) {
+    return getAutoCuratorScheduler(userId);
 }

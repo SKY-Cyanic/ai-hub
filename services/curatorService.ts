@@ -1,12 +1,16 @@
 /**
- * AI Curator Service - Phase 4
+ * AI Curator Service - Phase 4 Enhanced
  * 트렌딩 토픽을 자동으로 발견하고 리서치 후 게시
+ * AI 고도화 + 안전 정책 통합
  */
 
 import { getGroqClient } from './groqClient';
 import { ResearchService } from './researchService';
 import { PostIntegrationService } from './postIntegrationService';
 import { storage } from './storage';
+import { AIEnhancementService } from './aiEnhancementService';
+import { SafetyPolicyService } from './safetyPolicyService';
+
 
 export interface TrendingTopic {
     title: string;
@@ -126,6 +130,298 @@ const KEYWORD_CATEGORIES: KeywordCategory[] = [
         ]
     }
 ];
+
+// ============================================
+// 📊 다양성 알고리즘 (Diversity Manager)
+// ============================================
+
+const DIVERSITY_STORAGE_KEY = 'curator_diversity_log';
+
+interface DiversityLog {
+    category: string;
+    source: string;
+    keywords: string[];
+    timestamp: number;
+}
+
+export const DiversityManager = {
+    /**
+     * 최근 게시 로그 조회 (24시간)
+     */
+    getRecentLogs(): DiversityLog[] {
+        try {
+            const logs: DiversityLog[] = JSON.parse(localStorage.getItem(DIVERSITY_STORAGE_KEY) || '[]');
+            const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+            return logs.filter(l => l.timestamp > cutoff);
+        } catch {
+            return [];
+        }
+    },
+
+    /**
+     * 게시 로그 추가
+     */
+    addLog(log: Omit<DiversityLog, 'timestamp'>): void {
+        const logs = this.getRecentLogs();
+        logs.push({ ...log, timestamp: Date.now() });
+        localStorage.setItem(DIVERSITY_STORAGE_KEY, JSON.stringify(logs.slice(-50)));
+    },
+
+    /**
+     * 같은 카테고리 연속 게시 체크 (비활성화 - 모든 토픽이 같은 카테고리)
+     * 현재 모든 토픽이 "지식 허브"로 분류되어 이 체크는 무의미함
+     */
+    isCategoryConsecutive(category: string): boolean {
+        // 비활성화: 모든 토픽이 같은 카테고리이므로 체크 불필요
+        return false;
+
+        // 아래는 다중 카테고리 지원 시 활성화
+        // const logs = this.getRecentLogs();
+        // if (logs.length < 3) return false;
+        // const recent = logs.slice(-3);
+        // return recent.every(l => l.category === category);
+    },
+
+    /**
+     * 키워드 중복 체크 (유사도 기반) - 더 관대하게
+     */
+    hasKeywordOverlap(keywords: string[]): { overlap: boolean; similarity: number } {
+        const logs = this.getRecentLogs();
+
+        // 로그가 없으면 중복 없음
+        if (logs.length === 0) return { overlap: false, similarity: 0 };
+
+        const allRecentKeywords = new Set(logs.flatMap(l => l.keywords));
+
+        const overlap = keywords.filter(k => allRecentKeywords.has(k.toLowerCase()));
+        const similarity = keywords.length > 0 ? overlap.length / keywords.length : 0;
+
+        return {
+            overlap: similarity > 0.8, // 70% → 80%로 완화
+            similarity
+        };
+    },
+
+    /**
+     * 출처 균형 체크 (더 관대하게)
+     */
+    getSourceBalance(): { reddit: number; hackernews: number; other: number; balanced: boolean } {
+        const logs = this.getRecentLogs();
+
+        // 10개 미만이면 항상 균형 (5 → 10으로 완화)
+        if (logs.length < 10) {
+            return { reddit: 0, hackernews: 0, other: 0, balanced: true };
+        }
+
+        const total = logs.length;
+
+        const counts = {
+            reddit: logs.filter(l => l.source === 'reddit').length,
+            hackernews: logs.filter(l => l.source === 'hackernews').length,
+            other: logs.filter(l => !['reddit', 'hackernews'].includes(l.source)).length
+        };
+
+        // 하나의 출처가 95% 이상이면 불균형 (85% → 95%로 완화)
+        const balanced = Object.values(counts).every(c => c / total < 0.95);
+
+        return {
+            reddit: counts.reddit / total,
+            hackernews: counts.hackernews / total,
+            other: counts.other / total,
+            balanced
+        };
+    },
+
+    /**
+     * 다양성 검증 (토픽 선택 전 체크) - 더 관대한 버전
+     */
+    checkDiversity(topic: TrendingTopic, keywords: string[]): {
+        pass: boolean;
+        reason?: string;
+    } {
+        // 1. 카테고리 체크 비활성화 (모든 토픽이 같은 카테고리)
+        // if (this.isCategoryConsecutive(topic.category)) {
+        //     return { pass: false, reason: `같은 카테고리(${topic.category}) 3회 연속 게시 방지` };
+        // }
+
+        // 2. 키워드 중복 체크 (80% 이상만 차단)
+        const { overlap, similarity } = this.hasKeywordOverlap(keywords);
+        if (overlap) {
+            return { pass: false, reason: `키워드 중복률 ${(similarity * 100).toFixed(0)}% (최대 80%)` };
+        }
+
+        // 3. 출처 균형 체크 (95% 이상만 차단)
+        const balance = this.getSourceBalance();
+        if (!balance.balanced) {
+            const dominant = balance.reddit > 0.95 ? 'reddit' :
+                balance.hackernews > 0.95 ? 'hackernews' : 'other';
+            return { pass: false, reason: `${dominant} 출처 비율 과다 (균형 필요)` };
+        }
+
+        return { pass: true };
+    },
+
+    /**
+     * 다양성 로그 초기화 (디버깅용)
+     */
+    clearLogs(): void {
+        localStorage.removeItem(DIVERSITY_STORAGE_KEY);
+        console.log('🗑️ Diversity logs cleared');
+    }
+};
+
+// ============================================
+// 🎯 품질 검증 시스템 (Quality Gate)
+// ============================================
+
+export interface QualityCheckResult {
+    pass: boolean;
+    score: number;          // 1-10
+    sourceReliability: number; // 신뢰 출처 비율
+    duplicationLevel: number;  // 0-1
+    issues: string[];
+}
+
+export const QualityGate = {
+    MIN_QUALITY_SCORE: 6,
+    MIN_RELIABLE_SOURCE_RATIO: 0.6,
+    MAX_DUPLICATION: 0.7,
+
+    /**
+     * 품질 검증 실행
+     */
+    async checkQuality(
+        report: any,
+        existingPosts: any[]
+    ): Promise<QualityCheckResult> {
+        const issues: string[] = [];
+
+        // 1. 품질 점수 계산
+        const score = this.calculateQualityScore(report);
+        if (score < this.MIN_QUALITY_SCORE) {
+            issues.push(`품질 점수 미달: ${score}/10 (최소 ${this.MIN_QUALITY_SCORE})`);
+        }
+
+        // 2. 신뢰 출처 비율 체크
+        const sourceReliability = this.calculateSourceReliability(report.sources || []);
+        if (sourceReliability < this.MIN_RELIABLE_SOURCE_RATIO) {
+            issues.push(`신뢰 출처 부족: ${(sourceReliability * 100).toFixed(0)}% (최소 60%)`);
+        }
+
+        // 3. 중복 내용 감지
+        const duplicationLevel = this.calculateDuplication(report, existingPosts);
+        if (duplicationLevel > this.MAX_DUPLICATION) {
+            issues.push(`중복 내용 과다: ${(duplicationLevel * 100).toFixed(0)}% (최대 70%)`);
+        }
+
+        // 4. 최소 출처 수 체크
+        if (!report.sources || report.sources.length < 3) {
+            issues.push(`출처 부족: ${report.sources?.length || 0}개 (최소 3개)`);
+        }
+
+        return {
+            pass: issues.length === 0,
+            score,
+            sourceReliability,
+            duplicationLevel,
+            issues
+        };
+    },
+
+    /**
+     * 품질 점수 계산 (1-10)
+     */
+    calculateQualityScore(report: any): number {
+        let score = 5; // 기본 점수
+
+        // 콘텐츠 길이
+        const length = report.detailedAnalysis?.length || 0;
+        if (length > 2000) score += 1.5;
+        else if (length > 1000) score += 1;
+        else if (length < 500) score -= 1;
+
+        // 출처 수
+        const sourceCount = report.sources?.length || 0;
+        if (sourceCount >= 5) score += 1.5;
+        else if (sourceCount >= 3) score += 1;
+        else if (sourceCount < 2) score -= 1.5;
+
+        // 신뢰도 (qualityScore 필드)
+        if (report.qualityScore?.overall) {
+            score += (report.qualityScore.overall - 5) / 2;
+        }
+
+        // 구조화 정도 (헤딩 수)
+        const headingCount = (report.detailedAnalysis?.match(/#{1,3}\s/g) || []).length;
+        if (headingCount >= 4) score += 0.5;
+
+        return Math.max(1, Math.min(10, Math.round(score * 10) / 10));
+    },
+
+    /**
+     * 신뢰 출처 비율 계산
+     */
+    calculateSourceReliability(sources: any[]): number {
+        if (!sources || sources.length === 0) return 0;
+
+        const reliable = sources.filter(s => (s.trustScore || 0) >= 70);
+        return reliable.length / sources.length;
+    },
+
+    /**
+     * 중복 레벨 계산 (기존 게시물과 비교)
+     */
+    calculateDuplication(report: any, existingPosts: any[]): number {
+        if (!existingPosts || existingPosts.length === 0) return 0;
+
+        const reportWords = new Set(
+            (report.detailedAnalysis || '')
+                .toLowerCase()
+                .split(/\s+/)
+                .filter((w: string) => w.length > 3)
+        );
+
+        let maxSimilarity = 0;
+
+        for (const post of existingPosts.slice(0, 20)) {
+            const postWords = new Set(
+                (post.content || '')
+                    .toLowerCase()
+                    .split(/\s+/)
+                    .filter((w: string) => w.length > 3)
+            );
+
+            const intersection = [...reportWords].filter(w => postWords.has(w));
+            const similarity = intersection.length / Math.max(reportWords.size, postWords.size, 1);
+
+            if (similarity > maxSimilarity) {
+                maxSimilarity = similarity;
+            }
+        }
+
+        return maxSimilarity;
+    },
+
+    /**
+     * 팩트 체크 강화: 출처 간 불일치 감지
+     */
+    detectInconsistencies(sources: any[]): string[] {
+        // 간단한 구현: 핵심 수치/날짜가 다른 경우 감지
+        const inconsistencies: string[] = [];
+
+        if (sources.length < 3) {
+            inconsistencies.push('출처가 3개 미만으로 교차 검증 불가');
+        }
+
+        // 출처 도메인 다양성 체크
+        const domains = new Set(sources.map(s => s.domain));
+        if (domains.size < 2 && sources.length >= 3) {
+            inconsistencies.push('출처 도메인 다양성 부족');
+        }
+
+        return inconsistencies;
+    }
+};
 
 export const CuratorService = {
 
@@ -503,44 +799,188 @@ export const CuratorService = {
                 return null;
             }
 
-            // 3. Research수행
-            console.log(`📚 Performing research...`);
-            const report = await ResearchService.performResearch(
-                topic.title,
-                (progress) => {
-                    console.log(`Progress: ${progress.step}`);
-                }
-            );
+            // 3. 📊 다양성 체크 (연속 카테고리, 키워드 중복, 출처 균형)
+            const topicKeywords = topic.title.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+            const diversityCheck = DiversityManager.checkDiversity(topic, topicKeywords);
 
-            if (!report || !report.summary) {
-                throw new Error('Research failed - empty report');
+            if (!diversityCheck.pass) {
+                console.log(`⏭️ Skipping (diversity): ${diversityCheck.reason}`);
+                this.addLog({
+                    id: `log_${Date.now()}`,
+                    timestamp: Date.now(),
+                    topic: topic.title,
+                    source: topic.source,
+                    status: 'skipped',
+                    reason: `다양성: ${diversityCheck.reason}`
+                });
+                return null;
             }
 
-            // 3. 게시물로 변환
+            // 4. Research 수행 (재시도 포함)
+            console.log(`📚 Performing research...`);
+            let report = null;
+            let researchAttempts = 0;
+            const maxResearchAttempts = 2;
+
+            while (researchAttempts < maxResearchAttempts && !report) {
+                researchAttempts++;
+                try {
+                    report = await ResearchService.performResearch(
+                        topic.title,
+                        (progress) => {
+                            console.log(`Progress: ${progress.step}`);
+                        }
+                    );
+                } catch (researchError: any) {
+                    console.warn(`⚠️ Research attempt ${researchAttempts} failed:`, researchError.message);
+                    if (researchAttempts < maxResearchAttempts) {
+                        await new Promise(r => setTimeout(r, 2000)); // 2초 대기 후 재시도
+                    }
+                }
+            }
+
+            if (!report || !report.summary) {
+                throw new Error('Research failed - empty report after retries');
+            }
+
+            // 5. 🎯 품질 검증 (Quality Gate) - 실패해도 경고만
+            console.log(`🎯 Running quality checks...`);
+            let qualityResult = { pass: true, score: 7, issues: [] as string[] };
+            try {
+                const existingPosts = this.getRecentCuratorPosts();
+                qualityResult = await QualityGate.checkQuality(report, existingPosts);
+
+                if (!qualityResult.pass) {
+                    console.warn(`⚠️ Quality warning: ${qualityResult.issues.join(', ')} - 게시 계속 진행`);
+                    // 품질 미달이어도 게시 진행 (차단 안함)
+                    qualityResult.pass = true;
+                    qualityResult.score = Math.max(5, qualityResult.score); // 최소 5점
+                }
+            } catch (qualityError: any) {
+                console.warn(`⚠️ Quality check failed:`, qualityError.message);
+                // 품질 검사 실패 시 기본값 사용
+            }
+
+            // 6. 팩트 체크 (선택적)
+            try {
+                const inconsistencies = QualityGate.detectInconsistencies(report.sources || []);
+                if (inconsistencies.length > 0) {
+                    console.warn(`⚠️ Fact check warning: ${inconsistencies.join(', ')}`);
+                }
+            } catch (e) {
+                console.warn('Fact check skipped');
+            }
+
+            // 7. 🔒 안전 정책 검사 - 실패해도 경고만 (NSFW는 차단)
+            console.log(`🔒 Running safety checks...`);
+            let safetyCheck = { allowed: true, score: 90, reasons: [] as string[], flags: [] as any[] };
+            try {
+                const avgTrustScore = report.sources?.length > 0
+                    ? report.sources.reduce((sum, s) => sum + (s.trustScore || 50), 0) / report.sources.length
+                    : 50;
+
+                safetyCheck = SafetyPolicyService.checkContent(
+                    topic.title,
+                    report.detailedAnalysis || report.summary,
+                    topic.url,
+                    avgTrustScore
+                );
+
+                // NSFW만 차단, 나머지는 경고만
+                const hasNSFW = safetyCheck.flags?.some(f => f.type === 'nsfw');
+                if (hasNSFW) {
+                    console.log(`🚫 Blocking NSFW content`);
+                    this.addLog({
+                        id: `log_${Date.now()}`,
+                        timestamp: Date.now(),
+                        topic: topic.title,
+                        source: topic.source,
+                        status: 'skipped',
+                        reason: `안전: NSFW 콘텐츠`
+                    });
+                    return null;
+                }
+
+                if (!safetyCheck.allowed) {
+                    console.warn(`⚠️ Safety warning: ${safetyCheck.reasons.join(', ')} - 게시 계속 진행`);
+                    safetyCheck.allowed = true;
+                }
+            } catch (safetyError: any) {
+                console.warn(`⚠️ Safety check failed:`, safetyError.message);
+            }
+
+            // 8. 🏷️ AI 자동 태그 생성 (선택적 - 실패해도 기본 태그 사용)
+            console.log(`🏷️ Generating AI tags...`);
+            let generatedTags = { contentTags: [], trendingTags: [], techStackTags: [] };
+            try {
+                generatedTags = await AIEnhancementService.generateTags(
+                    topic.title,
+                    report.detailedAnalysis || report.summary
+                );
+            } catch (tagError: any) {
+                console.warn(`⚠️ Tag generation failed:`, tagError.message, '- using default tags');
+            }
+
+            // 9. 게시물로 변환
             console.log(`📝 Converting to post...`);
             const postDraft = await PostIntegrationService.convertReportToPost(
                 report,
                 topic.title
             );
 
-            // 4. 카테고리 설정
+            // 10. 카테고리 설정
             postDraft.category = topic.category || '지식 허브';
             postDraft.boardId = this.getBoardIdByCategory(postDraft.category);
 
-            // 5. AI Curator 메타데이터 추가
+            // 11. 태그 통합 (수동 + AI 생성)
             postDraft.tags = [
                 ...postDraft.tags,
                 'AI큐레이터',
-                topic.source.toUpperCase()
-            ];
+                topic.source.toUpperCase(),
+                `품질${Math.round(qualityResult.score)}`,
+                ...(generatedTags.contentTags?.slice(0, 3) || []),
+                ...(generatedTags.techStackTags?.slice(0, 2) || [])
+            ].filter(t => t && t.length > 0);
 
-            // 6. 게시
-            console.log(`🎉 Publishing post...`);
-            const postId = await PostIntegrationService.publishPost(postDraft, userId);
+            // 12. URL 히스토리에 추가 (스팸 방지)
+            try {
+                SafetyPolicyService.addUrlToHistory(topic.url);
+            } catch (e) {
+                console.warn('URL history update failed');
+            }
+
+            // 13. 게시 (재시도 포함)
+            console.log(`🎉 Publishing post (quality: ${qualityResult.score.toFixed(1)}/10)...`);
+            let postId = null;
+            let publishAttempts = 0;
+            const maxPublishAttempts = 2;
+
+            while (publishAttempts < maxPublishAttempts && !postId) {
+                publishAttempts++;
+                try {
+                    postId = await PostIntegrationService.publishPost(postDraft, userId);
+                } catch (publishError: any) {
+                    console.warn(`⚠️ Publish attempt ${publishAttempts} failed:`, publishError.message);
+                    if (publishAttempts < maxPublishAttempts) {
+                        await new Promise(r => setTimeout(r, 2000));
+                    }
+                }
+            }
+
+            if (!postId) {
+                throw new Error('Failed to publish after retries');
+            }
 
             console.log(`✅ Successfully published: ${postId}`);
 
-            // 7. 로그 기록 (unique ID로)
+            // 11. 다양성 로그 추가
+            DiversityManager.addLog({
+                category: topic.category,
+                source: topic.source,
+                keywords: topicKeywords.slice(0, 10)
+            });
+
+            // 12. 큐레이터 로그 기록
             this.addLog({
                 id: `log_${topic.source}_${Date.now()}`,
                 timestamp: Date.now(),

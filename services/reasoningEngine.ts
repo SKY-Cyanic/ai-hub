@@ -413,7 +413,7 @@ ${allAnswers}
             .map(s => `[신뢰도 ${s.confidence}] ${s.question}: ${s.answer}`)
             .join('\n\n');
 
-        const prompt = `하위 문제의 답변들을 종합하여 최종 답변을 생성하세요.
+        const prompt = `하위 문제의 답변들을 종합하여 **마크다운 형식으로 직접** 최종 답변을 생성하세요.
 
 ## 원본 질문
 "${query}"
@@ -427,20 +427,28 @@ ${weightedAnswers}
 ## 검증 결과
 ${verification.issues.length > 0 ? `주의: ${verification.issues.join(', ')}` : '검증 통과'}
 
-## 지시
-다음 JSON 형식으로 종합 답변 (순수 JSON만):
-{
-    "clearAnswer": "종합된 명확한 답변 (마크다운 형식, 본문에 출처 언급 금지)",
-    "confidence": 0.0~1.0,
-    "keyNotes": ["주의사항1", "주의사항2", "주의사항3"]
-}
+## 출력 형식 (마크다운)
+아래 구조로 **직접 마크다운 텍스트만** 작성하세요 (JSON 아님!):
 
-## 작성 원칙
-- 두괄식: 결론부터
-- MECE: 중복 없이, 누락 없이
-- 개조식: 번호/글머리 사용
-- 수치화: 모호한 표현 금지
-- 본문에 출처 직접 언급 금지`;
+### 핵심 요약
+(3-4문장으로 핵심 내용 요약)
+
+### 상세 분석
+1. **주요 내용 1**: 설명
+2. **주요 내용 2**: 설명
+3. **주요 내용 3**: 설명
+
+### 주요 시사점
+- 시사점 1
+- 시사점 2
+
+## 필수 규칙
+1. JSON 형식으로 응답하지 마세요! 마크다운 텍스트만!
+2. 본문에 출처 직접 언급 금지
+3. 두괄식: 결론부터
+4. MECE: 중복 없이, 누락 없이
+5. 개조식: 번호/글머리 사용
+6. 수치화: 모호한 표현 금지`;
 
         let response = '';
         await groqClient.streamChat(
@@ -453,18 +461,27 @@ ${verification.issues.length > 0 ? `주의: ${verification.issues.join(', ')}` :
             (chunk: string, full: string) => { response = full; }
         );
 
-        try {
-            const match = response.match(/\{[\s\S]*\}/);
-            if (match) {
-                const parsed = JSON.parse(match[0]);
-                return {
-                    clearAnswer: parsed.clearAnswer || '종합 실패',
-                    confidence: parsed.confidence || 0.5,
-                    keyNotes: parsed.keyNotes || []
-                };
-            }
-        } catch (e) {
-            console.error('Synthesize parsing failed:', e);
+        // 마크다운 응답 처리
+        const cleanResponse = response
+            .replace(/^```[\w]*\n?/gm, '')
+            .replace(/```$/gm, '')
+            .replace(/^\{[\s\S]*\}$/gm, '') // JSON 잔재 제거
+            .trim();
+
+        // keyNotes 추출
+        const keyNotes: string[] = [];
+        const sigsMatch = cleanResponse.match(/### 주요 시사점[\s\S]*?(?=###|$)/i);
+        if (sigsMatch) {
+            const lines = sigsMatch[0].split('\n').filter(l => l.trim().startsWith('-'));
+            keyNotes.push(...lines.map(l => l.replace(/^-\s*/, '').trim()).slice(0, 3));
+        }
+
+        if (cleanResponse.length > 100) {
+            return {
+                clearAnswer: cleanResponse,
+                confidence: 0.85,
+                keyNotes: keyNotes.length > 0 ? keyNotes : ['종합 분석 결과입니다.']
+            };
         }
 
         // 폴백: 첫 번째 답변
@@ -505,14 +522,14 @@ ${verification.issues.length > 0 ? `주의: ${verification.issues.join(', ')}` :
     },
 
     /**
-     * 단순 답변 프롬프트 빌드
+     * 단순 답변 프롬프트 빌드 - 마크다운 직접 출력
      */
     buildSimpleAnswerPrompt(query: string, context: ContextAnalysis, searchResults: any[]): string {
         const sourcesText = searchResults.slice(0, 5).map((r, i) =>
             `${i + 1}. [${r.domain || r.displayLink}] ${r.title}: ${r.snippet}`
         ).join('\n');
 
-        return `사용자 질문에 대해 명확하게 답변하세요.
+        return `사용자 질문에 대해 **마크다운 형식으로 직접** 답변하세요.
 
 ## 질문
 "${query}"
@@ -527,43 +544,68 @@ ${context.isAmbiguous ? `- ⚠️ 다의어 가능: ${context.possibleMeanings.j
 ## 참고 자료
 ${sourcesText}
 
-## 지시
-다음 JSON 형식으로 응답 (순수 JSON만):
-{
-    "clearAnswer": "명확한 답변 (마크다운 형식, 본문에 출처 직접 언급 금지)",
-    "confidence": 0.0~1.0,
-    "keyNotes": ["주의사항1", "주의사항2"]
-}
+## 출력 형식 (마크다운)
+아래 구조로 **직접 마크다운 텍스트만** 작성하세요 (JSON 아님!):
+
+### 핵심 요약
+(3-4문장으로 핵심 내용 요약)
+
+### 상세 분석
+1. **주요 내용 1**: 설명
+2. **주요 내용 2**: 설명
+3. **주요 내용 3**: 설명
+
+### 주요 시사점
+- 시사점 1
+- 시사점 2
 
 ## 필수 규칙
-1. 본문에 출처를 직접 언급하지 마세요 (예: "네이버에 따르면" ❌)
-2. 답변은 두괄식으로 결론부터
-3. 개조식(번호, 글머리) 사용
-4. 모호한 표현 금지, 구체적 수치 사용`;
+1. JSON 형식으로 응답하지 마세요! 마크다운 텍스트만!
+2. 본문에 출처를 직접 언급하지 마세요 (예: "네이버에 따르면" ❌)
+3. 답변은 두괄식으로 결론부터
+4. 개조식(번호, 글머리) 사용
+5. 모호한 표현 금지, 구체적 수치 사용`;
     },
 
     /**
-     * 단순 응답 파싱
+     * 단순 응답 파싱 - 마크다운 직접 반환
      */
     parseSimpleResponse(response: string): { clearAnswer: string; confidence: number; keyNotes: string[] } {
+        // JSON 형식인지 확인 후 처리
         try {
             const match = response.match(/\{[\s\S]*\}/);
             if (match) {
                 const parsed = JSON.parse(match[0]);
-                return {
-                    clearAnswer: parsed.clearAnswer || '답변 생성 실패',
-                    confidence: parsed.confidence || 0.7,
-                    keyNotes: parsed.keyNotes || []
-                };
+                if (parsed.clearAnswer && typeof parsed.clearAnswer === 'string') {
+                    return {
+                        clearAnswer: parsed.clearAnswer,
+                        confidence: parsed.confidence || 0.7,
+                        keyNotes: parsed.keyNotes || []
+                    };
+                }
             }
         } catch (e) {
-            console.error('Simple response parsing failed:', e);
+            // JSON이 아니면 마크다운으로 처리
+        }
+
+        // 마크다운 응답이면 그대로 반환
+        const cleanResponse = response
+            .replace(/^```[\w]*\n?/gm, '')  // 코드 블록 제거
+            .replace(/```$/gm, '')
+            .trim();
+
+        // 주요 시사점에서 keyNotes 추출
+        const keyNotes: string[] = [];
+        const sigsMatch = cleanResponse.match(/### 주요 시사점[\s\S]*?(?=###|$)/i);
+        if (sigsMatch) {
+            const lines = sigsMatch[0].split('\n').filter(l => l.trim().startsWith('-'));
+            keyNotes.push(...lines.map(l => l.replace(/^-\s*/, '').trim()).slice(0, 3));
         }
 
         return {
-            clearAnswer: response,
-            confidence: 0.6,
-            keyNotes: ['파싱 실패로 원본 응답 반환']
+            clearAnswer: cleanResponse,
+            confidence: 0.8,
+            keyNotes: keyNotes.length > 0 ? keyNotes : ['AI 분석 결과입니다.']
         };
     }
 };

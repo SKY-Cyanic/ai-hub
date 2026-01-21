@@ -1,7 +1,7 @@
 /**
- * Research Service - Refactored with Phase A-B Modules
+ * Research Service - Refactored with Phase A-D Modules
  * 통합 리서치 서비스: 맥락분석 → 검색 → 추론 → 품질검증 → 템플릿 포맷
- * + 후속 질문 기능 + 심화 분석 (50CR)
+ * + 후속 질문 기능 + 심화 분석 (50CR) + 캐싱 + 분석
  */
 
 import { SearchAPI, SearchResult } from './searchAPI';
@@ -12,6 +12,9 @@ import { QualityVerifier, QualityScore } from './qualityVerifier';
 import { ResponseTemplates, TemplateVariables, FormattedReport } from './responseTemplates';
 import { SourceManager, ValidatedSource } from './sourceManager';
 import { storage } from './storage';
+import { ResearchCacheService } from './researchCacheService';
+import { ResearchAnalyticsService } from './researchAnalyticsService';
+import { ErrorRecoveryService } from './researchErrorRecovery';
 
 // ============================================
 // Constants
@@ -132,6 +135,18 @@ export const ResearchService = {
 
             updateProgress('CR 차감', 'completed', `${DEEP_ANALYSIS_COST}CR 결제 완료`);
         }
+
+        // ============================================
+        // Phase C: 캐시 확인
+        // ============================================
+        const cachedReport = ResearchCacheService.getReport(query, isDeepAnalysis);
+        if (cachedReport) {
+            updateProgress('캐시 조회', 'completed', '캐시된 결과 반환');
+            ResearchAnalyticsService.trackCacheHit(query);
+            return cachedReport;
+        }
+
+        const startTime = Date.now();
 
         // ============================================
         // Phase A1: 맥락 분석
@@ -297,10 +312,21 @@ export const ResearchService = {
             isDeepAnalysis
         };
 
+        // ============================================
+        // Phase C: 캐시 저장
+        // ============================================
+        ResearchCacheService.cacheReport(query, isDeepAnalysis, report);
+
+        // ============================================
+        // Phase D: 분석 추적
+        // ============================================
+        const duration = Date.now() - startTime;
+        ResearchAnalyticsService.trackReport(query, isDeepAnalysis, duration, true);
+
         // 저장
         this.saveReport(report);
 
-        console.log(`✅ Research complete: ${reportId}`);
+        console.log(`✅ Research complete: ${reportId} (${duration}ms)`);
         return report;
     },
 
