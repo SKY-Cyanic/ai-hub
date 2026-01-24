@@ -66,6 +66,9 @@ export class AutoCuratorScheduler {
 
         console.log('🤖 Auto Curator Scheduler starting...');
 
+        // 🔥 Catch-up: 놓친 시간만큼 즉시 실행
+        this.runCatchUpIfNeeded();
+
         // 1분마다 현재 시간 체크
         this.checkIntervalId = setInterval(() => {
             this.checkAndRunHourly();
@@ -75,6 +78,63 @@ export class AutoCuratorScheduler {
         this.checkAndRunHourly();
 
         console.log('✅ Auto Scheduler is now running (every hour at :00)');
+    }
+
+    /**
+     * 🔥 Catch-up 모드: 놓친 시간만큼 즉시 실행
+     */
+    private async runCatchUpIfNeeded(): Promise<void> {
+        const now = new Date();
+        const currentHour = now.getHours();
+        const currentDate = now.toISOString().split('T')[0];
+
+        // 마지막 실행 정보 확인
+        const lastRunDate = this.status.lastRunDate;
+        const lastRunHour = this.status.lastRunHour;
+
+        // 오늘 아직 실행 안했으면
+        if (lastRunDate !== currentDate) {
+            // 새로운 날이면 현재 시간만큼 놓친 것
+            const missedHours = Math.min(currentHour, 3); // 최대 3개까지만 catch-up
+            console.log(`🔄 Catch-up mode: missed ~${currentHour}h, running ${missedHours} jobs`);
+
+            for (let i = 0; i < missedHours; i++) {
+                if (this.checkEmergencyStop()) break;
+                if (!CuratorService.canPost()) {
+                    console.log('⚠️ Daily post limit reached during catch-up.');
+                    break;
+                }
+
+                console.log(`⏳ Catch-up job ${i + 1}/${missedHours}...`);
+
+                try {
+                    await this.runCuration(currentHour, currentDate);
+                    // 성공 시 대기 (API 부하 방지)
+                    await new Promise(r => setTimeout(r, 20000));
+                } catch (e) {
+                    console.error('❌ Catch-up job failed, stopping catch-up sequence:', e);
+                    break; // 하나라도 실패하면 나머지 catch-up 포기
+                }
+            }
+        } else if (lastRunHour < currentHour - 1) {
+            // 같은 날이지만 시간이 많이 지났으면
+            const missedHours = Math.min(currentHour - lastRunHour - 1, 3);
+            console.log(`🔄 Catch-up mode: missed ${missedHours}h today`);
+
+            for (let i = 0; i < missedHours; i++) {
+                if (this.checkEmergencyStop()) break;
+                if (!CuratorService.canPost()) break;
+
+                console.log(`⏳ Catch-up job ${i + 1}/${missedHours}...`);
+                try {
+                    await this.runCuration(currentHour, currentDate);
+                    await new Promise(r => setTimeout(r, 20000));
+                } catch (e) {
+                    console.error('❌ Catch-up job failed:', e);
+                    break;
+                }
+            }
+        }
     }
 
     /**

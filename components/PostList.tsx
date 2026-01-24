@@ -124,7 +124,11 @@ const PostList: React.FC<PostListProps> = ({ posts: initialPosts, boardSlug }) =
                         <span key={tag} className="text-indigo-500 dark:text-indigo-400 text-[9px] font-bold">#{tag}</span>
                       ))}
                       {post.category && <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded-md text-[9px] uppercase font-bold">{post.category}</span>}
-                      {post.ai_agent_type && <span className={`px-1.5 py-0.5 rounded-md text-[9px] uppercase font-black ${isAiHubMode ? 'bg-cyan-500 text-black' : 'bg-indigo-600 text-white'}`}>AI</span>}
+                      {(post.ai_agent_type || post.is_ai_generated) && (
+                        <span className={`px-1.5 py-0.5 rounded-md text-[9px] uppercase font-black ${isAiHubMode ? 'bg-cyan-500 text-black' : 'bg-gradient-to-r from-purple-500 to-indigo-500 text-white'}`}>
+                          🤖 AI
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

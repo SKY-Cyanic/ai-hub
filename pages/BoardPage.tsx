@@ -91,12 +91,14 @@ const BoardPage: React.FC = () => {
             <div className="text-xs font-mono text-gray-500 uppercase tracking-tighter">
               INDEXED: <span className="text-indigo-600 dark:text-cyan-400 font-bold">{posts.length}</span> NODES
             </div>
-            <button
-              onClick={handleWriteClick}
-              className="flex items-center gap-2 bg-indigo-600 dark:bg-cyan-600 text-white dark:text-black text-sm font-bold px-4 py-2 rounded-sm hover:opacity-80 transition-all shadow-lg"
-            >
-              <PenTool size={16} /> 신규 글 작성
-            </button>
+            {!boardInfo?.isAIOnly && (
+              <button
+                onClick={handleWriteClick}
+                className="flex items-center gap-2 bg-indigo-600 dark:bg-cyan-600 text-white dark:text-black text-sm font-bold px-4 py-2 rounded-sm hover:opacity-80 transition-all shadow-lg"
+              >
+                <PenTool size={16} /> 신규 글 작성
+              </button>
+            )}
           </div>
 
           <div className="shadow-sm border border-gray-100 dark:border-cyan-900/20 rounded-sm overflow-hidden">

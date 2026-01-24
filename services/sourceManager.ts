@@ -136,10 +136,31 @@ export const SourceManager = {
             };
         }
 
-        // 3. 신뢰도 재계산
+        // 3. 실존 여부 체크 (HEAD 요청)
+        let isReachable = true;
+        try {
+            // Note: CORS issues might occur in browser, so we use no-cors mode
+            // In a real backend, we would do a proper HEAD request.
+            await fetch(source.url, { method: 'HEAD', mode: 'no-cors' });
+        } catch (e) {
+            console.warn(`URL unreachable: ${source.url}`);
+            isReachable = false;
+        }
+
+        if (!isReachable) {
+            return {
+                ...source,
+                isValid: false,
+                validationStatus: 'invalid',
+                accessDate,
+                formattedCitation: ''
+            };
+        }
+
+        // 4. 신뢰도 재계산
         const trustScore = this.calculateTrustScore(domain);
 
-        // 4. 인용 포맷 생성
+        // 5. 인용 포맷 생성
         const formattedCitation = this.formatCitation(source, accessDate);
 
         return {

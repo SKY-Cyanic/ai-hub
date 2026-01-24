@@ -10,6 +10,8 @@ export interface PostDraft {
     tags: string[];
     category: string;
     reportId?: string;
+    isAIGenerated?: boolean;
+    sourceUrl?: string; // 원본 URL used by curator
 }
 
 export const PostIntegrationService = {
@@ -17,7 +19,7 @@ export const PostIntegrationService = {
      * 리포트를 게시물로 변환
      */
     async convertReportToPost(report: ResearchReport, userId: string): Promise<PostDraft> {
-        // AI로 카테고리 자동 분류
+        // AI로 카테고리 자동 분류 (참고용)
         const category = await this.suggestCategory(report.query);
 
         // AI로 태그 자동 생성
@@ -32,10 +34,11 @@ export const PostIntegrationService = {
         return {
             title,
             content,
-            boardId: category,
-            tags,
+            boardId: 'stock', // 사용자 요청: 무조건 지식 허브(stock)에 게시
+            tags: ['AI리서치', 'AI생성', ...tags],
             category,
-            reportId: report.id
+            reportId: report.id,
+            isAIGenerated: true
         };
     },
 
@@ -188,8 +191,9 @@ export const PostIntegrationService = {
                 likes: [],
                 comments_count: 0,
                 is_pinned: false,
-                is_ai_generated: true, // AI가 생성한 게시물 표시
-                research_id: draft.reportId || null
+                is_ai_generated: draft.isAIGenerated || false, // AI가 생성한 게시물 표시
+                research_id: draft.reportId || null,
+                source_url: draft.sourceUrl || null
             };
 
             const docRef = await addDoc(collection(firebase.db, 'posts'), postData);

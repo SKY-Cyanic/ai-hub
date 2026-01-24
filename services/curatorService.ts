@@ -931,6 +931,7 @@ export const CuratorService = {
             // 10. 카테고리 설정
             postDraft.category = topic.category || '지식 허브';
             postDraft.boardId = this.getBoardIdByCategory(postDraft.category);
+            postDraft.sourceUrl = topic.url; // 원본 URL 설정
 
             // 11. 태그 통합 (수동 + AI 생성)
             postDraft.tags = [
@@ -1004,21 +1005,17 @@ export const CuratorService = {
                 reason: error.message
             });
 
-            return null;
+            // 스케줄러가 에러를 감지하고 루프를 멈출 수 있도록 rethrow
+            throw error;
         }
     },
 
     /**
-     * 카테고리 → Board ID 매핑
+     * 카테고리에 따른 게시판 ID 반환
+     * AI 큐레이터는 전용 게시판 사용
      */
     getBoardIdByCategory(category: string): string {
-        const mapping: Record<string, string> = {
-            '자유 광장': 'free',
-            '지식 허브': 'knowledge',
-            '코드 넥서스': 'dev',
-            'deepweb': 'deepweb'
-        };
-        return mapping[category] || 'knowledge';
+        return 'ai-curator';
     },
 
     /**

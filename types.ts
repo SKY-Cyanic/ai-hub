@@ -105,6 +105,7 @@ export interface Board {
   description?: string;
   categories?: string[];
   required_achievement?: string; // 접근 제한 조건
+  isAIOnly?: boolean;
 }
 
 export interface Post {
@@ -132,6 +133,8 @@ export interface Post {
   is_pinned?: boolean; // Admin can pin posts
   ai_agent_type?: 'news' | 'reddit' | 'wiki';
   style_effect?: 'glow' | 'neon' | 'standard';
+  is_ai_generated?: boolean;
+  source_url?: string;
 }
 
 export interface Profile {

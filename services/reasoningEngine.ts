@@ -448,7 +448,9 @@ ${verification.issues.length > 0 ? `주의: ${verification.issues.join(', ')}` :
 3. 두괄식: 결론부터
 4. MECE: 중복 없이, 누락 없이
 5. 개조식: 번호/글머리 사용
-6. 수치화: 모호한 표현 금지`;
+6. 수치화: 모호한 표현 금지
+7. **참고자료 URL은 절대 생성하지 마세요.** 제공된 검색 결과의 URL만 사용해야 합니다.
+8. 본문에 링크를 걸지 마세요. (마지막에 참고자료 섹션으로 자동 정리됩니다)`;
 
         let response = '';
         await groqClient.streamChat(

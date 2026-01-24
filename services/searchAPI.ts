@@ -16,10 +16,43 @@ export interface SearchResponse {
 
 export const SearchAPI = {
     /**
-     * Wikipedia API로 실제 검색
+     * 통합 검색 (Backend -> Wikipedia Fallback)
      */
     async search(query: string, num: number = 5): Promise<SearchResult[]> {
-        console.log('🔍 Wikipedia Search:', query);
+        // 1. DuckDuckGo Backend 시도
+        try {
+            console.log('🔍 DuckDuckGo Search (Backend):', query);
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000); // 8초 타임아웃
+
+            const response = await fetch('http://localhost:8000/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query, num }),
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log(`✅ Backend returned ${data.items.length} results`);
+                if (data.items.length > 0) {
+                    return data.items;
+                }
+            }
+        } catch (error) {
+            console.warn('⚠️ Backend search unavailable, falling back to Wikipedia...');
+        }
+
+        // 2. 실패 시 Wikipedia 검색
+        return this.searchWikipedia(query, num);
+    },
+
+    /**
+     * Wikipedia API로 실제 검색 (Fallback)
+     */
+    async searchWikipedia(query: string, num: number = 5): Promise<SearchResult[]> {
+        console.log('🔍 Wikipedia Search (Fallback):', query);
 
         try {
             // Wikipedia API 검색

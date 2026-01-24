@@ -15,12 +15,12 @@ const ResearchPage: React.FC = () => {
     const [currentReport, setCurrentReport] = useState<ResearchReport | null>(null);
     const [progress, setProgress] = useState<SearchProgress[]>([]);
     const [error, setError] = useState<string | null>(null);
+    // Trending Topics
+    const [trendingTopics, setTrendingTopics] = useState<any[]>([]);
+
+    // Missing States Restored
     const [recentReports, setRecentReports] = useState<ResearchReport[]>([]);
-
-    // 심화 분석 모드
     const [isDeepAnalysis, setIsDeepAnalysis] = useState(false);
-
-    // Phase 2: 게시물 발행
     const [showPostModal, setShowPostModal] = useState(false);
     const [postDraft, setPostDraft] = useState<PostDraft | null>(null);
     const [isPublishing, setIsPublishing] = useState(false);
@@ -28,10 +28,24 @@ const ResearchPage: React.FC = () => {
     React.useEffect(() => {
         // 최근 리포트 로드
         setRecentReports(ResearchService.getReports().slice(0, 5));
+
+        // 트렌딩 토픽 로드
+        loadTrending();
     }, []);
 
-    const handleResearch = async () => {
-        if (!query.trim() || isResearching) return;
+    const loadTrending = async () => {
+        try {
+            const { TrendingService } = await import('../services/trendingService');
+            const topics = await TrendingService.getTechTrending();
+            setTrendingTopics(topics);
+        } catch (e) {
+            console.error('Failed to load trending:', e);
+        }
+    };
+
+    const handleResearch = async (searchQuery?: string) => {
+        const queryToUse = searchQuery || query;
+        if (!queryToUse.trim() || isResearching) return;
         if (!user) {
             setError('로그인이 필요합니다.');
             return;
@@ -41,10 +55,11 @@ const ResearchPage: React.FC = () => {
         setError(null);
         setProgress([]);
         setCurrentReport(null);
+        if (searchQuery) setQuery(searchQuery);
 
         try {
             const report = await ResearchService.performResearch(
-                query,
+                queryToUse,
                 (progressUpdate) => {
                     setProgress(prev => [...prev.filter(p => p.step !== progressUpdate.step), progressUpdate]);
                 },
@@ -188,6 +203,29 @@ const ResearchPage: React.FC = () => {
                     {/* 추천 질문 */}
                     {!isResearching && !currentReport && (
                         <div className="mt-4">
+                            <h1 className="text-3xl font-black text-white mb-2 tracking-tight">AI Research Agent</h1>
+                            <p className="text-gray-400 mb-8 max-w-2xl mx-auto">
+                                최신 AI 모델과 실시간 웹 검색을 통해 심도 있는 기술 리포트를 작성합니다.
+                            </p>
+
+                            {/* Trending Keywords */}
+                            {trendingTopics.length > 0 && (
+                                <div className="flex flex-wrap justify-center gap-2 mb-6 max-w-3xl mx-auto">
+                                    <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-400 mr-2 bg-cyan-950/30 px-2 py-1 rounded backdrop-blur-sm border border-cyan-900/50">
+                                        <TrendingUp size={12} /> GLOBAL TRENDS
+                                    </div>
+                                    {trendingTopics.slice(0, 5).map((topic, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => handleResearch(topic.title)}
+                                            className="px-3 py-1 bg-gray-800/50 hover:bg-indigo-600/50 border border-gray-700/50 hover:border-indigo-500 text-gray-300 hover:text-white text-xs rounded-full transition-all flex items-center gap-1 group"
+                                        >
+                                            <span className="opacity-50 text-[10px] group-hover:text-indigo-300">#{i + 1}</span>
+                                            {topic.title.length > 20 ? topic.title.substring(0, 20) + '...' : topic.title}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                             <p className="text-sm text-gray-500 mb-2">💡 추천 질문:</p>
                             <div className="flex flex-wrap gap-2">
                                 {[

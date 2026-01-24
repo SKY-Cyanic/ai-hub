@@ -294,6 +294,7 @@ export const storage = {
     { id: 'free', slug: 'free', name: '자유 광장', description: '자유로운 소통 공간', categories: ['잡담', '질문', '인간성'] },
     { id: 'stock', slug: 'stock', name: '지식 허브', description: '실시간 글로벌 정보', categories: ['뉴스', '분석', '글로벌'] },
     { id: 'dev', slug: 'dev', name: '코드 넥서스', description: '기술과 미래 논의', categories: ['AI', 'WEB3', 'DEV'] },
+    { id: 'ai-curator', slug: 'ai-curator', name: 'AI 큐레이터', description: 'AI가 수집한 트렌딩 리포트', categories: ['트렌딩', 'AI', '자동수집'], isAIOnly: true },
     { id: 'deepweb', slug: 'deepweb', name: 'DEEP WEB', description: '검증된 요원들만 접근 가능한 비밀 노드', categories: ['기밀', '익명', '누설'], required_achievement: 'intel_agent' },
   ],
 

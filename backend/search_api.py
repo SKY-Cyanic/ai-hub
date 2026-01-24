@@ -111,9 +111,90 @@ async def search(request: SearchRequest):
         
         return SearchResponse(items=items)
     
+        return SearchResponse(items=items)
+    
     except Exception as e:
         print(f"[Error] Search error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+class VisitRequest(BaseModel):
+    url: str
+
+@app.post("/visit")
+async def visit_page(request: VisitRequest):
+    """
+    URL 콘텐츠 스크래핑 (Bot 차단 우회)
+    - curl_cffi 사용하여 TLS Fingerprint 변조
+    - 실제 브라우저 헤더 사용
+    """
+    try:
+        from curl_cffi import requests as cffi_requests
+        from bs4 import BeautifulSoup
+        
+        print(f"[Visit] Fetching: {request.url}")
+        
+        # 1. 헤더 위장 (User Provided)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Cache-Control': 'max-age=0',
+        }
+
+        # 2. TLS Fingerprint Impression (Chrome 110)
+        response = cffi_requests.get(
+            request.url,
+            headers=headers,
+            impersonate="chrome110",
+            timeout=15
+        )
+        
+        # 인코딩 자동 감지
+        if response.encoding is None:
+            response.encoding = 'utf-8'
+
+        print(f"[Visit] Status: {response.status_code}")
+        
+        if response.status_code >= 400:
+            raise HTTPException(status_code=response.status_code, detail="Failed to fetch page")
+
+        # 3. HTML 파싱 & 텍스트 추출
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # 불필요한 태그 제거
+        for tag in soup(['script', 'style', 'nav', 'footer', 'header', 'iframe']):
+            tag.decompose()
+            
+        text = soup.get_text(separator='\n', strip=True)
+        title = soup.title.string if soup.title else ""
+        
+        # 요약 (최대 5000자)
+        summary = text[:5000]
+        
+        return {
+            "url": request.url,
+            "status": response.status_code,
+            "title": title,
+            "content": summary,
+            "length": len(text)
+        }
+
+    except Exception as e:
+        print(f"[Error] Visit error: {str(e)}")
+        # 에러 나도 200으로 반환하되 에러 메시지 포함 (프론트 핸들링 용이)
+        return {
+            "url": request.url,
+            "status": 500,
+            "error": str(e),
+            "content": ""
+        }
 
 def extract_domain(url: str) -> str:
     """URL에서 도메인 추출"""
