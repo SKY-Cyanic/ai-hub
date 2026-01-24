@@ -322,7 +322,7 @@ const GamePage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto px-6 py-8 space-y-10">
+            <div className="max-w-7xl mx-auto px-4 md:px-6 py-8 space-y-10 overflow-x-hidden">
                 {/* Featured Game - Large Hero */}
                 <div
                     className={`relative rounded-2xl overflow-hidden bg-gradient-to-br ${featuredGame.bgGradient} group cursor-pointer shadow-2xl h-[280px] md:h-[500px]`}

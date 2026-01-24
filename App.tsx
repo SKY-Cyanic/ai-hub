@@ -17,6 +17,7 @@ import AIAnalyzerPage from './pages/tools/AIAnalyzerPage';
 import MockInvestmentPage from './pages/tools/MockInvestmentPage';
 import VibeCodePage from './pages/tools/VibeCodePage';
 import WebDevPage from './pages/WebDevPage';
+import LeaderboardPage from './pages/LeaderboardPage';
 import { TermsPage, PrivacyPage, YouthPolicyPage } from './pages/PolicyPages';
 import ActivityPage from './pages/ActivityPage';
 import SearchPage from './pages/SearchPage';
@@ -57,6 +58,7 @@ function App() {
             <Route path="research" element={<ResearchPage />} />
             <Route path="curator" element={<CuratorDashboard />} />
             <Route path="webdev" element={<WebDevPage />} />
+            <Route path="leaderboard" element={<LeaderboardPage />} />
             <Route path="tools" element={<ToolsPage />} />
             <Route path="tools/note/:noteId" element={<NoteViewerPage />} />
             <Route path="tools/encoder" element={<EncoderPage />} />

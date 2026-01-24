@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, Download, Copy, Image, Wand2, RefreshCw, Coins } from 'lucide-react';
+import { ChevronDown, Download, Copy, Image, Wand2, RefreshCw, Coins, Send } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { storage } from '../services/storage';
+import { useNavigate } from 'react-router-dom';
 
 // 생성 설정 타입
 interface GenSettings {
@@ -90,7 +91,26 @@ const OptionChip: React.FC<{
 
 const ImageStudioPage: React.FC = () => {
     const { user, refreshUser } = useAuth();
+    const navigate = useNavigate();
     const COST_PER_GEN = 10;
+
+    const handlePost = (imageUrl: string, promptText: string) => {
+        if (!user) {
+            alert('로그인이 필요합니다.');
+            return;
+        }
+        if (confirm('이 이미지를 게시판에 공유하시겠습니까?')) {
+            navigate('/write', {
+                state: {
+                    prefill: {
+                        title: `[AI 아트] ${promptText.slice(0, 20)}...`,
+                        content: `AI 이미지 스튜디오에서 생성된 이미지입니다.\n\n프롬프트: ${promptText}`,
+                        images: [imageUrl]
+                    }
+                }
+            });
+        }
+    };
 
     // 상태
     const [mode, setMode] = useState<'generate' | 'edit'>('generate');
@@ -775,6 +795,12 @@ const ImageStudioPage: React.FC = () => {
                                         <RefreshCw size={16} className="text-gray-600 dark:text-gray-400" />
                                     </button>
                                 </div>
+                                <button
+                                    onClick={() => handlePost(resultUrl, prompt)}
+                                    className="w-full py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg font-bold text-sm shadow-md hover:opacity-90 transition flex items-center justify-center gap-2 mb-3"
+                                >
+                                    <Send size={16} /> 게시판에 공유하기
+                                </button>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{prompt}</p>
                                 <p className="text-xs text-gray-400 mt-1">{genSettings.width}×{genSettings.height} | {genSettings.model}</p>
                             </div>

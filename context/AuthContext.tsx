@@ -23,16 +23,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [isLoading, setIsLoading] = useState(true);
     const [tempAdminUser, setTempAdminUser] = useState<User | null>(null);
 
-    const refreshUser = () => {
+    const refreshUser = async () => {
         const sessionUser = storage.getSession();
         if (sessionUser) {
-            // Firestore에서 최신 데이터 가져오기 (효율성: 캐시 먼저 확인)
-            const cachedUser = storage.getUserByRawId(sessionUser.id);
-            if (cachedUser) {
-                setUser(cachedUser);
-                storage.setSession(cachedUser);
+            // Firestore에서 강제 동기화 (PC/Mobile 연동 해결)
+            const latestUser = await storage.fetchUserById(sessionUser.id, true);
+            if (latestUser) {
+                setUser(latestUser);
+                storage.setSession(latestUser);
+                // 날짜 변경 체크 및 출석 처리
+                console.log("Syncing user data and checking attendance...");
+                storage.processAttendance(latestUser.id);
             } else {
-                // 캐시에 없으면 세션 데이터 사용
                 setUser(sessionUser);
             }
         } else {
@@ -43,6 +45,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     useEffect(() => {
         refreshUser();
         setIsLoading(false);
+
+        // 1분마다 날짜 변경 체크 (일일 리셋 자동화)
+        const dateCheckInterval = setInterval(() => {
+            if (user) {
+                const kstOffset = 9 * 60 * 60 * 1000;
+                const now = new Date(Date.now() + kstOffset);
+                const today = now.toISOString().split('T')[0];
+
+                if (user.last_attendance_date !== today) {
+                    console.log("New day detected, refreshing user logic...");
+                    refreshUser();
+                }
+            }
+        }, 60000);
 
         // 게스트 계정 자동 만료 체크
         const sessionUser = storage.getSession();
@@ -58,7 +74,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     storage.setSession(null);
                     setUser(null);
                 }, remainingTime);
-                return () => clearTimeout(timer);
+                return () => {
+                    clearTimeout(timer);
+                    clearInterval(dateCheckInterval);
+                }
             }
         }
 
@@ -68,7 +87,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
         };
         storage.channel.onmessage = handleSync;
-        return () => { storage.channel.onmessage = null; };
+        return () => {
+            storage.channel.onmessage = null;
+            clearInterval(dateCheckInterval);
+        };
     }, []);
 
     const login = (username: string, password?: string) => {

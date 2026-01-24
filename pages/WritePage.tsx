@@ -16,13 +16,14 @@ const WritePage: React.FC = () => {
   // Edit Mode Logic
   const editPost = location.state?.editPost as Post | undefined;
   const isEditMode = !!editPost;
+  const prefill = location.state?.prefill;
 
-  const [title, setTitle] = useState(editPost?.title || '');
-  const [content, setContent] = useState(editPost?.content?.replace(/<br\/>/g, '\n') || '');
+  const [title, setTitle] = useState(editPost?.title || prefill?.title || '');
+  const [content, setContent] = useState(editPost?.content?.replace(/<br\/>/g, '\n') || prefill?.content || '');
   const [boardId, setBoardId] = useState(editPost?.board_id || 'free');
   const [category, setCategory] = useState(editPost?.category || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [images, setImages] = useState<string[]>(editPost?.images || []);
+  const [images, setImages] = useState<string[]>(editPost?.images || prefill?.images || []);
   const [isSpoiler, setIsSpoiler] = useState(editPost?.is_spoiler || false); // New state
 
   const [showPoll, setShowPoll] = useState(!!editPost?.poll);

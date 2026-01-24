@@ -95,10 +95,12 @@ export const storage = {
   },
 
   // Async version that fetches from Firestore if not in local cache
-  fetchUserById: async (id: string): Promise<User | undefined> => {
-    // Check local cache first
-    const local = storage.getUserByRawId(id);
-    if (local) return local;
+  fetchUserById: async (id: string, force: boolean = false): Promise<User | undefined> => {
+    // Check local cache first unless forced
+    if (!force) {
+      const local = storage.getUserByRawId(id);
+      if (local) return local;
+    }
 
     // Query Firestore by ID field
     try {
@@ -108,11 +110,19 @@ export const storage = {
         const userData = snapshot.docs[0].data() as User;
         // Cache locally for future lookups
         const users = storage.getUsers();
-        users.push(userData);
+        // Update existing or add new
+        const idx = users.findIndex(u => u.id === id);
+        if (idx !== -1) {
+          users[idx] = userData;
+        } else {
+          users.push(userData);
+        }
         localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
         return userData;
       }
-    } catch (e) { }
+    } catch (e) {
+      console.error("Fetch user error:", e);
+    }
     return undefined;
   },
 

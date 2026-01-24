@@ -9,7 +9,7 @@ import React from 'react';
  */
 export default function MockInvestmentPage() {
     return (
-        <div className="w-full h-[calc(100vh-64px)] -m-4 md:-m-6">
+        <div className="w-full h-[calc(100vh-64px)] overflow-hidden bg-slate-900">
             <iframe
                 src="/mock-invest/index.html"
                 title="모의투자 시뮬레이션"

@@ -133,7 +133,7 @@ const ResearchPage: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-4">
+        <div className="min-h-screen bg-gray-50 dark:bg-gray-950 p-4 overflow-x-hidden">
             <div className="max-w-6xl mx-auto">
                 {/* 헤더 */}
                 <div className="mb-8 text-center">
@@ -159,7 +159,7 @@ const ResearchPage: React.FC = () => {
                             style={{ fontSize: '16px' }}
                         />
                         <button
-                            onClick={handleResearch}
+                            onClick={() => handleResearch()}
                             disabled={!query.trim() || isResearching}
                             className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-bold hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
                         >
