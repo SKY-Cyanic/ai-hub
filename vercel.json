@@ -5,7 +5,11 @@
             "destination": "https://image.pollinations.ai/:path*"
         },
         {
-            "source": "/((?!ads\\.txt|robots\\.txt|sitemap\\.xml|manifest\\.json|favicon\\.svg|images/.*).*)",
+            "source": "/api/:path*",
+            "destination": "/api/index.py"
+        },
+        {
+            "source": "/((?!api/|ads\\.txt|robots\\.txt|sitemap\\.xml|manifest\\.json|favicon\\.svg|images/.*).*)",
             "destination": "/index.html"
         }
     ]

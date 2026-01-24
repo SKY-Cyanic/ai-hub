@@ -20,17 +20,21 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api\/pollinations/, ''),
           headers: {
-            // 원본 HTML처럼 보이게 헤더 제거
             'Origin': '',
             'Referer': '',
           },
           configure: (proxy) => {
             proxy.on('proxyReq', (proxyReq) => {
-              // Origin과 Referer 헤더 완전 제거
               proxyReq.removeHeader('origin');
               proxyReq.removeHeader('referer');
             });
           },
+        },
+        // DuckDuckGo Search API Backend Proxy
+        '/api': {
+          target: 'http://localhost:8000',
+          changeOrigin: true,
+          // /api prefix is preserved, matching backend APIRouter(prefix="/api")
         },
       },
     },

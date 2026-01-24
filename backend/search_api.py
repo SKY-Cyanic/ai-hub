@@ -11,7 +11,7 @@ import io
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from duckduckgo_search import DDGS
@@ -19,12 +19,23 @@ import time
 import asyncio
 from typing import List
 
+# curl_cffi 설치 확인 (Vercel 배포 시 의존성 문제 방지)
+try:
+    from curl_cffi import requests as cffi_requests
+    from bs4 import BeautifulSoup
+    CURL_CFFI_AVAILABLE = True
+except ImportError:
+    CURL_CFFI_AVAILABLE = False
+    print("Warning: curl_cffi or beautifulsoup4 not found. /api/visit will fail.")
+
 app = FastAPI(title="DuckDuckGo Search API")
+router = APIRouter(prefix="/api") # prefix="/api"
+
 
 # CORS 설정 (프론트엔드 연동)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],  # Vite 기본 포트
+    allow_origins=["*"], # Vercel 등 다양한 환경 지원을 위해 * 허용 (보안 필요 시 수정)
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -63,19 +74,13 @@ async def rate_limit():
 
 @app.get("/")
 async def root():
-    return {
-        "message": "DuckDuckGo Search API",
-        "endpoints": {
-            "/search": "POST with {query, num}",
-            "/health": "GET health check"
-        }
-    }
+    return {"message": "DuckDuckGo Search API (Please use /api/search)"}
 
-@app.get("/health")
+@router.get("/health")
 async def health():
     return {"status": "healthy"}
 
-@app.post("/search", response_model=SearchResponse)
+@router.post("/search", response_model=SearchResponse)
 async def search(request: SearchRequest):
     """
     DuckDuckGo 검색 수행
@@ -111,8 +116,6 @@ async def search(request: SearchRequest):
         
         return SearchResponse(items=items)
     
-        return SearchResponse(items=items)
-    
     except Exception as e:
         print(f"[Error] Search error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
@@ -120,17 +123,22 @@ async def search(request: SearchRequest):
 class VisitRequest(BaseModel):
     url: str
 
-@app.post("/visit")
+@router.post("/visit")
 async def visit_page(request: VisitRequest):
     """
     URL 콘텐츠 스크래핑 (Bot 차단 우회)
     - curl_cffi 사용하여 TLS Fingerprint 변조
     - 실제 브라우저 헤더 사용
     """
+    if not CURL_CFFI_AVAILABLE:
+        return {
+            "url": request.url,
+            "status": 500,
+            "error": "curl_cffi not installed on server",
+            "content": ""
+        }
+
     try:
-        from curl_cffi import requests as cffi_requests
-        from bs4 import BeautifulSoup
-        
         print(f"[Visit] Fetching: {request.url}")
         
         # 1. 헤더 위장 (User Provided)
@@ -149,6 +157,7 @@ async def visit_page(request: VisitRequest):
         }
 
         # 2. TLS Fingerprint Impression (Chrome 110)
+        # cffi_requests는 여기서 이미 import됨 (top-level check)
         response = cffi_requests.get(
             request.url,
             headers=headers,
@@ -195,6 +204,9 @@ async def visit_page(request: VisitRequest):
             "error": str(e),
             "content": ""
         }
+
+# 라우터 등록
+app.include_router(router)
 
 def extract_domain(url: str) -> str:
     """URL에서 도메인 추출"""
