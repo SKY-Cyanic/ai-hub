@@ -66,7 +66,29 @@ export interface User {
       plan: '30d' | '1y';
       purchased_at: string;
     }
-  }
+  };
+
+  // Pro Membership
+  membership_tier?: 'free' | 'pro';
+  membership_expires_at?: number; // Timestamp
+  subscription_status?: 'active' | 'canceled' | 'expired';
+}
+
+export interface Agent {
+  id: string;
+  creator_id: string;
+  name: string;
+  description: string;
+  system_prompt: string;
+  price_per_use: number; // CR
+  rental_price_daily: number; // CR
+  total_revenue: number;
+  rating: number;
+  tags: string[];
+  is_public: boolean;
+  model_id: string; // e.g., 'gpt-4o', 'flux-schnell'
+  thumbnail_url?: string;
+  created_at: string;
 }
 
 export interface Report {
@@ -326,5 +348,24 @@ export interface PrivateMessage {
   sender_id: string;
   content: string;
   created_at: string;
-  is_read: boolean;
+
+export interface PredictionMarket {
+  id: string;
+  question: string;
+  options: { id: string; label: string; pool: number }[];
+  total_pool: number;
+  is_resolved: boolean;
+  result_option_id?: string;
+  deadline: string;
+  created_at: string;
+}
+
+export interface Bet {
+  id: string;
+  user_id: string;
+  market_id: string;
+  option_id: string;
+  amount: number;
+  odds_at_bet: number; // For reference
+  created_at: string;
 }

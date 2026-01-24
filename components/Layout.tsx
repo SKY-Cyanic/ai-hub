@@ -614,6 +614,19 @@ const Layout: React.FC = () => {
             isAiHubMode={isAiHubMode}
           />
 
+          {/* Agent Economy Promo */}
+          <div className="px-2">
+            <Link to="/marketplace" className="block w-full p-3 rounded-xl bg-gradient-to-r from-purple-900/50 to-pink-900/50 border border-purple-500/30 group hover:border-purple-500 transition-all">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-purple-300">Agent Market</span>
+                <span className="text-[10px] bg-purple-500 text-white px-1.5 rounded-full animate-pulse">NEW</span>
+              </div>
+              <div className="text-sm font-bold text-white group-hover:text-purple-200">
+                AI 에이전트 대여하기 &rarr;
+              </div>
+            </Link>
+          </div>
+
           <div>
             <h3 className="text-[10px] font-black text-gray-400 mb-2 uppercase tracking-[0.2em] px-2">Quick Access</h3>
             <nav className="space-y-1">

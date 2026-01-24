@@ -32,6 +32,10 @@ import ResearchPage from './pages/ResearchPage';
 import AICommentTest from './pages/AICommentTest';
 import CuratorDashboard from './pages/CuratorDashboard';
 
+import AgentMarketplacePage from './pages/AgentMarketplacePage';
+import AgentStudioPage from './pages/AgentStudioPage';
+import PredictionMarketPage from './pages/PredictionMarketPage';
+
 function App() {
   return (
     <AuthProvider>
@@ -47,6 +51,9 @@ function App() {
             <Route path="search" element={<SearchPage />} />
             <Route path="bookmarks" element={<BookmarksPage />} />
             <Route path="shop" element={<ShopPage />} />
+            <Route path="marketplace" element={<AgentMarketplacePage />} />
+            <Route path="studio" element={<AgentStudioPage />} />
+            <Route path="prediction" element={<PredictionMarketPage />} />
             <Route path="wiki" element={<WikiPage />} />
             <Route path="wiki/:slug" element={<WikiPage />} />
             <Route path="messages" element={<MessagesPage />} />

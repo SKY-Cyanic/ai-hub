@@ -3,9 +3,9 @@ import { db } from './firebase';
 import {
   collection, doc, getDocs, getDoc, setDoc, updateDoc,
   query, where, orderBy, limit, addDoc, deleteDoc,
-  onSnapshot, serverTimestamp, Timestamp, writeBatch
+  onSnapshot, serverTimestamp, Timestamp, writeBatch, runTransaction
 } from "firebase/firestore";
-import { Post, Comment, Board, User, WikiPage, ChatMessage, AiLog, ShopItem, Notification, Conversation, PrivateMessage, Achievement, AuctionItem, BalanceGame, FactCheckReport, GameSubmission, Transaction, WikiHistoryItem } from '../types';
+import { Post, Comment, Board, User, WikiPage, ChatMessage, AiLog, ShopItem, Notification, Conversation, PrivateMessage, Achievement, AuctionItem, BalanceGame, FactCheckReport, GameSubmission, Transaction, WikiHistoryItem, Agent, PredictionMarket, Bet } from '../types';
 
 export const NODE_GAS_FEE = 2;
 
@@ -144,6 +144,37 @@ export const storage = {
     else users.push(user);
     localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(users));
     storage.channel.postMessage({ type: 'USER_UPDATE' });
+  },
+
+
+
+  // --- Pro Membership ---
+  upgradeToPro: async (userId: string): Promise<boolean> => {
+    try {
+      const userRef = doc(db, "users", userId);
+      // 30 days from now
+      const expiresAt = Date.now() + (30 * 24 * 60 * 60 * 1000);
+
+      await updateDoc(userRef, {
+        membership_tier: 'pro',
+        membership_expires_at: expiresAt,
+        subscription_status: 'active'
+      });
+
+      // Bonus CR for upgrading (Event)
+      await storage.addTransaction({
+        id: crypto.randomUUID(),
+        type: 'earn',
+        amount: 500,
+        description: 'Pro Membership Signup Bonus (Event)',
+        created_at: new Date().toISOString()
+      }, userId);
+
+      return true;
+    } catch (error) {
+      console.error("Pro upgrade failed:", error);
+      return false;
+    }
   },
 
   // --- Fact Check Report ---
@@ -526,6 +557,25 @@ export const storage = {
     return { success: true, message: '입찰에 성공했습니다!' };
   },
 
+  addTransaction: async (transaction: Transaction, userId: string): Promise<boolean> => {
+    const user = storage.getUserByRawId(userId);
+    if (!user) return false;
+
+    // Check types and update balance
+    if (transaction.type === 'earn' || transaction.type === 'charge' || transaction.type === 'refund') {
+      user.points += transaction.amount;
+    } else if (transaction.type === 'spend') {
+      user.points -= transaction.amount;
+    }
+
+    if (!user.transactions) user.transactions = [];
+    user.transactions.push(transaction);
+
+    await storage.saveUser(user);
+    if (storage.getSession()?.id === user.id) storage.setSession(user);
+    return true;
+  },
+
   chargePoints: async (userId: string, amount: number) => {
     const user = storage.getUserByRawId(userId);
     if (user) {
@@ -545,6 +595,263 @@ export const storage = {
   },
 
   // --- Megaphone & Lottery Systems ---
+
+  // --- Agent Economy ---
+  subscribeAgents: (callback: (agents: Agent[]) => void) => {
+    // try-catch block inside to prevent crashing on query errors (e.g., missing index)
+    try {
+      const q = query(collection(db, "agents"), where("is_public", "==", true)); // Removed orderBy
+      return onSnapshot(q, (snapshot) => {
+        // Fix: id comes LAST to prevent overwrite
+        const agents = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Agent));
+        // Client-side sorting
+        agents.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        callback(agents);
+      }, (error) => {
+        console.error("subscribeAgents error:", error);
+        // Fallback or empty on error
+        callback([]);
+      });
+    } catch (e) {
+      console.error("subscribeAgents query setup error:", e);
+      return () => { }; // return empty unsubscribe function
+    }
+  },
+
+  getMyAgents: async (userId: string): Promise<Agent[]> => {
+    try {
+      const q = query(collection(db, "agents"), where("creator_id", "==", userId));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Agent));
+    } catch (e) {
+      console.error("getMyAgents error:", e);
+      return [];
+    }
+  },
+
+  saveAgent: async (agent: Agent) => {
+    try {
+      // New agent
+      if (!agent.id) {
+        const docRef = await addDoc(collection(db, "agents"), sanitize(agent));
+        return { ...agent, id: docRef.id };
+      }
+      // Update existing
+      else {
+        await setDoc(doc(db, "agents", agent.id), sanitize(agent));
+        return agent;
+      }
+    } catch (e) {
+      console.error("saveAgent error:", e);
+      return null;
+    }
+  },
+
+
+  // --- Prediction Market ---
+  getMarkets: async (): Promise<PredictionMarket[]> => {
+    try {
+      const q = query(collection(db, "predictions"), where("is_resolved", "==", false), orderBy("created_at", "desc"));
+      // Snapshot or getDocs depending on need, let's use getDocs for now
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as PredictionMarket));
+    } catch (e) {
+      console.error("getMarkets error:", e);
+      return [];
+    }
+  },
+
+  createMarket: async (question: string, options: string[], deadline: string): Promise<boolean> => {
+    try {
+      const newMarket: Omit<PredictionMarket, 'id'> = {
+        question,
+        options: options.map(opt => ({ id: crypto.randomUUID(), label: opt, pool: 0 })),
+        total_pool: 0,
+        is_resolved: false,
+        deadline,
+        created_at: new Date().toISOString()
+      };
+      await addDoc(collection(db, "predictions"), newMarket);
+      return true;
+    } catch (e) {
+      console.error("createMarket error:", e);
+      return false;
+    }
+  },
+
+  placeBet: async (userId: string, marketId: string, optionId: string, amount: number): Promise<{ success: boolean, message: string }> => {
+    const user = storage.getUserByRawId(userId);
+    if (!user) return { success: false, message: '사용자를 찾을 수 없습니다.' };
+    if (user.points < amount) return { success: false, message: 'CR이 부족합니다.' };
+
+    try {
+      const marketRef = doc(db, "predictions", marketId);
+      // Transaction for atomicity
+      await runTransaction(db, async (transaction) => {
+        const marketSnap = await transaction.get(marketRef);
+        if (!marketSnap.exists()) throw "Market not found";
+
+        const market = marketSnap.data() as PredictionMarket;
+        if (market.is_resolved) throw "이미 종료된 마켓입니다.";
+        if (new Date(market.deadline) < new Date()) throw "베팅 마감되었습니다.";
+
+        const optionIndex = market.options.findIndex(o => o.id === optionId);
+        if (optionIndex === -1) throw "Invalid option";
+
+        // Logic: Calculate Odds *at the time of bet*? 
+        // Pari-mutuel usually calculates final odds. 
+        // We will store "estimated odds" for reference.
+        const currentOptionPool = market.options[optionIndex].pool;
+        const currentTotal = market.total_pool;
+        const estOdds = currentOptionPool > 0 ? (currentTotal / currentOptionPool) : 2.0;
+
+        // Update Market
+        market.options[optionIndex].pool += amount;
+        market.total_pool += amount;
+        transaction.update(marketRef, {
+          options: market.options,
+          total_pool: market.total_pool
+        });
+
+        // Save Bet
+        const betRef = doc(collection(db, "bets"));
+        const betData: Bet = {
+          id: betRef.id,
+          user_id: userId,
+          market_id: marketId,
+          option_id: optionId,
+          amount: amount,
+          odds_at_bet: estOdds, // Reference only
+          created_at: new Date().toISOString()
+        };
+        transaction.set(betRef, betData);
+
+        // Update User
+        user.points -= amount;
+        user.transactions.push({
+          id: crypto.randomUUID(),
+          type: 'spend',
+          amount: amount,
+          description: `베팅: ${market.question.substring(0, 10)}...`,
+          created_at: new Date().toISOString()
+        });
+        transaction.set(doc(db, "users", userId), user);
+      });
+
+      // Also save user locally using existing method to update UI immediately
+      await storage.saveUser(user);
+      return { success: true, message: '베팅 성공!' };
+
+    } catch (e) {
+      console.error("placeBet error:", e);
+      return { success: false, message: typeof e === 'string' ? e : '베팅 실패' };
+    }
+  },
+
+  resolveMarket: async (marketId: string, resultOptionId: string): Promise<{ success: boolean, message: string }> => {
+    try {
+      // Step A: Mark Resolved
+      const marketRef = doc(db, "predictions", marketId);
+      await updateDoc(marketRef, {
+        is_resolved: true,
+        result_option_id: resultOptionId
+      });
+
+      // Step B: Get Market Data for calc
+      const marketSnap = await getDoc(marketRef);
+      const market = marketSnap.data() as PredictionMarket;
+      const winOption = market.options.find(o => o.id === resultOptionId);
+      if (!winOption) return { success: false, message: 'Option Error' };
+
+      if (winOption.pool === 0) return { success: true, message: '정산 완료 (당첨자 없음)' };
+
+      // Step C: Distribute
+      const q = query(collection(db, "bets"), where("market_id", "==", marketId), where("option_id", "==", resultOptionId));
+      const betSnaps = await getDocs(q);
+
+      const batch = writeBatch(db);
+
+      betSnaps.docs.forEach(betDoc => {
+        const bet = betDoc.data() as Bet;
+        // Payout Formula: (Bet / WinPool) * TotalPool
+        const share = bet.amount / winOption.pool;
+        const totalPayout = Math.floor(share * market.total_pool);
+
+        const userRef = doc(db, "users", bet.user_id);
+
+        // Payout to User
+        batch.update(userRef, {
+          points: (require("firebase/firestore").increment)(totalPayout),
+        });
+      });
+
+      await batch.commit();
+
+      return { success: true, message: `정산 완료! 총 ${betSnaps.size}명에게 배당금 지급.` };
+
+    } catch (e) {
+      console.error("resolveMarket error:", e);
+      return { success: false, message: '정산 실패' };
+    }
+  },
+  rentAgent: async (userId: string, agentId: string, days: number): Promise<{ success: boolean, message: string }> => {
+    const user = storage.getUserByRawId(userId);
+    if (!user) return { success: false, message: '사용자를 찾을 수 없습니다.' };
+
+    try {
+      const agentRef = doc(db, "agents", agentId);
+      const agentSnap = await getDoc(agentRef);
+      if (!agentSnap.exists()) return { success: false, message: '에이전트를 찾을 수 없습니다.' };
+
+      const agent = agentSnap.data() as Agent;
+      const totalCost = agent.rental_price_daily * days;
+
+      if (user.points < totalCost) return { success: false, message: 'CR이 부족합니다.' };
+
+      // 1. Deduct CR from User
+      user.points -= totalCost;
+      user.transactions.push({
+        id: crypto.randomUUID(),
+        type: 'spend',
+        amount: totalCost,
+        description: `에이전트 대여: ${agent.name} (${days}일)`,
+        created_at: new Date().toISOString()
+      });
+
+      // 2. Grant Permissions (Mock: Add to expires_at)
+      if (!user.expires_at) user.expires_at = {};
+      const expiry = new Date();
+      expiry.setDate(expiry.getDate() + days);
+      user.expires_at[`agent:${agentId}`] = expiry.toISOString();
+
+      await storage.saveUser(user);
+
+      // 3. Pay Creator (70%)
+      const creator = await storage.fetchUserById(agent.creator_id);
+      if (creator) {
+        creator.points += Math.floor(totalCost * 0.7);
+        if (!creator.transactions) creator.transactions = [];
+        creator.transactions.push({
+          id: crypto.randomUUID(),
+          type: 'earn',
+          amount: Math.floor(totalCost * 0.7),
+          description: `에이전트 수익 정산: ${agent.name}`,
+          created_at: new Date().toISOString()
+        });
+        await storage.saveUser(creator);
+      }
+
+      // 4. Update Agent Revenue
+      await updateDoc(agentRef, {
+        total_revenue: (agent.total_revenue || 0) + totalCost
+      });
+
+      return { success: true, message: `대여가 완료되었습니다! (${days}일)` };
+    } catch (e) {
+      console.error("rentAgent error:", e);
+      return { success: false, message: '거래 중 오류가 발생했습니다.' };
+    }
+  },
 
   getMegaphoneMessage() {
     // Legacy fallback for sync calls if any
