@@ -27,6 +27,7 @@ export interface User {
   points: number;
   credits: number;        // 크레딧 (실제 화폐 연동)
   inventory: string[];
+  membership?: 'free' | 'pro';
   active_items: {
     name_color?: string;
     name_style?: 'normal' | 'bold';
@@ -348,6 +349,7 @@ export interface PrivateMessage {
   sender_id: string;
   content: string;
   created_at: string;
+}
 
 export interface PredictionMarket {
   id: string;
@@ -368,4 +370,16 @@ export interface Bet {
   amount: number;
   odds_at_bet: number; // For reference
   created_at: string;
+}
+
+export interface Land {
+  id: string; // format: "x_y"
+  x: number;
+  y: number;
+  owner_id: string;
+  image_url?: string;
+  link_url?: string;
+  price: number;
+  tax_due_date: string;
+  is_for_sale: boolean;
 }

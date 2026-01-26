@@ -1,6 +1,8 @@
 
 import React, { useState, useRef, useCallback } from 'react';
-import { Lock, Unlock, FileText, Image, Music, Video, Copy, Download, ChevronDown } from 'lucide-react';
+import { Lock, Unlock, FileText, Image, Music, Video, Copy, Download, ChevronDown, Coins } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { storage } from '../services/storage';
 
 // 모스 부호 매핑
 const morseCode: Record<string, string> = {
@@ -17,6 +19,7 @@ type EncodeMethod = 'unicode' | 'base64' | 'binary' | 'hex' | 'url' | 'html' | '
 type DecodeMethod = 'auto' | EncodeMethod;
 
 const EncoderPage: React.FC = () => {
+  const { user, refreshUser } = useAuth();
   const [mode, setMode] = useState<'encode' | 'decode'>('encode');
   const [inputType, setInputType] = useState<InputType>('text');
   const [encodeMethod, setEncodeMethod] = useState<EncodeMethod>('unicode');
@@ -114,7 +117,7 @@ const EncoderPage: React.FC = () => {
   };
 
   // 변환 실행
-  const handleConvert = () => {
+  const handleConvert = async () => {
     if (inputType === 'text') {
       if (!inputText) return showToast('텍스트를 입력하세요', '⚠️');
       const encoded = encodeText(inputText, encodeMethod);
@@ -122,6 +125,20 @@ const EncoderPage: React.FC = () => {
       setResultType('text');
     } else {
       if (!uploadedFile) return showToast('파일을 선택하세요', '⚠️');
+
+      // 대용량 파일 과금 체크 (10MB 이상)
+      if (uploadedFile.size > 10 * 1024 * 1024) {
+        if (!user) return alert('대용량 파일 변환은 로그인이 필요합니다.');
+        const COST = 30;
+        if (!confirm(`대용량 파일(${Math.round(uploadedFile.size / 1024 / 1024)}MB) 변환 시 ${COST} CR이 차감됩니다. 진행하시겠습니까?`)) return;
+
+        const payRes = await storage.deductPoints(user.id, COST, `인코더 대용량 변환: ${uploadedFile.name}`);
+        if (!payRes.success) {
+          return alert(payRes.message);
+        }
+        refreshUser();
+      }
+
       const reader = new FileReader();
       reader.onload = e => {
         setResult(e.target?.result as string);
@@ -210,21 +227,19 @@ const EncoderPage: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-full p-1 shadow-lg inline-flex border border-gray-200 dark:border-gray-700">
           <button
             onClick={() => setMode('encode')}
-            className={`px-5 py-2.5 rounded-full font-medium text-sm flex items-center gap-2 transition-all ${
-              mode === 'encode'
+            className={`px-5 py-2.5 rounded-full font-medium text-sm flex items-center gap-2 transition-all ${mode === 'encode'
                 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
+              }`}
           >
             <Lock size={14} /> 변환
           </button>
           <button
             onClick={() => setMode('decode')}
-            className={`px-5 py-2.5 rounded-full font-medium text-sm flex items-center gap-2 transition-all ${
-              mode === 'decode'
+            className={`px-5 py-2.5 rounded-full font-medium text-sm flex items-center gap-2 transition-all ${mode === 'decode'
                 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
                 : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
+              }`}
           >
             <Unlock size={14} /> 복원
           </button>
@@ -246,11 +261,10 @@ const EncoderPage: React.FC = () => {
                 <button
                   key={t.id}
                   onClick={() => { setInputType(t.id); setUploadedFile(null); setFilePreviewUrl(null); }}
-                  className={`flex flex-col items-center gap-1 py-3 rounded-xl border-2 transition-all ${
-                    inputType === t.id
+                  className={`flex flex-col items-center gap-1 py-3 rounded-xl border-2 transition-all ${inputType === t.id
                       ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-transparent'
                       : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-indigo-300'
-                  }`}
+                    }`}
                 >
                   {t.icon}
                   <span className="text-xs font-medium">{t.label}</span>
@@ -269,11 +283,10 @@ const EncoderPage: React.FC = () => {
                     <button
                       key={m.id}
                       onClick={() => setEncodeMethod(m.id)}
-                      className={`text-xs py-2 px-2 rounded-lg border-2 font-medium transition-all ${
-                        encodeMethod === m.id
+                      className={`text-xs py-2 px-2 rounded-lg border-2 font-medium transition-all ${encodeMethod === m.id
                           ? 'bg-indigo-600 text-white border-indigo-600'
                           : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-indigo-300'
-                      }`}
+                        }`}
                     >
                       {m.label}
                     </button>
@@ -356,6 +369,17 @@ const EncoderPage: React.FC = () => {
               </div>
             )}
 
+            {/* 예상 비용 표시 */}
+            {inputType !== 'text' && uploadedFile && uploadedFile.size > 10 * 1024 * 1024 && (
+              <div className="mt-2 p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm text-indigo-700 dark:text-indigo-300">
+                  <Coins size={16} />
+                  <span className="font-bold">대용량 파일 처리 (Premium)</span>
+                </div>
+                <span className="text-sm font-black text-indigo-600 dark:text-indigo-400">30 CR</span>
+              </div>
+            )}
+
             {/* 변환 버튼 */}
             <button
               onClick={handleConvert}
@@ -371,22 +395,20 @@ const EncoderPage: React.FC = () => {
             <div className="grid grid-cols-2 gap-2 mb-5">
               <button
                 onClick={() => setDecodeType('text')}
-                className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all ${
-                  decodeType === 'text'
+                className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all ${decodeType === 'text'
                     ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-transparent'
                     : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400'
-                }`}
+                  }`}
               >
                 <FileText size={18} />
                 <span className="text-sm font-medium">코드→텍스트</span>
               </button>
               <button
                 onClick={() => setDecodeType('file')}
-                className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all ${
-                  decodeType === 'file'
+                className={`flex items-center justify-center gap-2 py-3 rounded-xl border-2 transition-all ${decodeType === 'file'
                     ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-transparent'
                     : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400'
-                }`}
+                  }`}
               >
                 <Image size={18} />
                 <span className="text-sm font-medium">코드→파일</span>
@@ -404,11 +426,10 @@ const EncoderPage: React.FC = () => {
                     <button
                       key={m.id}
                       onClick={() => setDecodeMethod(m.id)}
-                      className={`text-xs py-2 px-2 rounded-lg border-2 font-medium transition-all ${
-                        decodeMethod === m.id
+                      className={`text-xs py-2 px-2 rounded-lg border-2 font-medium transition-all ${decodeMethod === m.id
                           ? 'bg-indigo-600 text-white border-indigo-600'
                           : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-indigo-300'
-                      }`}
+                        }`}
                     >
                       {m.label}
                     </button>
@@ -497,9 +518,8 @@ const EncoderPage: React.FC = () => {
 
       {/* 토스트 */}
       <div
-        className={`fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-5 py-3 rounded-full shadow-xl flex items-center gap-2 text-sm font-medium z-50 transition-all ${
-          toast.show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
-        }`}
+        className={`fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-5 py-3 rounded-full shadow-xl flex items-center gap-2 text-sm font-medium z-50 transition-all ${toast.show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+          }`}
       >
         <span>{toast.icon}</span>
         <span>{toast.message}</span>

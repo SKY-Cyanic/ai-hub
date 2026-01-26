@@ -1,18 +1,21 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { useNavigate } from 'react-router-dom';
 import { SHOP_ITEMS, storage } from '../services/storage';
 import { AuctionItem } from '../types';
 import {
     ShoppingBag, Check, Gavel, Loader2, Clock, Crown, Palette,
-    ChevronRight, Zap, Trophy, Coins, Sparkles, Filter
+    ChevronRight, Zap, Trophy, Coins, Sparkles, Filter, Shield, Box
 } from 'lucide-react';
 import { UserNickname, UserAvatar } from '../components/UserEffect';
 
 const ShopPage: React.FC = () => {
     const { user, refreshUser } = useAuth();
     const { setCustomTheme } = useTheme();
-    const [isBuying, setIsBuying] = useState<string | null>(null);
+    const navigate = useNavigate();
+    const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [auctions, setAuctions] = useState<AuctionItem[]>([]);
     const [activeTab, setActiveTab] = useState<'items' | 'auction'>('items');
     const [itemCat, setItemCat] = useState<'all' | 'avatar' | 'name' | 'system'>('all');
@@ -38,14 +41,13 @@ const ShopPage: React.FC = () => {
 
     // 구매 버튼 클릭 시 모달 열기
     const handleBuyClick = (itemId: string, itemValue: string | undefined, type: string) => {
-        console.log('[ShopPage] handleBuyClick:', { itemId, itemValue, type });
         if (!user) return alert('로그인이 필요합니다.');
 
         const item = SHOP_ITEMS.find(i => i.id === itemId);
         if (!item) return;
 
         if (itemId === 'item-box') {
-            if (user.points < 100) return alert('포인트가 부족합니다.');
+            if ((user.points || 0) < 100) return alert('포인트가 부족합니다.');
             setConfirmModal({
                 isOpen: true,
                 itemId,
@@ -54,7 +56,7 @@ const ShopPage: React.FC = () => {
                 message: `미스테리 박스를 개봉하시겠습니까? (100 CR)`
             });
         } else {
-            if (user.points < item.price) return alert('CR이 부족합니다.');
+            if ((user.points || 0) < item.price) return alert('CR이 부족합니다.');
             setConfirmModal({
                 isOpen: true,
                 itemId,
@@ -65,6 +67,39 @@ const ShopPage: React.FC = () => {
         }
     };
 
+    // 아이템 장착
+    const handleEquip = async (itemId: string) => {
+        if (!user) return;
+        setActionLoading(itemId);
+        try {
+            const res = await storage.equipItem(user.id, itemId);
+            if (res.success) {
+                // Remove alert for smoother UX, just refresh
+                refreshUser();
+            } else {
+                alert(res.message);
+            }
+        } catch (e) {
+            console.error(e);
+        }
+        setActionLoading(null);
+    };
+
+    // 아이템 해제 (장착 해제)
+    const handleUnequip = async (category: 'name_effect' | 'frame') => {
+        if (!user) return;
+        const loadingId = category === 'name_effect' ? 'unequip-name' : 'unequip-frame';
+        setActionLoading(loadingId);
+        try {
+            const res = await storage.unequipItem(user.id, category);
+            if (res.success) {
+                refreshUser();
+            }
+        } catch (e) { console.error(e); }
+        setActionLoading(null);
+    }
+
+
     // 구매 확정 처리
     const handleConfirmPurchase = async () => {
         if (!confirmModal || !user) return;
@@ -73,27 +108,21 @@ const ShopPage: React.FC = () => {
         setConfirmModal(null);
 
         if (itemId === 'item-box') {
-            setIsBuying(itemId);
+            setActionLoading(itemId);
             const res = await storage.openMysteryBox(user.id);
-            console.log('[ShopPage] openMysteryBox result:', res);
             if (res.success) {
                 setBoxResult({ message: res.message, type: res.type });
                 refreshUser();
             }
-            setIsBuying(null);
+            setActionLoading(null);
             return;
         }
 
-        console.log('[ShopPage] Purchase confirmed, calling buyItem...');
-        setIsBuying(itemId);
+        setActionLoading(itemId);
         try {
-            const res = await storage.buyItem(user.id, itemId);
-            console.log('[ShopPage] buyItem result:', res);
+            const res = await storage.purchaseItem(user.id, itemId);
             if (res.success) {
                 alert(res.message);
-                if (type === 'theme') {
-                    setCustomTheme(itemValue as any);
-                }
                 refreshUser();
             } else {
                 alert(res.message);
@@ -102,7 +131,7 @@ const ShopPage: React.FC = () => {
             console.error('[ShopPage] buyItem error:', error);
             alert('구매 중 오류가 발생했습니다.');
         }
-        setIsBuying(null);
+        setActionLoading(null);
     };
 
     const handleBid = async (aucId: string) => {
@@ -132,16 +161,15 @@ const ShopPage: React.FC = () => {
     const getPreviewProfile = () => {
         if (!user || !previewItem) return user;
         const newProfile = { ...user, active_items: { ...user.active_items } };
-        if (previewItem.type === 'color') newProfile.active_items.name_color = previewItem.value;
-        if (previewItem.type === 'frame') newProfile.active_items.frame = previewItem.value;
-        if (previewItem.type === 'badge') newProfile.active_items.badge = previewItem.value;
-        if (previewItem.type === 'special_effects' || previewItem.id.includes('effect')) {
+
+        if (previewItem.category === 'name' && previewItem.type === 'style') {
+            newProfile.active_items.name_color = undefined; // Reset color if effect
             if (!newProfile.active_items.special_effects) newProfile.active_items.special_effects = [];
-            if (!newProfile.active_items.special_effects.includes(previewItem.value)) {
-                newProfile.active_items.special_effects = [...newProfile.active_items.special_effects, previewItem.value];
-            }
+            newProfile.active_items.special_effects = [previewItem.value];
         }
-        if (previewItem.type === 'custom_title') newProfile.active_items.custom_title = "[미리보기 칭호]";
+        if (previewItem.type === 'frame') newProfile.active_items.frame = previewItem.value;
+        if (previewItem.type === 'custom_title') newProfile.active_items.custom_title = "PREVIEW";
+
         return newProfile;
     };
 
@@ -159,7 +187,7 @@ const ShopPage: React.FC = () => {
                 </div>
                 <div className="text-right">
                     <div className="text-[10px] text-indigo-200 uppercase font-black tracking-widest">Balance</div>
-                    <div className="text-3xl font-black">{user.points.toLocaleString()} CR</div>
+                    <div className="text-3xl font-black">{(user.points || 0).toLocaleString()} CR</div>
                     <button onClick={() => setIsChargeModalOpen(true)} className="mt-2 text-xs bg-white/20 hover:bg-white/30 px-3 py-1 rounded-lg backdrop-blur-sm transition-all font-bold">
                         + 충전하기
                     </button>
@@ -228,37 +256,113 @@ const ShopPage: React.FC = () => {
                 </div>
             )}
 
+            {/* Pro Membership Banner */}
+            {activeTab === 'items' && user?.membership_tier !== 'pro' && (
+                <div
+                    onClick={() => navigate('/pricing')}
+                    className="cursor-pointer relative overflow-hidden rounded-[32px] bg-gradient-to-r from-gray-900 via-indigo-900 to-black p-8 text-white shadow-2xl border border-indigo-500/50 group hover:scale-[1.01] transition-transform"
+                >
+                    <div className="absolute top-0 right-0 p-8 opacity-20 group-hover:opacity-30 transition-opacity">
+                        <Crown size={180} className="rotate-12 text-yellow-500" />
+                    </div>
+                    <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                        <div>
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/50 text-yellow-400 text-xs font-bold mb-2">
+                                <Crown size={12} /> PREMIUM MEMBERSHIP
+                            </div>
+                            <h2 className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400 mb-2">
+                                AI Hub <span className="text-indigo-400">Pro</span> 멤버십
+                            </h2>
+                            <p className="text-gray-400 text-sm max-w-lg">
+                                무제한 이미지 생성, 고속 전용 서버, 매월 1,000 CR 지급 등<br />
+                                압도적인 혜택을 지금 경험해보세요.
+                            </p>
+                        </div>
+                        <button className="px-8 py-4 bg-white text-indigo-950 rounded-2xl font-black text-sm hover:bg-indigo-50 transition-colors shadow-lg whitespace-nowrap">
+                            혜택 보러가기
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {activeTab === 'items' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredItems.map(item => {
-                        const isOwned = user.inventory.includes(item.id);
+                        const isOwned = user.inventory?.includes(item.id);
+
+                        // Check Equip Status
+                        let isEquipped = false;
+                        if (item.category === 'name' && item.type === 'style') {
+                            isEquipped = user.active_items?.special_effects?.includes(item.value!);
+                        } else if (item.category === 'avatar' && item.type === 'frame') {
+                            isEquipped = user.active_items?.frame === item.value;
+                        } else if (item.category === 'name' && item.type === 'custom_title') {
+                            isEquipped = user.active_items?.custom_title === item.name;
+                        }
+
                         const isSpecial = item.id.includes('effect') || item.id.includes('box');
+                        const isConsumable = item.is_consumable;
 
                         return (
-                            <div key={item.id} className={`group bg-white dark:bg-gray-800 border rounded-[32px] p-6 flex flex-col justify-between transition-all ${isOwned ? 'opacity-80 border-indigo-50 dark:border-indigo-900/10' : 'border-gray-100 dark:border-gray-700 hover:shadow-2xl hover:border-indigo-500/30 hover:-translate-y-1'}`}>
+                            <div key={item.id} className={`group bg-white dark:bg-gray-800 border rounded-[32px] p-6 flex flex-col justify-between transition-all ${isEquipped ? 'border-green-500/50 shadow-lg shadow-green-500/10' : ''} ${isOwned && !isEquipped ? 'opacity-90 border-indigo-50 dark:border-indigo-900/10' : 'border-gray-100 dark:border-gray-700 hover:shadow-2xl hover:border-indigo-500/30 hover:-translate-y-1'}`}>
                                 <div>
                                     <div className={`text-4xl mb-4 w-16 h-16 flex items-center justify-center rounded-2xl shadow-inner transition-transform group-hover:scale-110 ${isSpecial ? 'bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-900/20 dark:to-violet-900/20' : 'bg-gray-50 dark:bg-gray-900'}`}>
                                         {item.icon}
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <h3 className="font-bold text-lg text-gray-800 dark:text-white">{item.name}</h3>
+                                        {isEquipped && <span className="px-1.5 py-0.5 bg-green-500 text-white text-[9px] font-black rounded flex items-center gap-1"><Check size={8} /> EQUIPPED</span>}
                                         {item.id.includes('frame') && <span className="px-1.5 py-0.5 bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 text-[8px] font-black rounded">SEASON</span>}
                                     </div>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 leading-relaxed">{item.description}</p>
+
+                                    {isOwned && item.duration_days && (
+                                        <div className="mt-2 text-[10px] text-indigo-400 font-medium">
+                                            {user.expires_at?.[item.id] ? `만료: ${new Date(user.expires_at[item.id]).toLocaleDateString()}` : `기간: ${item.duration_days}일 (활성화 시 시작)`}
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="mt-6 flex gap-2">
-                                    {!isOwned && item.category !== 'system' && (
+                                    {(item.type === 'style' || item.type === 'frame' || item.type === 'custom_title') && (
                                         <button onClick={() => setPreviewItem(item)} className="p-3 border border-indigo-100 dark:border-gray-700 rounded-2xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" title="미리보기">
                                             👁️
                                         </button>
                                     )}
-                                    <button
-                                        onClick={() => handleBuyClick(item.id, item.value, item.type)}
-                                        disabled={isOwned || (isBuying === item.id)}
-                                        className={`flex-1 py-3 rounded-2xl font-black text-sm transition-all active:scale-95 shadow-lg ${isOwned ? 'bg-gray-100 dark:bg-gray-700 text-gray-400' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
-                                    >
-                                        {isOwned ? '보유 중' : isBuying === item.id ? <Loader2 size={18} className="animate-spin mx-auto" /> : item.id === 'item-box' ? '박스 개봉' : `${item.price.toLocaleString()} CR`}
-                                    </button>
+
+                                    {isEquipped ? (
+                                        <button
+                                            onClick={() => handleUnequip(item.category === 'avatar' ? 'frame' : 'name_effect')}
+                                            disabled={actionLoading === item.id}
+                                            className="flex-1 py-3 rounded-2xl font-black text-sm transition-all shadow-sm border border-gray-200 dark:border-gray-700 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                        >
+                                            {actionLoading ? <Loader2 size={18} className="animate-spin mx-auto" /> : '장착 해제'}
+                                        </button>
+                                    ) : isOwned ? (
+                                        isConsumable ? (
+                                            <button
+                                                className="flex-1 py-3 rounded-2xl font-black text-sm bg-gray-100 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+                                                disabled
+                                            >
+                                                보유 중 (소모품)
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => handleEquip(item.id)}
+                                                disabled={actionLoading === item.id}
+                                                className="flex-1 py-3 rounded-2xl font-black text-sm transition-all active:scale-95 shadow-lg bg-green-600 text-white hover:bg-green-700"
+                                            >
+                                                {actionLoading === item.id ? <Loader2 size={18} className="animate-spin mx-auto" /> : '장착하기'}
+                                            </button>
+                                        )
+                                    ) : (
+                                        <button
+                                            onClick={() => handleBuyClick(item.id, item.value, item.type)}
+                                            disabled={actionLoading === item.id}
+                                            className="flex-1 py-3 rounded-2xl font-black text-sm transition-all active:scale-95 shadow-lg bg-indigo-600 text-white hover:bg-indigo-700"
+                                        >
+                                            {actionLoading === item.id ? <Loader2 size={18} className="animate-spin mx-auto" /> : item.id === 'item-box' ? '박스 개봉' : `${item.price.toLocaleString()} CR`}
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         )

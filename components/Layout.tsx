@@ -6,7 +6,7 @@ import { useTheme } from '../context/ThemeContext';
 import {
   Menu, User as UserIcon, LogOut, PenTool, Moon, Sun,
   BookOpen, Cpu, Sparkles, Home, ShoppingBag, Gamepad2,
-  ChevronRight, Bell, Zap, Lock, Search, BarChart2, RefreshCw, X, Code2
+  ChevronRight, Bell, Zap, Lock, Search, BarChart2, RefreshCw, X, Code2, Box
 } from 'lucide-react';
 import { storage } from '../services/storage';
 import LiveChat from './LiveChat';
@@ -28,6 +28,8 @@ const MobileSidebar: React.FC<{
 
   const quickAccessItems = [
     { path: '/', icon: <Home size={18} />, label: '홈' },
+    { path: '/marketplace', icon: <ShoppingBag size={18} />, label: '에이전트 마켓' },
+    { path: '/prediction', icon: <BarChart2 size={18} />, label: '예측 시장' },
     { path: '/wiki', icon: <BookOpen size={18} />, label: '위키' },
   ];
 
@@ -665,8 +667,15 @@ const Layout: React.FC = () => {
               <Link to="/shop" className={`flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-lg transition-all ${location.pathname.startsWith('/shop') ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                 <ShoppingBag size={18} /> 상점
               </Link>
+              <Link to="/prediction" className={`flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-lg transition-all ${location.pathname.startsWith('/prediction') ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+                <BarChart2 size={18} /> 예측 시장
+              </Link>
+              <Link to="/land" className={`flex items-center gap-3 px-3 py-2 text-sm font-bold rounded-lg transition-all ${location.pathname.startsWith('/land') ? 'bg-pink-50 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+                <Box size={18} /> 디지털 부동산
+              </Link>
             </nav>
           </div>
+
 
           <div>
             <h3 className="text-[10px] font-black text-gray-400 mb-2 uppercase tracking-[0.2em] px-2">Tools</h3>

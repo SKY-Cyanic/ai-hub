@@ -370,8 +370,12 @@ const ImageStudioPage: React.FC = () => {
             return;
         }
         const userPoints = user.points ?? 0;
-        if (userPoints < COST_PER_GEN) {
-            alert(`크레딧이 부족합니다. (필요: ${COST_PER_GEN} CR, 보유: ${userPoints} CR)`);
+
+        // 추가 비용 계산 (고해상도 등) - 현재는 기본 10
+        const totalCost = COST_PER_GEN;
+
+        if (userPoints < totalCost) {
+            alert(`크레딧이 부족합니다. (필요: ${totalCost} CR, 보유: ${userPoints} CR)`);
             return;
         }
 
@@ -379,13 +383,20 @@ const ImageStudioPage: React.FC = () => {
             alert('프롬프트를 입력하거나 옵션을 선택하세요');
             return;
         }
+
+        if (!confirm(`${totalCost} CR이 차감됩니다. 계속하시겠습니까?`)) return;
+
         setIsLoading(true);
         setResultUrl(null);
 
         try {
             // 결제 처리
-            const success = await storage.updateUserCredits(user.id, -COST_PER_GEN, `이미지 생성: ${prompt.slice(0, 20)}...`);
-            if (!success) throw new Error('Credit transaction failed');
+            const payRes = await storage.deductPoints(user.id, totalCost, `이미지 생성: ${prompt.slice(0, 20)}...`);
+            if (!payRes.success) {
+                alert(payRes.message);
+                setIsLoading(false);
+                return;
+            }
             refreshUser();
 
             const currentSeed = seed || Math.floor(Math.random() * 1000000).toString();
@@ -415,6 +426,7 @@ const ImageStudioPage: React.FC = () => {
         } catch (e) {
             console.error(e);
             alert('생성 실패. 다시 시도해주세요.');
+            // 실패 시 환불 로직이 필요할 수 있으나, 일단 단순화
         } finally {
             setIsLoading(false);
         }

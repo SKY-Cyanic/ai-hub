@@ -5,7 +5,7 @@ import {
   query, where, orderBy, limit, addDoc, deleteDoc,
   onSnapshot, serverTimestamp, Timestamp, writeBatch, runTransaction
 } from "firebase/firestore";
-import { Post, Comment, Board, User, WikiPage, ChatMessage, AiLog, ShopItem, Notification, Conversation, PrivateMessage, Achievement, AuctionItem, BalanceGame, FactCheckReport, GameSubmission, Transaction, WikiHistoryItem, Agent, PredictionMarket, Bet } from '../types';
+import { Post, Comment, Board, User, WikiPage, ChatMessage, AiLog, ShopItem, Notification, Conversation, PrivateMessage, Achievement, AuctionItem, BalanceGame, FactCheckReport, GameSubmission, Transaction, WikiHistoryItem, Agent, PredictionMarket, Bet, Land } from '../types';
 
 export const NODE_GAS_FEE = 2;
 
@@ -128,6 +128,16 @@ export const storage = {
 
   getUserByReferralCode: (code: string): User | undefined => {
     return storage.getUsers().find(u => u.referral_code === code);
+  },
+
+  addNotification: async (notif: Notification) => {
+    try {
+      // Add to Firestore
+      await addDoc(collection(db, "notifications"), notif);
+      // We don't necessarily need to update local cache here as real-time listener in subscribeNotifications handles it
+    } catch (e) {
+      console.error("Failed to add notification:", e);
+    }
   },
 
   generateReferralCode: (): string => {
@@ -651,10 +661,14 @@ export const storage = {
   // --- Prediction Market ---
   getMarkets: async (): Promise<PredictionMarket[]> => {
     try {
-      const q = query(collection(db, "predictions"), where("is_resolved", "==", false), orderBy("created_at", "desc"));
-      // Snapshot or getDocs depending on need, let's use getDocs for now
+      // Index Error Fix: Removed orderBy("created_at", "desc") to avoid needing a composite index.
+      // We will sort in memory instead.
+      const q = query(collection(db, "predictions"), where("is_resolved", "==", false));
       const snapshot = await getDocs(q);
-      return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as PredictionMarket));
+      const markets = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as PredictionMarket));
+
+      // Client-side sort
+      return markets.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     } catch (e) {
       console.error("getMarkets error:", e);
       return [];
@@ -748,6 +762,160 @@ export const storage = {
     }
   },
 
+  // --- Land Conquest ---
+  getAllLands: async (): Promise<Land[]> => {
+    try {
+      const q = query(collection(db, "lands"));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(doc => doc.data() as Land);
+    } catch (e) {
+      console.error("getAllLands error:", e);
+      return [];
+    }
+  },
+
+  purchaseLand: async (userId: string, x: number, y: number): Promise<{ success: boolean, message: string }> => {
+    try {
+      const userRef = doc(db, "users", userId);
+      const landId = `${x}_${y}`;
+      const landRef = doc(db, "lands", landId);
+
+      return await runTransaction(db, async (transaction) => {
+        // 1. READ Phase (Must come before any writes)
+        const userSnap = await transaction.get(userRef);
+        const landSnap = await transaction.get(landRef);
+
+        // 2. Logic Phase
+        let user: User;
+        let isNewUser = false;
+
+        if (!userSnap.exists()) {
+          // Local Testing / Auto-Provisioning
+          user = {
+            id: userId,
+            username: "New User",
+            created_at: new Date().toISOString(),
+            level: 1,
+            points: 1000,
+            is_admin: false,
+            shields: 0
+          } as User;
+          // Add transactions array
+          user.transactions = [];
+          isNewUser = true;
+        } else {
+          user = userSnap.data() as User;
+        }
+
+        const landPrice = 100;
+        let isExpired = false;
+
+        if (landSnap.exists()) {
+          const land = landSnap.data() as Land;
+          // Check Tax Expiration (Grace period: 0)
+          if (new Date(land.tax_due_date).getTime() < Date.now()) {
+            isExpired = true; // Land is claimable
+          } else {
+            throw "이미 점령된 토지입니다.";
+          }
+        }
+
+        if (user.points < landPrice) throw "CR이 부족합니다.";
+
+        // 3. WRITE Phase
+        if (isNewUser) {
+          user.points -= landPrice;
+          transaction.set(userRef, user);
+        } else {
+          transaction.update(userRef, {
+            points: (require("firebase/firestore").increment)(-landPrice)
+          });
+        }
+
+        const newLand: Land = {
+          id: landId,
+          x,
+          y,
+          owner_id: userId, // New Owner
+          price: landPrice,
+          tax_due_date: new Date(Date.now() + 7 * 86400000).toISOString(), // Reset Tax (7 days)
+          is_for_sale: false,
+          // Reset content to avoid showing old owner's images on new purchase
+          image_url: "",
+          link_url: ""
+        };
+        transaction.set(landRef, newLand);
+
+        return { success: true, message: isExpired ? "세금 미납 토지를 강제 점령했습니다!" : "토지 점령 성공!" };
+      });
+
+    } catch (e) {
+      console.error("purchaseLand error:", e);
+      return { success: false, message: typeof e === "string" ? e : "점령 실패 (Transaction Error)" };
+    }
+  },
+
+  payTax: async (userId: string, landId: string): Promise<{ success: boolean, message: string }> => {
+    try {
+      const landRef = doc(db, "lands", landId);
+      const userRef = doc(db, "users", userId);
+
+      return await runTransaction(db, async (transaction) => {
+        const landSnap = await transaction.get(landRef);
+        const userSnap = await transaction.get(userRef);
+
+        if (!landSnap.exists()) throw "토지가 존재하지 않습니다.";
+        if (!userSnap.exists()) throw "사용자 오류";
+
+        const land = landSnap.data() as Land;
+        const user = userSnap.data() as User;
+
+        if (land.owner_id !== userId) throw "본인 소유의 땅이 아닙니다.";
+
+        const taxAmount = 20; // 20 CR
+
+        if (user.points < taxAmount) throw "세금 낼 CR이 부족합니다.";
+
+        // Deduct CR
+        transaction.update(userRef, {
+          points: (require("firebase/firestore").increment)(-taxAmount)
+        });
+
+        // Extend Date
+        const currentDue = new Date(land.tax_due_date).getTime();
+        const now = Date.now();
+        const baseTime = currentDue < now ? now : currentDue;
+        const newDue = new Date(baseTime + 7 * 86400000).toISOString();
+
+        transaction.update(landRef, {
+          tax_due_date: newDue
+        });
+
+        return { success: true, message: `세금 납부 완료! (기한 연장: ${new Date(newDue).toLocaleDateString()})` };
+      });
+    } catch (e) {
+      console.error("payTax error:", e);
+      return { success: false, message: typeof e === "string" ? e : "납부 실패" };
+    }
+  },
+
+  updateLand: async (userId: string, landId: string, data: Partial<Land>): Promise<{ success: boolean, message: string }> => {
+    try {
+      const landRef = doc(db, "lands", landId);
+      const landSnap = await getDoc(landRef);
+
+      if (!landSnap.exists()) return { success: false, message: "토지 없음" };
+      const land = landSnap.data() as Land;
+
+      if (land.owner_id !== userId) return { success: false, message: "소유권 없음" };
+
+      await updateDoc(landRef, data);
+      return { success: true, message: "업데이트 완료" };
+    } catch (e) {
+      return { success: false, message: "업데이트 실패" };
+    }
+  },
+
   resolveMarket: async (marketId: string, resultOptionId: string): Promise<{ success: boolean, message: string }> => {
     try {
       // Step A: Mark Resolved
@@ -794,8 +962,46 @@ export const storage = {
       return { success: false, message: '정산 실패' };
     }
   },
+
+  getMarketAnalytics: async (marketId: string): Promise<{ crowd: any[], whales: any[] }> => {
+    try {
+      const q = query(collection(db, "bets"), where("market_id", "==", marketId));
+      const snapshot = await getDocs(q);
+      const bets = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Bet));
+
+      // Crowd: Simple sum of amounts per option
+      const crowdStats: Record<string, number> = {};
+
+      // Whale: Top 10% users or explicitly rich users (> 10,000 P)
+      // Since we don't want to fetch all users, we'll assume "Whale" is anyone who bet a large amount (> 500) 
+      // OR we can fetch user data for each bet, but that's too heavy.
+      // Let's use "High Stakes" as proxy for Whale opinion for now.
+      const whaleStats: Record<string, number> = {};
+
+      bets.forEach(bet => {
+        // Crowd
+        crowdStats[bet.option_id] = (crowdStats[bet.option_id] || 0) + bet.amount;
+
+        // Whale Proxy (Bet amount > 1000)
+        if (bet.amount >= 1000) {
+          whaleStats[bet.option_id] = (whaleStats[bet.option_id] || 0) + bet.amount;
+        }
+      });
+
+      return {
+        crowd: Object.entries(crowdStats).map(([id, amount]) => ({ optionId: id, amount })),
+        whales: Object.entries(whaleStats).map(([id, amount]) => ({ optionId: id, amount }))
+      };
+    } catch (e) {
+      console.error("getMarketAnalytics error:", e);
+      return { crowd: [], whales: [] };
+    }
+  },
   rentAgent: async (userId: string, agentId: string, days: number): Promise<{ success: boolean, message: string }> => {
-    const user = storage.getUserByRawId(userId);
+    let user = storage.getUserByRawId(userId);
+    if (!user) {
+      user = await storage.fetchUserById(userId, true);
+    }
     if (!user) return { success: false, message: '사용자를 찾을 수 없습니다.' };
 
     try {
@@ -1988,5 +2194,242 @@ export const storage = {
       console.error('Purchase subscription error:', e);
       return { success: false, message: '구매 중 오류가 발생했습니다.' };
     }
+  },
+
+  // 아이템 구매
+  purchaseItem: async (userId: string, itemId: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const user = storage.getUserByRawId(userId);
+      if (!user) return { success: false, message: 'User not found' };
+
+      const item = SHOP_ITEMS.find(i => i.id === itemId);
+      if (!item) return { success: false, message: 'Item not found' };
+
+      if (user.inventory.includes(itemId)) {
+        // 이미 보유중인 기간제 아이템이면 기간 연장
+        if (!item.duration_days) {
+          return { success: false, message: '이미 보유 중인 아이템입니다.' };
+        }
+      }
+
+      if ((user.points || 0) < item.price) {
+        return { success: false, message: `CR이 부족합니다. (부족: ${item.price - (user.points || 0)} CR)` };
+      }
+
+      // 포인트 차감
+      user.points = (user.points || 0) - item.price;
+
+      // 인벤토리 추가
+      if (!user.inventory.includes(itemId)) {
+        user.inventory.push(itemId);
+      }
+
+      // 기간제 처리
+      if (item.duration_days) {
+        const now = new Date();
+        const existingExpiry = user.expires_at?.[itemId] ? new Date(user.expires_at[itemId]) : new Date();
+        // 만료일이 지났으면 현재부터 시작, 아니면 기존 만료일부터 연장
+        const baseDate = existingExpiry > now ? existingExpiry : now;
+
+        const expiryDate = new Date(baseDate);
+        expiryDate.setDate(expiryDate.getDate() + item.duration_days);
+
+        if (!user.expires_at) user.expires_at = {};
+        user.expires_at[itemId] = expiryDate.toISOString();
+      }
+
+      // 트랜잭션
+      const transaction: Transaction = {
+        id: `tx-shop-${Date.now()}`,
+        type: 'spend',
+        amount: item.price,
+        description: `상점 구매: ${item.name}`,
+        created_at: new Date().toISOString()
+      };
+
+      user.transactions = [
+        transaction,
+        ...(user.transactions || [])
+      ].slice(0, 50);
+
+      await storage.saveUser(user);
+      if (storage.getSession()?.id === userId) storage.setSession(user);
+
+      return { success: true, message: `${item.name} 구매 완료!` };
+    } catch (e) {
+      console.error('Purchase error:', e);
+      return { success: false, message: '구매 처리 중 오류 발생' };
+    }
+  },
+
+  // 아이템 장착
+  equipItem: async (userId: string, itemId: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const user = storage.getUserByRawId(userId);
+      if (!user) return { success: false, message: 'User not found' };
+
+      // 권한 검증
+      if (!user.inventory.includes(itemId)) {
+        // 기본 아이템(해제)인 경우는 예외
+        if (itemId !== 'unequip') return { success: false, message: '아이템을 보유하고 있지 않습니다.' };
+      }
+
+      // 만료 검증
+      if (user.expires_at?.[itemId]) {
+        if (new Date(user.expires_at[itemId]) < new Date()) {
+          return { success: false, message: '만료된 아이템입니다.' };
+        }
+      }
+
+      const item = SHOP_ITEMS.find(i => i.id === itemId);
+
+      if (!user.active_items) user.active_items = {};
+
+      if (itemId === 'unequip') {
+        // This part needs specific type handling if unequip is generic
+        return { success: true, message: '장착 해제됨' };
+      }
+
+      if (!item) return { success: false, message: 'Item info not found' };
+
+      // 카테고리별 장착 로직
+      if (item.category === 'name' && item.type === 'style') {
+        if (item.value === 'rainbow' || item.value === 'glitch') {
+          // 특수 효과는 배열로 관리 (중복 방지)
+          if (!user.active_items.special_effects) user.active_items.special_effects = [];
+          // 다른 효과와 충돌할 수 있으니 일단 하나만 활성화? 아니면 다중?
+          // 심플하게 일단 교체 방식 (하나의 효과만)
+          user.active_items.special_effects = [item.value!];
+        }
+      } else if (item.category === 'avatar' && item.type === 'frame') {
+        user.active_items.frame = item.value;
+      } else if (item.category === 'name' && item.type === 'custom_title') {
+        // 타이틀은 별도 설정 필요하지만 여기선 활성화만
+        user.active_items.custom_title = item.name;
+      }
+
+      await storage.saveUser(user);
+      if (storage.getSession()?.id === userId) storage.setSession(user);
+
+      return { success: true, message: `${item.name} 장착 완료!` };
+    } catch (e) {
+      console.error('Equip error:', e);
+      return { success: false, message: '장착 중 오류 발생' };
+    }
+  },
+
+  // 아이템 해제
+  unequipItem: async (userId: string, category: 'name_effect' | 'frame'): Promise<{ success: boolean; message: string }> => {
+    try {
+      const user = storage.getUserByRawId(userId);
+      if (!user) return { success: false, message: 'User not found' };
+
+      if (!user.active_items) user.active_items = {};
+
+      if (category === 'name_effect') {
+        user.active_items.special_effects = [];
+      } else if (category === 'frame') {
+        user.active_items.frame = undefined;
+      }
+
+      await storage.saveUser(user);
+      if (storage.getSession()?.id === userId) storage.setSession(user);
+
+      return { success: true, message: '장착 해제 완료' };
+    } catch (e) {
+      return { success: false, message: '오류 발생' };
+    }
+  },
+
+  // Pro 멤버십 업그레이드
+  upgradeToPro: async (userId: string): Promise<boolean> => {
+    try {
+      const user = storage.getUserByRawId(userId);
+      if (!user) return false;
+
+      // 이미 Pro인지 확인 등은 호출부에서 처리했다고 가정하거나 여기서 한 번 더 체크
+      if (user.membership_tier === 'pro') return true;
+
+      user.membership_tier = 'pro';
+      user.subscription_status = 'active';
+      user.membership_expires_at = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30일 후
+
+      // 가입 보너스
+      const bonus = 500;
+      user.points = (user.points || 0) + bonus;
+
+      // 뱃지 추가 (없으면)
+      if (!user.inventory.includes('badge-pro')) {
+        user.inventory.push('badge-pro');
+      }
+
+      // 트랜잭션 기록
+      const transaction: Transaction = {
+        id: `tx-sub-${Date.now()}`,
+        type: 'earn',
+        amount: bonus,
+        description: 'Pro 멤버십 가입 보너스',
+        created_at: new Date().toISOString()
+      };
+      user.transactions = [transaction, ...(user.transactions || [])].slice(0, 50);
+
+      // 알림 추가
+      storage.addNotification({
+        id: `notif-${Date.now()}`,
+        user_id: user.id,
+        type: 'system',
+        message: '환영합니다! Pro 멤버십이 활성화되었습니다. (보너스 500 CR 지급)',
+        link: '/mypage',
+        is_read: false,
+        created_at: new Date().toISOString()
+      });
+
+      await storage.saveUser(user);
+      if (storage.getSession()?.id === userId) storage.setSession(user);
+
+      return true;
+    } catch (e) {
+      console.error(e);
+      return false;
+    }
+  },
+
+  // 포인트 차감 (유틸리티 과금용)
+  deductPoints: async (userId: string, amount: number, reason: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const user = storage.getUserByRawId(userId);
+      if (!user) return { success: false, message: 'User not found' };
+
+      const currentPoints = user.points || 0;
+      if (currentPoints < amount) {
+        return { success: false, message: `CR이 부족합니다. (부족: ${(amount - currentPoints).toLocaleString()} CR)` };
+      }
+
+      // 포인트 차감
+      user.points = currentPoints - amount;
+
+      // 트랜잭션 기록
+      const transaction: Transaction = {
+        id: `tx-deduct-${Date.now()}`,
+        type: 'spend',
+        amount: amount,
+        description: reason,
+        created_at: new Date().toISOString()
+      };
+
+      user.transactions = [
+        transaction,
+        ...(user.transactions || [])
+      ].slice(0, 50);
+
+      await storage.saveUser(user);
+      if (storage.getSession()?.id === userId) storage.setSession(user);
+
+      return { success: true, message: '차감 완료' };
+    } catch (e) {
+      console.error('Deduct points error:', e);
+      return { success: false, message: '처리 중 오류 발생' };
+    }
   }
+
 };
