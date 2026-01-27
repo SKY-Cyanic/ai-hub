@@ -30,6 +30,25 @@ interface ChatMsg {
     codeGenerated?: boolean;
 }
 
+type QualityLevel = 'draft' | 'standard' | 'premium' | 'masterpiece';
+
+interface QualitySetting {
+    id: QualityLevel;
+    label: string;
+    cost: number;
+    tokens: number;
+    temp: number;
+    description: string;
+    color: string;
+}
+
+const QUALITY_SETTINGS: QualitySetting[] = [
+    { id: 'draft', label: 'Draft', cost: 20, tokens: 2000, temp: 0.5, description: 'Quick generation, basic logic', color: '#94a3b8' },
+    { id: 'standard', label: 'Standard', cost: 50, tokens: 4000, temp: 0.3, description: 'Beautiful UI, stable code', color: '#6366f1' },
+    { id: 'premium', label: 'Premium', cost: 100, tokens: 8000, temp: 0.2, description: 'Advanced animations, complex logic', color: '#a855f7' },
+    { id: 'masterpiece', label: 'Masterpiece', cost: 200, tokens: 16000, temp: 0.1, description: 'Expert app structure, top quality', color: '#f59e0b' },
+];
+
 interface CodeVersion {
     id: string;
     code: string;
@@ -765,136 +784,180 @@ const AIChatPanel: React.FC<{
     quickPrompts: typeof QUICK_PROMPTS;
     userCredits: number;
     isPro: boolean;
-}> = ({ messages, input, onInputChange, onSend, isGenerating, quickPrompts, userCredits, isPro }) => {
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+    quality: QualityLevel;
+    onQualityChange: (q: QualityLevel) => void;
+}> = ({
+    messages,
+    input,
+    onInputChange,
+    onSend,
+    isGenerating,
+    quickPrompts,
+    userCredits,
+    isPro,
+    quality,
+    onQualityChange
+}) => {
+        const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+        useEffect(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }, [messages]);
 
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter' && !e.shiftKey && input.trim() && !isGenerating) {
-            e.preventDefault();
-            onSend();
-        }
-    };
+        const handleKeyDown = (e: React.KeyboardEvent) => {
+            if (e.key === 'Enter' && !e.shiftKey && input.trim() && !isGenerating) {
+                e.preventDefault();
+                onSend();
+            }
+        };
 
-    return (
-        <div className="flex flex-col h-full bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center gap-3 p-4 border-b border-gray-800">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                    <SparklesIcon />
+        return (
+            <div className="flex flex-col h-full bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
+                {/* Header */}
+                <div className="flex items-center gap-3 p-4 border-b border-gray-800">
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                        <SparklesIcon />
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="font-bold text-white">AI Assistant</h3>
+                        <p className="text-xs text-gray-500">Describe what you want to create</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {isPro ? (
+                            <span className="px-2 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-bold rounded-full">
+                                PRO
+                            </span>
+                        ) : (
+                            <span className="text-xs text-indigo-400 font-mono font-bold">
+                                {userCredits} CR
+                            </span>
+                        )}
+                    </div>
                 </div>
-                <div className="flex-1">
-                    <h3 className="font-bold text-white">AI Assistant</h3>
-                    <p className="text-xs text-gray-500">Describe what you want to create</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    {isPro ? (
-                        <span className="px-2 py-1 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[10px] font-bold rounded-full">
-                            PRO
+
+                {/* Quality Selector */}
+                <div className="p-3 bg-gray-950/30 border-b border-gray-800">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">생성 품질 & 비용</span>
+                        <span className="text-[10px] text-amber-500 font-bold">
+                            {QUALITY_SETTINGS.find(q => q.id === quality)?.cost} CR
                         </span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-1">
+                        {QUALITY_SETTINGS.map((q) => (
+                            <button
+                                key={q.id}
+                                onClick={() => onQualityChange(q.id)}
+                                className={`flex flex-col items-center p-2 rounded-xl border transition-all ${quality === q.id
+                                    ? 'border-indigo-500 bg-indigo-500/10'
+                                    : 'border-gray-800 bg-gray-800/20 hover:border-gray-700'
+                                    }`}
+                                title={q.description}
+                            >
+                                <div
+                                    className="w-1.5 h-1.5 rounded-full mb-1"
+                                    style={{ backgroundColor: q.color, boxShadow: quality === q.id ? `0 0 8px ${q.color}` : 'none' }}
+                                />
+                                <span className={`text-[9px] font-bold ${quality === q.id ? 'text-white' : 'text-gray-500'}`}>
+                                    {q.id.charAt(0).toUpperCase() + q.id.slice(1)}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {messages.length === 0 ? (
+                        <div className="space-y-4">
+                            <div className="text-center py-8">
+                                <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-4">
+                                    <CodeIcon />
+                                </div>
+                                <h4 className="font-bold text-white mb-2">Ready to code?</h4>
+                                <p className="text-sm text-gray-500 max-w-[200px] mx-auto">
+                                    Describe what you want to build and I'll generate the code for you.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-1">
+                                    Quick prompts
+                                </p>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {quickPrompts.map((prompt, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => onInputChange(prompt.prompt)}
+                                            className="p-3 bg-gray-800/50 hover:bg-gray-800 rounded-xl text-left transition-colors group"
+                                        >
+                                            <span className="text-xs text-gray-400 group-hover:text-white transition-colors">
+                                                {prompt.label}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
                     ) : (
-                        <span className="text-xs text-gray-500 font-mono">
-                            {userCredits} CR
-                        </span>
+                        messages.map((msg) => (
+                            <div
+                                key={msg.id}
+                                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                            >
+                                <div
+                                    className={`max-w-[85%] px-4 py-3 rounded-2xl text-sm ${msg.role === 'user'
+                                        ? 'bg-indigo-600 text-white rounded-br-md'
+                                        : 'bg-gray-800 text-gray-300 rounded-bl-md'
+                                        }`}
+                                >
+                                    {msg.content}
+                                    {msg.codeGenerated && (
+                                        <div className="flex items-center gap-1 mt-2 pt-2 border-t border-white/10">
+                                            <CheckIcon />
+                                            <span className="text-xs opacity-70">Code generated</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                    <div ref={messagesEndRef} />
+                </div>
+
+                {/* Input */}
+                <div className="p-4 border-t border-gray-800">
+                    <div className="relative">
+                        <textarea
+                            value={input}
+                            onChange={(e) => onInputChange(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            placeholder="Describe what you want to create..."
+                            disabled={isGenerating}
+                            rows={2}
+                            className="w-full px-4 py-3 pr-14 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder-gray-500 resize-none outline-none focus:border-indigo-500 transition-colors disabled:opacity-50"
+                        />
+                        <button
+                            onClick={onSend}
+                            disabled={!input.trim() || isGenerating}
+                            className="absolute right-2 bottom-2 w-10 h-10 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg flex items-center justify-center transition-colors"
+                        >
+                            {isGenerating ? (
+                                <LoaderIcon className="w-5 h-5" />
+                            ) : (
+                                <SendIcon />
+                            )}
+                        </button>
+                    </div>
+                    {!isPro && (
+                        <p className="text-center text-[10px] text-gray-600 mt-2">
+                            50 CR per generation
+                        </p>
                     )}
                 </div>
             </div>
-
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {messages.length === 0 ? (
-                    <div className="space-y-4">
-                        <div className="text-center py-8">
-                            <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-4">
-                                <CodeIcon />
-                            </div>
-                            <h4 className="font-bold text-white mb-2">Ready to code?</h4>
-                            <p className="text-sm text-gray-500 max-w-[200px] mx-auto">
-                                Describe what you want to build and I'll generate the code for you.
-                            </p>
-                        </div>
-
-                        <div className="space-y-2">
-                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-1">
-                                Quick prompts
-                            </p>
-                            <div className="grid grid-cols-2 gap-2">
-                                {quickPrompts.map((prompt, i) => (
-                                    <button
-                                        key={i}
-                                        onClick={() => onInputChange(prompt.prompt)}
-                                        className="p-3 bg-gray-800/50 hover:bg-gray-800 rounded-xl text-left transition-colors group"
-                                    >
-                                        <span className="text-xs text-gray-400 group-hover:text-white transition-colors">
-                                            {prompt.label}
-                                        </span>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    messages.map((msg) => (
-                        <div
-                            key={msg.id}
-                            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                        >
-                            <div
-                                className={`max-w-[85%] px-4 py-3 rounded-2xl text-sm ${msg.role === 'user'
-                                    ? 'bg-indigo-600 text-white rounded-br-md'
-                                    : 'bg-gray-800 text-gray-300 rounded-bl-md'
-                                    }`}
-                            >
-                                {msg.content}
-                                {msg.codeGenerated && (
-                                    <div className="flex items-center gap-1 mt-2 pt-2 border-t border-white/10">
-                                        <CheckIcon />
-                                        <span className="text-xs opacity-70">Code generated</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    ))
-                )}
-                <div ref={messagesEndRef} />
-            </div>
-
-            {/* Input */}
-            <div className="p-4 border-t border-gray-800">
-                <div className="relative">
-                    <textarea
-                        value={input}
-                        onChange={(e) => onInputChange(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder="Describe what you want to create..."
-                        disabled={isGenerating}
-                        rows={2}
-                        className="w-full px-4 py-3 pr-14 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder-gray-500 resize-none outline-none focus:border-indigo-500 transition-colors disabled:opacity-50"
-                    />
-                    <button
-                        onClick={onSend}
-                        disabled={!input.trim() || isGenerating}
-                        className="absolute right-2 bottom-2 w-10 h-10 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg flex items-center justify-center transition-colors"
-                    >
-                        {isGenerating ? (
-                            <LoaderIcon className="w-5 h-5" />
-                        ) : (
-                            <SendIcon />
-                        )}
-                    </button>
-                </div>
-                {!isPro && (
-                    <p className="text-center text-[10px] text-gray-600 mt-2">
-                        50 CR per generation
-                    </p>
-                )}
-            </div>
-        </div>
-    );
-};
+        );
+    };
 
 // 템플릿 선택 모달
 const TemplateModal: React.FC<{
@@ -1174,6 +1237,7 @@ const VibeCodePage: React.FC = () => {
     // Usage
     const [usageInfo, setUsageInfo] = useState<UsageInfo | null>(null);
     const [userCredits, setUserCredits] = useState(0);
+    const [quality, setQuality] = useState<QualityLevel>('standard');
 
     const groqClient = getGroqClient();
     const isPro = user?.membership === 'pro';
@@ -1217,7 +1281,19 @@ const VibeCodePage: React.FC = () => {
     // Build system prompt
     const buildSystemPrompt = (): string => {
         const langConfig = LANGUAGE_CONFIG[language];
+        const qualitySetting = QUALITY_SETTINGS.find(q => q.id === quality)!;
+
+        let qualityInstructions = "";
+        if (quality === 'masterpiece') {
+            qualityInstructions = "CRITICAL: This is a MASTERPIECE request. Use advanced architectural patterns, modular structures, and state-of-the-art animations (GSAP-like behavior). The code must be production-ready and extremely polished.";
+        } else if (quality === 'premium') {
+            qualityInstructions = "Enhance the UI with rich animations, glassmorphism, and complex interactive elements. Ensure the logic handles edge cases.";
+        } else if (quality === 'draft') {
+            qualityInstructions = "Focus on a minimal working prototype. Keep it simple and direct.";
+        }
+
         return `You are an expert ${langConfig.label} developer. Create beautiful, working code.
+${qualityInstructions}
 
 CRITICAL RULES:
 1. Return ONLY a single code block - no explanations before or after
@@ -1241,9 +1317,8 @@ Format:
 
     // Generate code
     const handleGenerate = async () => {
-        if (!input.trim() || isGenerating) return;
-
-        const COST = 50;
+        const currentQuality = QUALITY_SETTINGS.find(q => q.id === quality)!;
+        const COST = currentQuality.cost;
 
         if (!user) {
             alert('Please login to use AI generation');
@@ -1253,7 +1328,7 @@ Format:
 
         if (!isPro) {
             if (userCredits < COST) {
-                alert('Not enough credits. Please purchase more.');
+                alert(`Not enough credits. ${currentQuality.label} requires ${COST} CR.`);
                 navigate('/shop');
                 return;
             }
@@ -1284,7 +1359,7 @@ Format:
         setChatMessages(prev => [...prev, {
             id: assistantMsgId,
             role: 'assistant',
-            content: 'Generating code...',
+            content: `Generating ${currentQuality.label} code...`,
             timestamp: new Date(),
         }]);
 
@@ -1299,8 +1374,8 @@ Format:
                 {
                     model: 'openai/gpt-oss-120b',
                     messages,
-                    max_tokens: 8000,
-                    temperature: 0.3,
+                    max_tokens: currentQuality.tokens,
+                    temperature: currentQuality.temp,
                 },
                 (delta, fullText) => {
                     const cleanText = removeThinkTags(fullText);
@@ -1604,6 +1679,8 @@ Format:
                         quickPrompts={QUICK_PROMPTS}
                         userCredits={userCredits}
                         isPro={isPro}
+                        quality={quality}
+                        onQualityChange={setQuality}
                     />
                 </div>
             </div>

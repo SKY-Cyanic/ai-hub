@@ -17,6 +17,7 @@ import ImageStudioPage from './pages/ImageStudioPage';
 import AIAnalyzerPage from './pages/tools/AIAnalyzerPage';
 import MockInvestmentPage from './pages/tools/MockInvestmentPage';
 import VibeCodePage from './pages/tools/VibeCodePage';
+// import AiPlaygroundPage from './pages/tools/AiPlaygroundPage';
 import WebDevPage from './pages/WebDevPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import { TermsPage, PrivacyPage, YouthPolicyPage } from './pages/PolicyPages';
@@ -84,6 +85,7 @@ function App() {
               <Route path="tools/ai-analysis" element={<AIAnalyzerPage />} />
               <Route path="tools/mock-invest" element={<MockInvestmentPage />} />
               <Route path="tools/vibe-code" element={<VibeCodePage />} />
+              {/* <Route path="/tools/ai-playground" element={<AiPlaygroundPage />} /> */}
               <Route path="admin" element={<AdminPage />} />
               <Route path="terms" element={<TermsPage />} />
               <Route path="privacy" element={<PrivacyPage />} />

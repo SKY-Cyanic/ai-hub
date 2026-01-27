@@ -4,7 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import {
     Bomb, ImageOff, EyeOff, Vote, Code, Shuffle, Stamp, Play,
     Copy, Check, AlertTriangle, Lock, Image, Users, FileCode,
-    Fingerprint, Download, Upload, Trash2, RefreshCw, UserPlus, BarChart
+    Fingerprint, Download, Upload, Trash2, RefreshCw, UserPlus, BarChart, Sparkles
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { storage } from '../services/storage';
@@ -985,6 +985,7 @@ const ToolsPage: React.FC = () => {
             name: '🤖 AI 도구',
             desc: '인공지능 활용 유틸리티',
             tools: [
+                // { id: 'ai-playground', name: 'AI Playground', icon: Sparkles, color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600', desc: 'Hugging Face 모델 체험', link: '/tools/ai-playground' },
                 { id: 'ai-analyzer', name: 'AI 모델 분석기', icon: BarChart, color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600', desc: '모델 성능/비용 분석', link: '/tools/ai-analysis' },
                 { id: 'mock-invest', name: '모의투자 시뮬레이션', icon: BarChart, color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600', desc: '실시간 모의투자', link: '/tools/mock-invest' },
             ]

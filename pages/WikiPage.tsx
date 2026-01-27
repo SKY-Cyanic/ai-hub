@@ -306,7 +306,7 @@ const WikiPage: React.FC = () => {
                                         </div>
                                     ))
                                 ) : (
-                                    <div className="col-span-full py-4 text-center text-gray-400 text-sm">기 기여자 데이터가 없습니다.</div>
+                                    <div className="col-span-full py-4 text-center text-gray-400 text-sm">기여자 데이터가 없습니다.</div>
                                 )}
                             </div>
                         </div>

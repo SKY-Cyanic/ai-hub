@@ -158,35 +158,6 @@ export const storage = {
 
 
 
-  // --- Pro Membership ---
-  upgradeToPro: async (userId: string): Promise<boolean> => {
-    try {
-      const userRef = doc(db, "users", userId);
-      // 30 days from now
-      const expiresAt = Date.now() + (30 * 24 * 60 * 60 * 1000);
-
-      await updateDoc(userRef, {
-        membership_tier: 'pro',
-        membership_expires_at: expiresAt,
-        subscription_status: 'active'
-      });
-
-      // Bonus CR for upgrading (Event)
-      await storage.addTransaction({
-        id: crypto.randomUUID(),
-        type: 'earn',
-        amount: 500,
-        description: 'Pro Membership Signup Bonus (Event)',
-        created_at: new Date().toISOString()
-      }, userId);
-
-      return true;
-    } catch (error) {
-      console.error("Pro upgrade failed:", error);
-      return false;
-    }
-  },
-
   // --- Fact Check Report ---
   reportAiError: async (report: FactCheckReport) => {
     try {

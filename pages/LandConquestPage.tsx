@@ -12,15 +12,15 @@ const WORLD_SIZE = 100; // 100x100 hex world (wraps around)
 
 // Biome configuration - NO EMOJIS, pure design
 const BIOMES = {
-    void: { name: 'Void', base: '#0a0a0f', accent: '#1a1a2e', pattern: 'none' },
-    plains: { name: 'Grasslands', base: '#1a3d2e', accent: '#2d5a45', pattern: 'dots' },
-    forest: { name: 'Dense Forest', base: '#0f2918', accent: '#1a4028', pattern: 'lines' },
-    mountain: { name: 'Highlands', base: '#2a2a3a', accent: '#3d3d52', pattern: 'cross' },
-    desert: { name: 'Arid Wastes', base: '#3d3020', accent: '#5a4830', pattern: 'dots' },
-    tundra: { name: 'Frozen Tundra', base: '#2a3540', accent: '#3d4d5a', pattern: 'none' },
-    volcanic: { name: 'Volcanic Zone', base: '#2d1a1a', accent: '#4a2828', pattern: 'lines' },
-    crystal: { name: 'Crystal Fields', base: '#1a1a3d', accent: '#2d2d5a', pattern: 'cross' },
-    ocean: { name: 'Deep Ocean', base: '#0a1a2d', accent: '#152840', pattern: 'waves' },
+    void: { name: '공허', base: '#0a0a0f', accent: '#1a1a2e', pattern: 'none' },
+    plains: { name: '초원', base: '#1a3d2e', accent: '#2d5a45', pattern: 'dots' },
+    forest: { name: '울창한 숲', base: '#0f2918', accent: '#1a4028', pattern: 'lines' },
+    mountain: { name: '고산 지대', base: '#2a2a3a', accent: '#3d3d52', pattern: 'cross' },
+    desert: { name: '황무지', base: '#3d3020', accent: '#5a4830', pattern: 'dots' },
+    tundra: { name: '냉대 툰드라', base: '#2a3540', accent: '#3d4d5a', pattern: 'none' },
+    volcanic: { name: '화산 지역', base: '#2d1a1a', accent: '#4a2828', pattern: 'lines' },
+    crystal: { name: '수정 대지', base: '#1a1a3d', accent: '#2d2d5a', pattern: 'cross' },
+    ocean: { name: '심해', base: '#0a1a2d', accent: '#152840', pattern: 'waves' },
 } as const;
 
 type BiomeType = keyof typeof BIOMES;
@@ -243,7 +243,7 @@ const Minimap: React.FC<{
 
                 <div className="relative bg-gray-950 rounded-lg p-1 border border-gray-800">
                     <div className="text-[10px] text-gray-500 text-center mb-1 font-mono tracking-widest">
-                        WORLD MAP
+                        월드 맵 (미니)
                     </div>
                     <canvas
                         ref={canvasRef}
@@ -295,14 +295,14 @@ const StatsDashboard: React.FC<{
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                                <span className="text-xs font-mono text-gray-400 tracking-wider">TERRITORY STATUS</span>
+                                <span className="text-xs font-mono text-gray-400 tracking-wider">나의 영토 현황</span>
                             </div>
                         </div>
                     </div>
 
                     {/* Balance */}
                     <div className="px-4 py-3 border-b border-gray-800/30">
-                        <div className="text-[10px] text-gray-500 font-mono mb-1">AVAILABLE CREDITS</div>
+                        <div className="text-[10px] text-gray-500 font-mono mb-1">가용 크레딧 (CR)</div>
                         <div className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">
                             {userBalance.toLocaleString()} <span className="text-sm">CR</span>
                         </div>
@@ -312,23 +312,23 @@ const StatsDashboard: React.FC<{
                     <div className="grid grid-cols-2 gap-px bg-gray-800/30">
                         <div className="bg-gray-950 p-3 text-center">
                             <div className="text-xl font-black text-pink-400">{stats.owned}</div>
-                            <div className="text-[10px] text-gray-500 font-mono">OWNED</div>
+                            <div className="text-[10px] text-gray-500 font-mono">소유 영토</div>
                         </div>
                         <div className="bg-gray-950 p-3 text-center">
                             <div className="text-xl font-black text-indigo-400">{stats.totalValue}</div>
-                            <div className="text-[10px] text-gray-500 font-mono">VALUE</div>
+                            <div className="text-[10px] text-gray-500 font-mono">자산 가치</div>
                         </div>
                         <div className="bg-gray-950 p-3 text-center">
                             <div className={`text-xl font-black ${stats.expiringSoon > 0 ? 'text-amber-400' : 'text-gray-600'}`}>
                                 {stats.expiringSoon}
                             </div>
-                            <div className="text-[10px] text-gray-500 font-mono">EXPIRING</div>
+                            <div className="text-[10px] text-gray-500 font-mono">만료 임박</div>
                         </div>
                         <div className="bg-gray-950 p-3 text-center">
                             <div className={`text-xl font-black ${stats.expired > 0 ? 'text-red-500 animate-pulse' : 'text-gray-600'}`}>
                                 {stats.expired}
                             </div>
-                            <div className="text-[10px] text-gray-500 font-mono">EXPIRED</div>
+                            <div className="text-[10px] text-gray-500 font-mono">세금 미납</div>
                         </div>
                     </div>
                 </div>
@@ -381,7 +381,7 @@ const CellDetailPanel: React.FC<{
                         <div className="relative flex justify-between items-start">
                             <div>
                                 <div className="text-[10px] font-mono text-gray-400 mb-1 tracking-widest">
-                                    SECTOR {cell.q.toString().padStart(3, '0')}.{cell.r.toString().padStart(3, '0')}
+                                    섹터 {cell.q.toString().padStart(3, '0')}.{cell.r.toString().padStart(3, '0')}
                                 </div>
                                 <h3 className="text-lg font-black text-white">{biome.name}</h3>
                             </div>
@@ -398,12 +398,12 @@ const CellDetailPanel: React.FC<{
                         {/* Status badge */}
                         {land && (
                             <div className={`mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold ${isOwner ? 'bg-pink-500/20 text-pink-300 border border-pink-500/30' :
-                                    isExpired ? 'bg-red-500/20 text-red-300 border border-red-500/30' :
-                                        'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                                isExpired ? 'bg-red-500/20 text-red-300 border border-red-500/30' :
+                                    'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
                                 }`}>
                                 <div className={`w-1.5 h-1.5 rounded-full ${isOwner ? 'bg-pink-400' : isExpired ? 'bg-red-400 animate-pulse' : 'bg-indigo-400'
                                     }`} />
-                                {isOwner ? 'YOUR TERRITORY' : isExpired ? 'EXPIRED CLAIM' : 'OCCUPIED'}
+                                {isOwner ? '나의 영토' : isExpired ? '소유권 만료됨' : '소유된 영토'}
                             </div>
                         )}
                     </div>
@@ -413,13 +413,13 @@ const CellDetailPanel: React.FC<{
                         {/* Terrain Info */}
                         <div className="grid grid-cols-2 gap-3">
                             <div className="bg-gray-900/50 rounded-xl p-3 border border-gray-800/50">
-                                <div className="text-[10px] text-gray-500 font-mono mb-1">ELEVATION</div>
+                                <div className="text-[10px] text-gray-500 font-mono mb-1">고도 (Elevation)</div>
                                 <div className="text-lg font-bold text-white">
                                     {(cell.elevation * 1000).toFixed(0)}m
                                 </div>
                             </div>
                             <div className="bg-gray-900/50 rounded-xl p-3 border border-gray-800/50">
-                                <div className="text-[10px] text-gray-500 font-mono mb-1">MOISTURE</div>
+                                <div className="text-[10px] text-gray-500 font-mono mb-1">습도 (Moisture)</div>
                                 <div className="text-lg font-bold text-white">
                                     {((cell.moisture + 1) * 50).toFixed(0)}%
                                 </div>
@@ -431,24 +431,24 @@ const CellDetailPanel: React.FC<{
                                 {/* Land Info */}
                                 <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-800/50 space-y-3">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-xs text-gray-500 font-mono">OWNER</span>
+                                        <span className="text-xs text-gray-500 font-mono">소유자</span>
                                         <span className="text-sm text-white font-mono">
                                             {land.owner_id.slice(0, 8)}...
                                         </span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                        <span className="text-xs text-gray-500 font-mono">VALUE</span>
+                                        <span className="text-xs text-gray-500 font-mono">영토 가치</span>
                                         <span className="text-sm font-bold text-yellow-400">
                                             {land.price} CR
                                         </span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                        <span className="text-xs text-gray-500 font-mono">TAX STATUS</span>
+                                        <span className="text-xs text-gray-500 font-mono">세금 상태</span>
                                         <span className={`text-sm font-bold ${isExpired ? 'text-red-400' :
-                                                daysUntilExpiry < 3 ? 'text-amber-400' :
-                                                    'text-green-400'
+                                            daysUntilExpiry < 3 ? 'text-amber-400' :
+                                                'text-green-400'
                                             }`}>
-                                            {isExpired ? 'EXPIRED' : `${daysUntilExpiry}D LEFT`}
+                                            {isExpired ? '만료됨' : `${daysUntilExpiry}일 남음`}
                                         </span>
                                     </div>
                                 </div>
@@ -463,7 +463,7 @@ const CellDetailPanel: React.FC<{
                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                             </svg>
-                                            PAY TAX · 20 CR
+                                            세금 납부 (유지) · 20 CR
                                         </button>
                                         <button
                                             onClick={onEdit}
@@ -472,7 +472,7 @@ const CellDetailPanel: React.FC<{
                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                             </svg>
-                                            MANAGE CONTENT
+                                            컨텐츠 관리 (수정)
                                         </button>
                                     </div>
                                 ) : isExpired ? (
@@ -480,11 +480,11 @@ const CellDetailPanel: React.FC<{
                                         onClick={onPurchase}
                                         className="w-full py-4 bg-gradient-to-r from-red-600 to-orange-600 hover:from-red-500 hover:to-orange-500 rounded-xl font-black text-white transition-all animate-pulse"
                                     >
-                                        CLAIM EXPIRED TERRITORY · 100 CR
+                                        만료된 영토 소유하기 · 100 CR
                                     </button>
                                 ) : (
                                     <div className="py-3 bg-gray-800/50 rounded-xl text-center text-sm text-gray-500 border border-gray-700/50">
-                                        Territory is currently owned
+                                        다른 사용자가 소유 중인 영토입니다
                                     </div>
                                 )}
 
@@ -506,18 +506,18 @@ const CellDetailPanel: React.FC<{
                                     <div className="py-6 text-center">
                                         <div className="text-4xl mb-3 opacity-50">〰️</div>
                                         <div className="text-gray-400 text-sm">
-                                            Ocean territories cannot be claimed
+                                            바다(Ocean) 영토는 소유할 수 없습니다
                                         </div>
                                     </div>
                                 ) : (
                                     <>
                                         <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-800/50">
                                             <div className="flex justify-between items-center mb-3">
-                                                <span className="text-xs text-gray-500 font-mono">CLAIM COST</span>
+                                                <span className="text-xs text-gray-500 font-mono">구매 가격</span>
                                                 <span className="text-xl font-black text-yellow-400">100 CR</span>
                                             </div>
                                             <div className="text-[10px] text-gray-500 leading-relaxed">
-                                                Claiming grants full ownership rights including content placement and advertising space.
+                                                영토를 구매하면 소유권이 부여되며, 해당 위치에 이미지와 링크를 게시할 수 있습니다.
                                             </div>
                                         </div>
 
@@ -525,7 +525,7 @@ const CellDetailPanel: React.FC<{
                                             onClick={onPurchase}
                                             className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-xl font-black text-white transition-all shadow-lg shadow-indigo-500/20 hover:shadow-indigo-500/40 hover:scale-[1.02]"
                                         >
-                                            CLAIM TERRITORY
+                                            영토 구매하기
                                         </button>
                                     </>
                                 )}
@@ -563,8 +563,8 @@ const ContentEditorModal: React.FC<{
                     {/* Header */}
                     <div className="px-6 py-4 border-b border-gray-800 flex justify-between items-center bg-gradient-to-r from-pink-900/20 to-purple-900/20">
                         <div>
-                            <div className="text-[10px] font-mono text-gray-500 mb-1">CONTENT MANAGER</div>
-                            <h3 className="text-lg font-bold text-white">Territory Settings</h3>
+                            <div className="text-[10px] font-mono text-gray-500 mb-1">컨텐츠 매니저</div>
+                            <h3 className="text-lg font-bold text-white">영토 설정</h3>
                         </div>
                         <button
                             onClick={onClose}
@@ -683,7 +683,7 @@ const ZoomControls: React.FC<{
 const CoordinatesDisplay: React.FC<{ q: number; r: number }> = ({ q, r }) => (
     <div className="absolute bottom-6 left-6 z-30">
         <div className="bg-gray-950/95 backdrop-blur-xl rounded-xl border border-gray-800 px-4 py-2 shadow-xl">
-            <div className="text-[10px] font-mono text-gray-500 mb-0.5">COORDINATES</div>
+            <div className="text-[10px] font-mono text-gray-500 mb-0.5">현재 좌표 (MAP)</div>
             <div className="text-sm font-mono text-white">
                 Q: {q.toString().padStart(4, ' ')} | R: {r.toString().padStart(4, ' ')}
             </div>
@@ -737,20 +737,27 @@ const LandConquestPage: React.FC = () => {
         if (!containerRef.current) return cells;
 
         const { width, height } = containerRef.current.getBoundingClientRect();
-        const padding = 4;
 
-        // Calculate visible range in hex coordinates
-        const topLeft = pixelToAxial(
-            (-camera.x - width / 2) / camera.scale - HEX_WIDTH * padding,
-            (-camera.y - height / 2) / camera.scale - HEX_HEIGHT * padding
-        );
-        const bottomRight = pixelToAxial(
-            (-camera.x + width / 2) / camera.scale + HEX_WIDTH * padding,
-            (-camera.y + height / 2) / camera.scale + HEX_HEIGHT * padding
-        );
+        // Logical bounds in pixel space
+        const xMin = (-camera.x - width / 2) / camera.scale;
+        const xMax = (-camera.x + width / 2) / camera.scale;
+        const yMin = (-camera.y - height / 2) / camera.scale;
+        const yMax = (-camera.y + height / 2) / camera.scale;
 
-        for (let r = topLeft.r - padding; r <= bottomRight.r + padding; r++) {
-            for (let q = topLeft.q - padding; q <= bottomRight.q + padding; q++) {
+        const padding = 2; // Extra hexes around the edge
+
+        // Calculate r range (straightforward for pointy-top)
+        const rMin = Math.floor((yMin / (HEX_SIZE * 1.5))) - padding;
+        const rMax = Math.ceil((yMax / (HEX_SIZE * 1.5))) + padding;
+
+        for (let r = rMin; r <= rMax; r++) {
+            // For each r, calculate the range of q that covers [xMin, xMax]
+            // x = HEX_SIZE * sqrt(3) * (q + r/2)
+            // q = x / (HEX_SIZE * sqrt(3)) - r/2
+            const qMin = Math.floor(xMin / HEX_WIDTH - r / 2) - padding;
+            const qMax = Math.ceil(xMax / HEX_WIDTH - r / 2) + padding;
+
+            for (let q = qMin; q <= qMax; q++) {
                 const cell = getCellAt(q, r);
                 cells.set(`${q}_${r}`, cell);
             }

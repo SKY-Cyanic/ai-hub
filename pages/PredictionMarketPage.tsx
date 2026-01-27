@@ -29,19 +29,19 @@ type FilterCategory = 'all' | 'crypto' | 'sports' | 'politics' | 'entertainment'
 
 // ==================== Constants ====================
 const CATEGORIES: { id: FilterCategory; label: string; icon: React.ReactNode }[] = [
-    { id: 'all', label: 'All Markets', icon: <GridIcon /> },
-    { id: 'crypto', label: 'Crypto', icon: <CryptoIcon /> },
-    { id: 'sports', label: 'Sports', icon: <SportsIcon /> },
-    { id: 'politics', label: 'Politics', icon: <PoliticsIcon /> },
-    { id: 'entertainment', label: 'Entertainment', icon: <EntertainmentIcon /> },
-    { id: 'tech', label: 'Technology', icon: <TechIcon /> },
+    { id: 'all', label: '전체 시장', icon: <GridIcon /> },
+    { id: 'crypto', label: '암호화폐', icon: <CryptoIcon /> },
+    { id: 'sports', label: '스포츠', icon: <SportsIcon /> },
+    { id: 'politics', label: '정치', icon: <PoliticsIcon /> },
+    { id: 'entertainment', label: '엔터테인먼트', icon: <EntertainmentIcon /> },
+    { id: 'tech', label: '테크/경제', icon: <TechIcon /> },
 ];
 
 const SORT_OPTIONS: { id: SortOption; label: string }[] = [
-    { id: 'trending', label: 'Trending' },
-    { id: 'volume', label: 'Highest Volume' },
-    { id: 'ending', label: 'Ending Soon' },
-    { id: 'newest', label: 'Newest' },
+    { id: 'trending', label: '실시간 인기' },
+    { id: 'volume', label: '거래 대금순' },
+    { id: 'ending', label: '마감 임박' },
+    { id: 'newest', label: '최신 등록' },
 ];
 
 // ==================== Icons ====================
@@ -148,15 +148,15 @@ function formatTimeRemaining(deadline: string): string {
     const end = new Date(deadline).getTime();
     const diff = end - now;
 
-    if (diff <= 0) return 'Ended';
+    if (diff <= 0) return '종료됨';
 
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
 
-    if (days > 0) return `${days}d ${hours}h`;
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
+    if (days > 0) return `${days}일 ${hours}시간 남음`;
+    if (hours > 0) return `${hours}시간 ${minutes}분 남음`;
+    return `${minutes}분 남음`;
 }
 
 function formatNumber(num: number): string {
@@ -169,7 +169,7 @@ function getMarketStatus(market: PredictionMarket): MarketStatus {
     const now = Date.now();
     const deadline = new Date(market.deadline).getTime();
 
-    if (market.resolved_option) return 'resolved';
+    if (market.result_option_id) return 'resolved';
     if (deadline < now) return 'pending';
     return 'active';
 }
@@ -430,7 +430,7 @@ const MarketCard: React.FC<{
                                             <div className="text-xl font-black text-white font-mono">
                                                 x{odds.toFixed(2)}
                                             </div>
-                                            <div className="text-xs text-gray-500">odds</div>
+                                            <div className="text-xs text-gray-500">배당률</div>
                                         </div>
                                     </div>
 
@@ -440,7 +440,7 @@ const MarketCard: React.FC<{
                                             <div className="space-y-3">
                                                 <div>
                                                     <div className="flex justify-between text-sm mb-2">
-                                                        <span className="text-gray-400">Bet Amount</span>
+                                                        <span className="text-gray-400">베팅 금액</span>
                                                         <span className="text-white font-bold">{betAmount} CR</span>
                                                     </div>
                                                     <BetSlider
@@ -452,7 +452,7 @@ const MarketCard: React.FC<{
                                                 </div>
 
                                                 <div className="flex justify-between items-center p-3 bg-gray-900 rounded-lg">
-                                                    <span className="text-sm text-gray-400">Potential Return</span>
+                                                    <span className="text-sm text-gray-400">예상 수익</span>
                                                     <span className="text-lg font-bold text-green-400">
                                                         +{formatNumber(getPotentialReturn(option.pool, betAmount))} CR
                                                     </span>
@@ -465,7 +465,7 @@ const MarketCard: React.FC<{
                                                     }}
                                                     className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
                                                 >
-                                                    Place Bet
+                                                    베팅 참여하기
                                                 </button>
                                             </div>
                                         </div>
@@ -600,7 +600,7 @@ const CreateMarketModal: React.FC<{
 
     const handleSubmit = () => {
         if (!question.trim() || options.some(o => !o.trim()) || !deadline) {
-            alert('Please fill in all fields');
+            alert('모든 필드(질문, 옵션, 마감시간)를 입력해주세요.');
             return;
         }
         onCreate(question, options.filter(o => o.trim()), deadline, category);
@@ -627,7 +627,7 @@ const CreateMarketModal: React.FC<{
             <div className="bg-gray-900 rounded-2xl border border-gray-700 w-full max-w-lg overflow-hidden animate-scaleIn">
                 <div className="p-6 border-b border-gray-800">
                     <div className="flex justify-between items-center">
-                        <h2 className="text-xl font-bold text-white">Create Prediction Market</h2>
+                        <h2 className="text-xl font-bold text-white">새 예측 시장 생성</h2>
                         <button
                             onClick={onClose}
                             className="w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-400 hover:text-white transition-colors"
@@ -642,19 +642,19 @@ const CreateMarketModal: React.FC<{
                 <div className="p-6 space-y-5">
                     {/* Question */}
                     <div>
-                        <label className="text-sm font-bold text-gray-400 block mb-2">Question</label>
+                        <label className="text-sm font-bold text-gray-400 block mb-2">질문 (Question)</label>
                         <input
                             type="text"
                             value={question}
                             onChange={(e) => setQuestion(e.target.value)}
-                            placeholder="Will Bitcoin reach $100k by end of 2024?"
+                            placeholder="예: 2024년 말 비트코인이 10만 달러를 돌파할까요?"
                             className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-blue-500 outline-none transition-colors"
                         />
                     </div>
 
                     {/* Category */}
                     <div>
-                        <label className="text-sm font-bold text-gray-400 block mb-2">Category</label>
+                        <label className="text-sm font-bold text-gray-400 block mb-2">카테고리</label>
                         <div className="grid grid-cols-3 gap-2">
                             {CATEGORIES.filter(c => c.id !== 'all').map((cat) => (
                                 <button
@@ -675,13 +675,13 @@ const CreateMarketModal: React.FC<{
                     {/* Options */}
                     <div>
                         <div className="flex justify-between items-center mb-2">
-                            <label className="text-sm font-bold text-gray-400">Options</label>
+                            <label className="text-sm font-bold text-gray-400">선택 옵션</label>
                             <button
                                 onClick={addOption}
                                 disabled={options.length >= 6}
                                 className="text-xs text-blue-400 hover:text-blue-300 disabled:text-gray-600 disabled:cursor-not-allowed"
                             >
-                                + Add Option
+                                + 옵션 추가
                             </button>
                         </div>
                         <div className="space-y-2">
@@ -695,7 +695,7 @@ const CreateMarketModal: React.FC<{
                                             newOptions[idx] = e.target.value;
                                             setOptions(newOptions);
                                         }}
-                                        placeholder={`Option ${idx + 1}`}
+                                        placeholder={`옵션 ${idx + 1}`}
                                         className="flex-1 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-blue-500 outline-none transition-colors"
                                     />
                                     {options.length > 2 && (
@@ -715,7 +715,7 @@ const CreateMarketModal: React.FC<{
 
                     {/* Deadline */}
                     <div>
-                        <label className="text-sm font-bold text-gray-400 block mb-2">Deadline</label>
+                        <label className="text-sm font-bold text-gray-400 block mb-2">마감 일시 (Deadline)</label>
                         <input
                             type="datetime-local"
                             value={deadline}
@@ -730,7 +730,7 @@ const CreateMarketModal: React.FC<{
                         onClick={handleSubmit}
                         className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl transition-all hover:scale-[1.02]"
                     >
-                        Create Market
+                        시장 생성하기
                     </button>
                 </div>
             </div>
@@ -790,22 +790,22 @@ const MarketDetailModal: React.FC<{
                     <div className="flex gap-4 mt-4">
                         <div className="text-center">
                             <div className="text-2xl font-bold text-white">{formatNumber(market.total_pool)}</div>
-                            <div className="text-xs text-gray-500">Total Pool (CR)</div>
+                            <div className="text-xs text-gray-500">총 거래액 (CR)</div>
                         </div>
                         <div className="text-center">
                             <div className="text-2xl font-bold text-blue-400">{analytics.totalBettors}</div>
-                            <div className="text-xs text-gray-500">Participants</div>
+                            <div className="text-xs text-gray-500">참여자 수</div>
                         </div>
                         <div className="text-center">
                             <div className="text-2xl font-bold text-green-400">{formatNumber(analytics.averageBet)}</div>
-                            <div className="text-xs text-gray-500">Avg. Bet (CR)</div>
+                            <div className="text-xs text-gray-500">평균 베팅 (CR)</div>
                         </div>
                     </div>
                 </div>
 
                 {/* Chart */}
                 <div className="p-6 border-b border-gray-800">
-                    <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Volume History (24h)</h3>
+                    <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">거래량 히스토리 (24시간)</h3>
                     <div className="h-32">
                         <MiniChart data={analytics.volumeHistory} height={128} />
                     </div>
@@ -813,7 +813,7 @@ const MarketDetailModal: React.FC<{
 
                 {/* Options */}
                 <div className="p-6">
-                    <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Place Your Bet</h3>
+                    <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">베팅 참여하기</h3>
                     <div className="space-y-3">
                         {market.options.map((option, idx) => {
                             const odds = option.pool > 0 ? market.total_pool / option.pool : 2.0;
@@ -850,7 +850,7 @@ const MarketDetailModal: React.FC<{
                                         <div className="mt-4 pt-4 border-t border-gray-700 space-y-4 animate-fadeIn">
                                             <div>
                                                 <div className="flex justify-between text-sm mb-2">
-                                                    <span className="text-gray-400">Amount</span>
+                                                    <span className="text-gray-400">베팅 금액</span>
                                                     <span className="text-white font-bold">{betAmount} CR</span>
                                                 </div>
                                                 <BetSlider
@@ -876,7 +876,7 @@ const MarketDetailModal: React.FC<{
                                             </div>
 
                                             <div className="flex justify-between items-center p-4 bg-green-900/20 border border-green-500/30 rounded-xl">
-                                                <span className="text-green-400">Potential Return</span>
+                                                <span className="text-green-400">예상 수익</span>
                                                 <span className="text-xl font-bold text-green-400">
                                                     +{formatNumber(Math.floor(betAmount * odds))} CR
                                                 </span>
@@ -890,7 +890,7 @@ const MarketDetailModal: React.FC<{
                                                 }}
                                                 className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-xl transition-all hover:scale-[1.02]"
                                             >
-                                                Confirm Bet
+                                                베팅 확정
                                             </button>
                                         </div>
                                     )}
@@ -944,12 +944,12 @@ const PredictionMarketPage: React.FC = () => {
 
     const handleBet = async (marketId: string, optionId: string, amount: number) => {
         if (!user) {
-            alert('Please login to place a bet');
+            alert('베팅에 참여하려면 로그인이 필요합니다.');
             navigate('/login');
             return;
         }
 
-        if (window.confirm(`Place ${amount} CR on this prediction?`)) {
+        if (window.confirm(`${amount} CR을 이 예측에 베팅하시겠습니까?`)) {
             const result = await storage.placeBet(user.id, marketId, optionId, amount);
             if (result.success) {
                 alert(result.message);
@@ -1021,11 +1021,11 @@ const PredictionMarketPage: React.FC = () => {
                         <div>
                             <h1 className="text-4xl lg:text-5xl font-black mb-2">
                                 <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 text-transparent bg-clip-text">
-                                    Prediction Market
+                                    예측 시장 (Alpha)
                                 </span>
                             </h1>
                             <p className="text-gray-400 text-lg">
-                                Forecast the future. Earn rewards for accurate predictions.
+                                미래를 예측하고 정확한 분석으로 보상을 획득하세요.
                             </p>
                         </div>
 
@@ -1036,7 +1036,7 @@ const PredictionMarketPage: React.FC = () => {
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                             </svg>
-                            Create Market
+                            시장 생성하기
                         </button>
                     </div>
 
@@ -1044,15 +1044,15 @@ const PredictionMarketPage: React.FC = () => {
                     <div className="grid grid-cols-3 gap-4 mb-8">
                         <div className="bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-gray-800 p-4 text-center">
                             <div className="text-3xl font-bold text-white mb-1">{formatNumber(stats.totalVolume)}</div>
-                            <div className="text-sm text-gray-500">Total Volume (CR)</div>
+                            <div className="text-sm text-gray-500">누적 거래액 (CR)</div>
                         </div>
                         <div className="bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-gray-800 p-4 text-center">
                             <div className="text-3xl font-bold text-green-400 mb-1">{stats.activeMarkets}</div>
-                            <div className="text-sm text-gray-500">Active Markets</div>
+                            <div className="text-sm text-gray-500">진행 중인 예측</div>
                         </div>
                         <div className="bg-gray-900/50 backdrop-blur-xl rounded-2xl border border-gray-800 p-4 text-center">
                             <div className="text-3xl font-bold text-blue-400 mb-1">{formatNumber(stats.totalParticipants)}</div>
-                            <div className="text-sm text-gray-500">Total Participants</div>
+                            <div className="text-sm text-gray-500">총 참여자 수</div>
                         </div>
                     </div>
 
@@ -1064,7 +1064,7 @@ const PredictionMarketPage: React.FC = () => {
                                 type="text"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Search predictions..."
+                                placeholder="예측 시장 검색 (키워드, 종목 등)..."
                                 className="w-full px-5 py-3 pl-12 bg-gray-900/80 border border-gray-800 rounded-xl text-white placeholder-gray-500 focus:border-blue-500 outline-none transition-colors"
                             />
                             <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1116,13 +1116,13 @@ const PredictionMarketPage: React.FC = () => {
                         <div className="w-20 h-20 rounded-full bg-gray-800 flex items-center justify-center mx-auto mb-4">
                             <ChartIcon />
                         </div>
-                        <h3 className="text-xl font-bold text-white mb-2">No markets found</h3>
-                        <p className="text-gray-500 mb-6">Be the first to create a prediction market!</p>
+                        <h3 className="text-xl font-bold text-white mb-2">검색된 마켓이 없습니다</h3>
+                        <p className="text-gray-500 mb-6">첫 번째 예측 시장을 직접 만들어보세요!</p>
                         <button
                             onClick={() => setShowCreateModal(true)}
                             className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-colors"
                         >
-                            Create Market
+                            시장 생성하기
                         </button>
                     </div>
                 ) : (
